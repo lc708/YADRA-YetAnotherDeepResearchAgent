@@ -52,14 +52,21 @@ cd YADRA-YetAnotherDeepResearchAgent
 
 ### 2. 设置环境
 
-#### 使用 uv（推荐）
+#### 使用 bootstrap.sh 脚本（推荐）
 
 ```bash
-# 运行初始化脚本
-./bootstrap.sh  # macOS/Linux
-# 或
-bootstrap.bat   # Windows
+# 开发模式（推荐）- 启用热重载
+./bootstrap.sh --dev    # 或 -d, dev, development
+# 生产模式
+./bootstrap.sh
+
+# Windows 用户
+bootstrap.bat
 ```
+
+**开发模式 vs 生产模式**：
+- **开发模式**：后端启用 `--reload`，前端运行 `pnpm dev`
+- **生产模式**：后端无热重载，前端运行 `pnpm start`
 
 #### 使用传统方法
 
@@ -74,6 +81,8 @@ pip install -e .
 
 ### 3. 配置
 
+#### 后端配置
+
 ```bash
 # 复制配置文件模板
 cp conf.yaml.example conf.yaml
@@ -81,10 +90,24 @@ cp conf.yaml.example conf.yaml
 # 编辑配置文件，添加你的 API 密钥
 nano conf.yaml
 
-# 配置前端环境变量（如果使用 Web UI）
+# 设置根目录环境变量
+cp .env.example .env
+# 编辑 .env 文件，添加必要的环境变量
+```
+
+#### 前端配置（Web UI）
+
+```bash
+# 进入前端目录
 cd web
+
+# 复制环境变量模板
 cp .env.template .env.local
-# 编辑 .env.local，添加 Supabase 配置
+
+# 编辑 .env.local，配置以下必需变量：
+# - NEXT_PUBLIC_API_URL=http://localhost:8000/api
+# - NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+# - NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
 ```
 
 ### 4. Supabase 配置（用于工件管理）
@@ -104,7 +127,19 @@ cp .env.template .env.local
 
 ### 5. 运行
 
-#### 命令行模式
+#### 全栈应用（推荐）
+
+```bash
+# 开发模式 - 同时启动后端和前端
+./bootstrap.sh --dev
+
+# 访问应用
+# - 前端: http://localhost:3001
+# - 后端 API: http://localhost:8000
+# - API 文档: http://localhost:8000/docs
+```
+
+#### 仅后端（命令行模式）
 
 ```bash
 # 交互式模式（推荐新手）
@@ -117,7 +152,7 @@ python main.py "人工智能的最新发展趋势是什么？"
 python main.py --debug --interactive
 ```
 
-#### Web 服务模式
+#### 仅后端（Web 服务模式）
 
 ```bash
 # 启动 API 服务器
@@ -125,6 +160,15 @@ python server.py
 
 # 或使用自定义配置
 python server.py --host 0.0.0.0 --port 8080 --reload
+```
+
+#### 仅前端
+
+```bash
+cd web
+pnpm install
+pnpm dev
+# 访问 http://localhost:3001
 ```
 
 ## 📝 使用方法
@@ -298,4 +342,4 @@ YADRA-YetAnotherDeepResearchAgent/
 
 <div align="center">
 Made with ❤️ by the YADRA Team
-</div>  
+</div>    
