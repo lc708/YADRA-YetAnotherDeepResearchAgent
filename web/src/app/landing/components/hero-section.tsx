@@ -1,12 +1,11 @@
 
-import React from "react";
 import { GithubFilled } from "@ant-design/icons";
-import { ChevronRight, Sparkles, Zap, Shield, FileText, Database, Clock } from "lucide-react";
+import { ChevronRight, Sparkles, FileText, Database, Clock } from "lucide-react";
 import Link from "next/link";
+import React from "react";
 
 import { Button } from "~/components/ui/button";
 import { HeroInput } from "~/components/yadra/hero-input";
-import { env } from "~/env";
 
 export function HeroSection() {
   return (
