@@ -3,23 +3,15 @@
 import { useMemo } from "react";
 
 import { SiteHeader } from "./chat/components/site-header";
-import { Jumbotron } from "./landing/components/jumbotron";
+import { HeroSection } from "./landing/components/hero-section";
 import { Ray } from "./landing/components/ray";
-import { CaseStudySection } from "./landing/sections/case-study-section";
-import { CoreFeatureSection } from "./landing/sections/core-features-section";
-import { JoinCommunitySection } from "./landing/sections/join-community-section";
-import { MultiAgentSection } from "./landing/sections/multi-agent-section";
 
 export default function HomePage() {
   return (
-    <div className="flex flex-col items-center">
+    <div className="flex flex-col items-center min-h-screen">
       <SiteHeader />
-      <main className="container flex flex-col items-center justify-center gap-56">
-        <Jumbotron />
-        <CaseStudySection />
-        <MultiAgentSection />
-        <CoreFeatureSection />
-        <JoinCommunitySection />
+      <main className="flex-1 w-full">
+        <HeroSection />
       </main>
       <Footer />
       <Ray />

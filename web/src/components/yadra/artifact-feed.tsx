@@ -89,14 +89,21 @@ export function ArtifactFeed({ traceId, className }: ArtifactFeedProps) {
       setArtifacts(data || []);
     } catch (error) {
       console.error("Error fetching artifacts:", error);
+      console.warn("🔄 使用Mock数据作为fallback - Supabase连接失败");
+      console.info("📢 通知用户: 正在使用Mock演示数据作为fallback");
+      if (typeof window !== "undefined") {
+        setTimeout(() => {
+          alert("⚠️ 正在使用演示数据 - Supabase连接失败，显示Mock数据作为fallback");
+        }, 1000);
+      }
       setArtifacts([
         {
           id: "demo-1",
           trace_id: traceId,
-          node_name: "Research Planning",
-          type: "process",
+          node_name: "研究规划",
+          type: "process" as const,
           mime: "text/markdown",
-          summary: "Initial research plan for quantum computing analysis",
+          summary: "量子计算分析的初始研究计划",
           payload_url: undefined,
           created_at: new Date().toISOString(),
           user_id: "demo-user",
@@ -104,11 +111,10 @@ export function ArtifactFeed({ traceId, className }: ArtifactFeedProps) {
         {
           id: "demo-2",
           trace_id: traceId,
-          node_name: "Quantum Computing Report",
-          type: "result",
+          node_name: "量子计算报告",
+          type: "result" as const,
           mime: "text/markdown",
-          summary:
-            "Comprehensive analysis of quantum computing developments in 2024",
+          summary: "2024年量子计算发展的综合分析",
           payload_url: undefined,
           created_at: new Date().toISOString(),
           user_id: "demo-user",
@@ -136,7 +142,10 @@ export function ArtifactFeed({ traceId, className }: ArtifactFeedProps) {
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
-        Loading artifacts...
+        <div className="space-y-2 text-center">
+          <div className="mx-auto h-8 w-8 animate-spin rounded-full border-b-2 border-blue-600"></div>
+          <p className="text-muted-foreground text-sm">加载工件中...</p>
+        </div>
       </div>
     );
   }
@@ -147,33 +156,33 @@ export function ArtifactFeed({ traceId, className }: ArtifactFeedProps) {
         <div className="relative">
           <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform" />
           <Input
-            placeholder="Search artifacts..."
+            placeholder="搜索工件..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10"
           />
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button
             variant={typeFilter === "all" ? "default" : "outline"}
             size="sm"
             onClick={() => setTypeFilter("all")}
           >
-            All
+            全部
           </Button>
           <Button
             variant={typeFilter === "process" ? "default" : "outline"}
             size="sm"
             onClick={() => setTypeFilter("process")}
           >
-            Process
+            过程
           </Button>
           <Button
             variant={typeFilter === "result" ? "default" : "outline"}
             size="sm"
             onClick={() => setTypeFilter("result")}
           >
-            Result
+            结果
           </Button>
         </div>
       </div>
@@ -190,8 +199,12 @@ export function ArtifactFeed({ traceId, className }: ArtifactFeedProps) {
             {renderItem}
           </List>
         ) : (
-          <div className="text-muted-foreground flex h-full items-center justify-center">
-            No artifacts found for this trace
+          <div className="text-muted-foreground flex h-full flex-col items-center justify-center space-y-2">
+            <p>研究会话正在启动中...</p>
+            <p className="text-sm">工件将在研究过程中实时显示</p>
+            {artifacts.length > 0 && (
+              <p className="text-xs text-orange-600">⚠️ 当前显示演示数据</p>
+            )}
           </div>
         )}
       </div>
