@@ -80,9 +80,29 @@ cp conf.yaml.example conf.yaml
 
 # 编辑配置文件，添加你的 API 密钥
 nano conf.yaml
+
+# 配置前端环境变量（如果使用 Web UI）
+cd web
+cp .env.template .env.local
+# 编辑 .env.local，添加 Supabase 配置
 ```
 
-### 4. 运行
+### 4. Supabase 配置（用于工件管理）
+
+如果您需要使用前端 Web UI 和工件管理功能，请配置 Supabase：
+
+```bash
+# 详细设置指南请参考
+# docs/20250614-supabase-setup.md
+```
+
+**必需的环境变量**：
+- `NEXT_PUBLIC_SUPABASE_URL` - 您的 Supabase 项目 URL
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` - 您的 Supabase 匿名密钥
+
+详细的 Supabase 设置说明请查看 [docs/20250614-supabase-setup.md](docs/20250614-supabase-setup.md)。
+
+### 5. 运行
 
 #### 命令行模式
 
@@ -281,4 +301,4 @@ YADRA-YetAnotherDeepResearchAgent/
 
 <div align="center">
 Made with ❤️ by the YADRA Team
-</div> 
+</div>  
