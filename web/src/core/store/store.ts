@@ -1,5 +1,5 @@
 // Copyright (c) 2025 YADRA
-// SPDX-License-Identifier: MIT
+
 
 import { nanoid } from "nanoid";
 import { toast } from "sonner";

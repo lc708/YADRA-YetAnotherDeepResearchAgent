@@ -1,5 +1,5 @@
 // Copyright (c) 2025 YADRA
-// SPDX-License-Identifier: MIT
+
 
 import { Check, Copy } from "lucide-react";
 import { useMemo, useState } from "react";

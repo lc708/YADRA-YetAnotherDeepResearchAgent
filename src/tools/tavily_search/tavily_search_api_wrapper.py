@@ -1,6 +1,6 @@
 # Copyright (c) 2025 YADRA
 # Copyright (c) 2025 YADRA
-# SPDX-License-Identifier: MIT
+
 
 import json
 from typing import Dict, List, Optional

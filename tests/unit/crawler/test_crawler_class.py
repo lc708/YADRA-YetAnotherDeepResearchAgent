@@ -1,5 +1,5 @@
 # Copyright (c) 2025 YADRA
-# SPDX-License-Identifier: MIT
+
 
 import pytest
 import src.crawler as crawler_module

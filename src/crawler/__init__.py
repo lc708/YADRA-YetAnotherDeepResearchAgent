@@ -1,5 +1,5 @@
 # Copyright (c) 2025 YADRA
-# SPDX-License-Identifier: MIT
+
 
 from .article import Article
 from .crawler import Crawler

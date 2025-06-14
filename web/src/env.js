@@ -1,5 +1,5 @@
 // Copyright (c) 2025 YADRA
-// SPDX-License-Identifier: MIT
+
 
 import { createEnv } from "@t3-oss/env-nextjs";
 import { z } from "zod";

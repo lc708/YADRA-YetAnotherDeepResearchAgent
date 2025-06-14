@@ -1,5 +1,5 @@
 # Copyright (c) 2025 YADRA
-# SPDX-License-Identifier: MIT
+
 
 from typing import TypedDict, Optional
 from src.config.report_style import ReportStyle

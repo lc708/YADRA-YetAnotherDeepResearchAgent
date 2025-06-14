@@ -1,5 +1,5 @@
 // Copyright (c) 2025 YADRA
-// SPDX-License-Identifier: MIT
+
 
 import { Button } from "../../ui/button";
 import { PopoverContent } from "../../ui/popover";

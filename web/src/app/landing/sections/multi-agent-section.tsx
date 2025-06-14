@@ -1,5 +1,5 @@
 // Copyright (c) 2025 YADRA
-// SPDX-License-Identifier: MIT
+
 
 import { MultiAgentVisualization } from "../components/multi-agent-visualization";
 import { SectionHeader } from "../components/section-header";

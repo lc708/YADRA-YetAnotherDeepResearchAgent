@@ -1,5 +1,5 @@
 // Copyright (c) 2025 YADRA
-// SPDX-License-Identifier: MIT
+
 
 import { Check, Copy, Headphones, Pencil, Undo2, X, Download } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";

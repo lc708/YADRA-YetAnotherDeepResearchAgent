@@ -1,5 +1,5 @@
 // Copyright (c) 2025 YADRA
-// SPDX-License-Identifier: MIT
+
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Settings } from "lucide-react";

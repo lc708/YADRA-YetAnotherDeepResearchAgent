@@ -1,5 +1,5 @@
 # Copyright (c) 2025 YADRA
-# SPDX-License-Identifier: MIT
+
 
 from src.config.tools import SELECTED_RAG_PROVIDER, RAGProvider
 from src.rag.ragflow import RAGFlowProvider

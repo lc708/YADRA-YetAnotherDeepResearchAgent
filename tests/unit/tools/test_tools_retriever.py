@@ -1,5 +1,5 @@
 # Copyright (c) 2025 YADRA
-# SPDX-License-Identifier: MIT
+
 
 from unittest.mock import Mock, patch, MagicMock
 from langchain_core.callbacks import (

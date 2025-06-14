@@ -1,5 +1,5 @@
 // Copyright (c) 2025 YADRA
-// SPDX-License-Identifier: MIT
+
 
 import { Loader2 } from "lucide-react";
 import { useCallback, useState } from "react";

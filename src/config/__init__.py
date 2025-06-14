@@ -1,5 +1,5 @@
 # Copyright (c) 2025 YADRA
-# SPDX-License-Identifier: MIT
+
 
 from .tools import SELECTED_SEARCH_ENGINE, SearchEngine
 from .loader import load_yaml_config

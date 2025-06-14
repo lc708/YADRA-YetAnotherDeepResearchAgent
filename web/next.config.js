@@ -3,7 +3,7 @@
  * for Docker builds.
  */
 // Copyright (c) 2025 YADRA
-// SPDX-License-Identifier: MIT
+
 
 import "./src/env.js";
 

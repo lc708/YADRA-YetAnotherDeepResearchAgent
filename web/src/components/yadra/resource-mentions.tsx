@@ -1,5 +1,5 @@
 // Copyright (c) 2025 YADRA
-// SPDX-License-Identifier: MIT
+
 
 import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
 import type { Resource } from "~/core/messages";

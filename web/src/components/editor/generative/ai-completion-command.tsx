@@ -1,5 +1,5 @@
 // Copyright (c) 2025 YADRA
-// SPDX-License-Identifier: MIT
+
 
 import { CommandGroup, CommandItem, CommandSeparator } from "../../ui/command";
 import { useEditor } from "novel";

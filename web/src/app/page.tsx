@@ -1,5 +1,5 @@
 // Copyright (c) 2025 YADRA
-// SPDX-License-Identifier: MIT
+
 
 import { useMemo } from "react";
 
@@ -39,7 +39,7 @@ function Footer() {
         </p>
       </div>
       <div className="text-muted-foreground container mb-8 flex flex-col items-center justify-center text-xs">
-        <p>Licensed under MIT License</p>
+        {/* <p>Licensed under MIT License</p> */}
         <p>&copy; {year} YADRA</p>
       </div>
     </footer>

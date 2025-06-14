@@ -1,5 +1,5 @@
 # Copyright (c) 2025 YADRA
-# SPDX-License-Identifier: MIT
+
 
 from .retriever import Retriever, Document, Resource, Chunk
 from .ragflow import RAGFlowProvider

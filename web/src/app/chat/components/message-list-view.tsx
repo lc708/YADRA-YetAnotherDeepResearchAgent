@@ -1,5 +1,5 @@
 // Copyright (c) 2025 YADRA
-// SPDX-License-Identifier: MIT
+
 
 import { LoadingOutlined } from "@ant-design/icons";
 import { motion } from "framer-motion";

@@ -1,5 +1,5 @@
 // Copyright (c) 2025 YADRA
-// SPDX-License-Identifier: MIT
+
 
 import { Bird, Microscope, Podcast, Usb, User } from "lucide-react";
 

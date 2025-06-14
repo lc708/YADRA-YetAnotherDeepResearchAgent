@@ -1,5 +1,5 @@
 // Copyright (c) 2025 YADRA
-// SPDX-License-Identifier: MIT
+
 
 import { motion } from "framer-motion";
 import { Blocks, PencilRuler, Trash } from "lucide-react";
