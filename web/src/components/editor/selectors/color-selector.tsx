@@ -1,6 +1,5 @@
 // Copyright (c) 2025 YADRA
 
-
 import { Check, ChevronDown } from "lucide-react";
 import { EditorBubbleItem, useEditor } from "novel";
 

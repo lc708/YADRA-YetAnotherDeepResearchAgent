@@ -1,6 +1,5 @@
 // Copyright (c) 2025 YADRA
 
-
 import { resolveServiceURL } from "./resolve-service-url";
 
 export async function generatePodcast(content: string) {

@@ -1,6 +1,5 @@
 // Copyright (c) 2025 YADRA
 
-
 import { useMemo } from "react";
 
 import { SiteHeader } from "./chat/components/site-header";

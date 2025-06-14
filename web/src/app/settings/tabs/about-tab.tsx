@@ -1,6 +1,5 @@
 // Copyright (c) 2025 YADRA
 
-
 import { BadgeInfo } from "lucide-react";
 
 import { Markdown } from "~/components/yadra/markdown";

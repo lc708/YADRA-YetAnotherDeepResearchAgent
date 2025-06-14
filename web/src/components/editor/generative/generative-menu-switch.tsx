@@ -1,6 +1,5 @@
 // Copyright (c) 2025 YADRA
 
-
 import { EditorBubble, removeAIHighlight, useEditor } from "novel";
 import { Fragment, type ReactNode, useEffect } from "react";
 import { Button } from "../../ui/button";

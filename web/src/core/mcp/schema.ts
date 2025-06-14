@@ -1,6 +1,5 @@
 // Copyright (c) 2025 YADRA
 
-
 import { z } from "zod";
 
 export const MCPConfigSchema = z.object({

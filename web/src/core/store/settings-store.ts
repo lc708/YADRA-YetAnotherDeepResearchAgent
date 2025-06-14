@@ -1,6 +1,5 @@
 // Copyright (c) 2025 YADRA
 
-
 import { create } from "zustand";
 
 import type { MCPServerMetadata, SimpleMCPServerMetadata } from "../mcp";
@@ -127,7 +126,9 @@ export const getChatStreamSettings = () => {
   };
 };
 
-export function setReportStyle(value: "academic" | "popular_science" | "news" | "social_media") {
+export function setReportStyle(
+  value: "academic" | "popular_science" | "news" | "social_media",
+) {
   useSettingsStore.setState((state) => ({
     general: {
       ...state.general,

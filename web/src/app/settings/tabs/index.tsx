@@ -1,6 +1,5 @@
 // Copyright (c) 2025 YADRA
 
-
 import { Settings, type LucideIcon } from "lucide-react";
 
 import { AboutTab } from "./about-tab";

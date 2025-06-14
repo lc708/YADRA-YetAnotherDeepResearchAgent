@@ -1,6 +1,5 @@
 // Copyright (c) 2025 YADRA
 
-
 export type MessageRole = "user" | "assistant" | "tool";
 
 export interface Message {

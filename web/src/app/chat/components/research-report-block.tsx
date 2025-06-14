@@ -1,6 +1,5 @@
 // Copyright (c) 2025 YADRA
 
-
 import { useCallback, useRef } from "react";
 
 import ReportEditor from "~/components/editor";

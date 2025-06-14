@@ -1,6 +1,5 @@
 // Copyright (c) 2025 YADRA
 
-
 import type { Option } from "../messages";
 
 // Tool Calls

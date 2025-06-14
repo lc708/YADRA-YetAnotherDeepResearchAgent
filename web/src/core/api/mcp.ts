@@ -1,6 +1,5 @@
 // Copyright (c) 2025 YADRA
 
-
 import type { SimpleMCPServerMetadata } from "../mcp";
 
 import { resolveServiceURL } from "./resolve-service-url";

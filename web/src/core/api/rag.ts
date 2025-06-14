@@ -10,7 +10,7 @@ export function queryRAGResources(query: string) {
     .then((res) => {
       return res.resources as Array<Resource>;
     })
-    .catch((err) => {
+    .catch((_err) => {
       return [];
     });
 }

@@ -1,6 +1,5 @@
 // Copyright (c) 2025 YADRA
 
-
 import { env } from "~/env";
 
 export function resolveServiceURL(path: string) {

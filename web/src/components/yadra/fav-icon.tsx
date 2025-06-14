@@ -1,6 +1,5 @@
 // Copyright (c) 2025 YADRA
 
-
 import { cn } from "~/lib/utils";
 
 export function FavIcon({

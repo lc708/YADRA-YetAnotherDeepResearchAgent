@@ -1,6 +1,5 @@
 // Copyright (c) 2025 YADRA
 
-
 import { StarFilledIcon, GitHubLogoIcon } from "@radix-ui/react-icons";
 import Link from "next/link";
 
@@ -30,7 +29,10 @@ export async function SiteHeader() {
             asChild
             className="group relative z-10"
           >
-            <Link href="https://github.com/{space_holder}/yadra" target="_blank">
+            <Link
+              href="https://github.com/{space_holder}/yadra"
+              target="_blank"
+            >
               <GitHubLogoIcon className="size-4" />
               Star on GitHub
               {env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY &&

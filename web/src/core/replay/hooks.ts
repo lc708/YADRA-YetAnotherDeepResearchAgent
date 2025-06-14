@@ -1,6 +1,5 @@
 // Copyright (c) 2025 YADRA
 
-
 import { useSearchParams } from "next/navigation";
 import { useMemo } from "react";
 

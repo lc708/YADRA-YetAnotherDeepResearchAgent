@@ -4,7 +4,6 @@
  */
 // Copyright (c) 2025 YADRA
 
-
 import "./src/env.js";
 
 /** @type {import("next").NextConfig} */
