@@ -205,20 +205,23 @@ uv sync --extra dev
 
 ```bash
 # 运行所有测试
-pytest
+make test
 
 # 运行特定测试文件
 pytest tests/test_workflow.py
 
 # 生成覆盖率报告
-pytest --cov=src --cov-report=html
+make coverage
 ```
 
 ### 代码格式化
 
 ```bash
-# 格式化代码
-black src/ tests/
+# 运行Lint
+make lint
+
+# 格式化
+make format
 
 # 运行 pre-commit 检查
 pre-commit run --all-files
