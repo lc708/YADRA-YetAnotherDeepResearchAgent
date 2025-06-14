@@ -1,10 +1,11 @@
 // Copyright (c) 2025 YADRA
 
-
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
 import { create } from "zustand";
 import { useShallow } from "zustand/react/shallow";
+
+import type { Artifact } from "~/lib/supa";
 
 import { chatStream, generatePodcast } from "../api";
 import type { Message, Resource } from "../messages";
@@ -26,6 +27,8 @@ export const useStore = create<{
   researchActivityIds: Map<string, string[]>;
   ongoingResearchId: string | null;
   openResearchId: string | null;
+  artifacts: Map<string, Artifact>;
+  artifactsByTrace: Map<string, string[]>;
 
   appendMessage: (message: Message) => void;
   updateMessage: (message: Message) => void;
@@ -33,6 +36,8 @@ export const useStore = create<{
   openResearch: (researchId: string | null) => void;
   closeResearch: () => void;
   setOngoingResearch: (researchId: string | null) => void;
+  addArtifact: (artifact: Artifact) => void;
+  updateArtifact: (artifact: Artifact) => void;
 }>((set) => ({
   responding: false,
   threadId: THREAD_ID,
@@ -44,6 +49,8 @@ export const useStore = create<{
   researchActivityIds: new Map<string, string[]>(),
   ongoingResearchId: null,
   openResearchId: null,
+  artifacts: new Map<string, Artifact>(),
+  artifactsByTrace: new Map<string, string[]>(),
 
   appendMessage(message: Message) {
     set((state) => ({
@@ -71,6 +78,26 @@ export const useStore = create<{
   },
   setOngoingResearch(researchId: string | null) {
     set({ ongoingResearchId: researchId });
+  },
+  addArtifact(artifact: Artifact) {
+    set((state) => {
+      const newArtifacts = new Map(state.artifacts).set(artifact.id, artifact);
+      const traceArtifacts =
+        state.artifactsByTrace.get(artifact.trace_id) ?? [];
+      const newArtifactsByTrace = new Map(state.artifactsByTrace).set(
+        artifact.trace_id,
+        [...traceArtifacts, artifact.id],
+      );
+      return {
+        artifacts: newArtifacts,
+        artifactsByTrace: newArtifactsByTrace,
+      };
+    });
+  },
+  updateArtifact(artifact: Artifact) {
+    set((state) => ({
+      artifacts: new Map(state.artifacts).set(artifact.id, artifact),
+    }));
   },
 }));
 

@@ -1,6 +1,5 @@
 // Copyright (c) 2025 YADRA
 
-
 import { GithubFilled } from "@ant-design/icons";
 import { ChevronRight } from "lucide-react";
 import Link from "next/link";
@@ -8,6 +7,7 @@ import Link from "next/link";
 import { AuroraText } from "~/components/magicui/aurora-text";
 import { FlickeringGrid } from "~/components/magicui/flickering-grid";
 import { Button } from "~/components/ui/button";
+import { HeroInput } from "~/components/yadra/hero-input";
 import { env } from "~/env";
 
 export function Jumbotron() {
@@ -39,13 +39,21 @@ export function Jumbotron() {
           <AuroraText>at Your Fingertips</AuroraText>
         </h1>
         <p className="max-w-4xl p-2 text-center text-sm opacity-85 md:text-2xl">
-          Meet YADRA, your personal Deep Research assistant. With powerful
-          tools like search engines, web crawlers, Python and MCP services, it
+          Meet YADRA, your personal Deep Research assistant. With powerful tools
+          like search engines, web crawlers, Python and MCP services, it
           delivers instant insights, comprehensive reports, and even captivating
           podcasts.
         </p>
-        <div className="flex gap-6">
-          <Button className="hidden text-lg md:flex md:w-42" size="lg" asChild>
+        <div className="mt-8 w-full max-w-4xl">
+          <HeroInput />
+        </div>
+        <div className="mt-4 flex gap-6">
+          <Button
+            className="hidden text-lg md:flex md:w-42"
+            size="lg"
+            variant="outline"
+            asChild
+          >
             <Link
               target={
                 env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY ? "_blank" : undefined
@@ -56,7 +64,7 @@ export function Jumbotron() {
                   : "/chat"
               }
             >
-              Get Started <ChevronRight />
+              Or use Classic Chat <ChevronRight />
             </Link>
           </Button>
           {!env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY && (
