@@ -1,6 +1,5 @@
 // Copyright (c) 2025 YADRA
 
-
 export interface MCPToolMetadata {
   name: string;
   description: string;

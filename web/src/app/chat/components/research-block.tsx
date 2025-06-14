@@ -1,7 +1,14 @@
 // Copyright (c) 2025 YADRA
 
-
-import { Check, Copy, Headphones, Pencil, Undo2, X, Download } from "lucide-react";
+import {
+  Check,
+  Copy,
+  Headphones,
+  Pencil,
+  Undo2,
+  X,
+  Download,
+} from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 import { Button } from "~/components/ui/button";
@@ -74,12 +81,12 @@ export function ResearchBlock({
       return;
     }
     const now = new Date();
-    const pad = (n: number) => n.toString().padStart(2, '0');
+    const pad = (n: number) => n.toString().padStart(2, "0");
     const timestamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`;
     const filename = `research-report-${timestamp}.md`;
-    const blob = new Blob([report.content], { type: 'text/markdown' });
+    const blob = new Blob([report.content], { type: "text/markdown" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
     a.download = filename;
     document.body.appendChild(a);
@@ -90,7 +97,6 @@ export function ResearchBlock({
     }, 0);
   }, [reportId]);
 
-    
   const handleEdit = useCallback(() => {
     setEditing((editing) => !editing);
   }, []);

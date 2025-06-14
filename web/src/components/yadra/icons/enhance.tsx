@@ -1,6 +1,5 @@
 // Copyright (c) 2025 YADRA
 
-
 import type { SVGProps } from "react";
 
 export function Enhance(props: SVGProps<SVGSVGElement>) {

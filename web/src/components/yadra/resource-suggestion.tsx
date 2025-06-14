@@ -1,6 +1,5 @@
 // Copyright (c) 2025 YADRA
 
-
 import type { MentionOptions } from "@tiptap/extension-mention";
 import { ReactRenderer } from "@tiptap/react";
 import {

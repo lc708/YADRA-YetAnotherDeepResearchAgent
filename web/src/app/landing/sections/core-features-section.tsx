@@ -1,6 +1,5 @@
 // Copyright (c) 2025 YADRA
 
-
 import { Bird, Microscope, Podcast, Usb, User } from "lucide-react";
 
 import { BentoCard, BentoGrid } from "~/components/magicui/bento-grid";

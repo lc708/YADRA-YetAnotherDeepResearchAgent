@@ -33,12 +33,7 @@ export function ReportStyle({ className }: { className?: string }) {
           strokeWidth="2"
           strokeLinecap="round"
         />
-        <circle
-          cx="16"
-          cy="15"
-          r="2"
-          fill="currentColor"
-        />
+        <circle cx="16" cy="15" r="2" fill="currentColor" />
       </g>
     </svg>
   );

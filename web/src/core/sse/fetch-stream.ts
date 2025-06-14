@@ -1,6 +1,5 @@
 // Copyright (c) 2025 YADRA
 
-
 import { type StreamEvent } from "./StreamEvent";
 
 export async function* fetchStream(

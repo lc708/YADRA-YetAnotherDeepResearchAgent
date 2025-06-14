@@ -1,6 +1,5 @@
 // Copyright (c) 2025 YADRA
 
-
 "use client";
 
 import Mention from "@tiptap/extension-mention";

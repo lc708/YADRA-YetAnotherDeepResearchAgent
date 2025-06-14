@@ -1,6 +1,5 @@
 // Copyright (c) 2025 YADRA
 
-
 import "~/styles/globals.css";
 
 import { type Metadata } from "next";

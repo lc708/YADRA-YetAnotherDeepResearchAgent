@@ -1,6 +1,5 @@
 // Copyright (c) 2025 YADRA
 
-
 import Link from "next/link";
 
 export function Logo() {

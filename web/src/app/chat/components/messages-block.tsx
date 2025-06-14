@@ -1,6 +1,5 @@
 // Copyright (c) 2025 YADRA
 
-
 import { motion } from "framer-motion";
 import { FastForward, Play } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
@@ -140,8 +139,7 @@ export function MessagesBlock({ className }: { className?: string }) {
                       transition={{ duration: 0.3 }}
                     >
                       <video
-                      
-                                                  src="/images/{space_holder}.webm"
+                        src="/images/{space_holder}.webm"
                         autoPlay
                         loop
                         muted

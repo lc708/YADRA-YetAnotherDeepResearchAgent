@@ -1,6 +1,5 @@
 // Copyright (c) 2025 YADRA
 
-
 import type { Edge, Node } from "@xyflow/react";
 import {
   Brain,

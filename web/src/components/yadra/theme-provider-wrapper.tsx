@@ -1,6 +1,5 @@
 // Copyright (c) 2025 YADRA
 
-
 "use client";
 
 import { usePathname } from "next/navigation";

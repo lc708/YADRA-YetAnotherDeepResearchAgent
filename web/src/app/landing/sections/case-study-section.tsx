@@ -1,6 +1,5 @@
 // Copyright (c) 2025 YADRA
 
-
 import { Bike, Building, Film, Github, Ham, Home, Pizza } from "lucide-react";
 import { Bot } from "lucide-react";
 
