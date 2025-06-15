@@ -52,15 +52,17 @@ def _create_llm_use_conf(llm_type: LLMType, conf: Dict[str, Any]) -> ChatOpenAI:
     http_client = httpx.Client(
         verify=False,  # 跳过SSL验证
         timeout=60.0,  # 增加超时时间
-        limits=httpx.Limits(max_connections=10, max_keepalive_connections=5)
+        limits=httpx.Limits(max_connections=10, max_keepalive_connections=5),
     )
-    
+
     # 添加HTTP客户端和其他连接设置到配置中
-    merged_conf.update({
-        'http_client': http_client,
-        'max_retries': 2,  # 减少重试次数
-        'timeout': 60.0,   # 设置超时
-    })
+    merged_conf.update(
+        {
+            "http_client": http_client,
+            "max_retries": 2,  # 减少重试次数
+            "timeout": 60.0,  # 设置超时
+        }
+    )
 
     return ChatOpenAI(**merged_conf)
 

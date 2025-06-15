@@ -22,7 +22,7 @@ class State(MessagesState):
     auto_accepted_plan: bool = False
     enable_background_investigation: bool = True
     background_investigation_results: str = None
-    
+
     # Feedback System Fields
     original_user_input: Optional[Dict[str, Any]] = None  # 用户原始输入状态
     early_termination: Optional[bool] = None  # 提前终止标记

@@ -133,9 +133,13 @@ async def _astream_workflow_generator(
             if "__interrupt__" in event_data:
                 interrupt_data = event_data["__interrupt__"][0]
                 interrupt_value = interrupt_data.value
-                
+
                 # 检查是否是reask类型的interrupt
-                if isinstance(interrupt_value, tuple) and len(interrupt_value) == 2 and interrupt_value[0] == "reask":
+                if (
+                    isinstance(interrupt_value, tuple)
+                    and len(interrupt_value) == 2
+                    and interrupt_value[0] == "reask"
+                ):
                     # 处理reask interrupt
                     original_input = interrupt_value[1]
                     yield _make_event(

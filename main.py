@@ -53,14 +53,14 @@ def main(
     """
     print("🔬 YADRA - Yet Another Deep Research Agent")
     print("=" * 50)
-    
+
     # Direct input for professional users
     initial_question = input("Enter your research question: ").strip()
-    
+
     if not initial_question:
         print("❌ No question provided. Exiting.")
         return
-    
+
     print(f"🚀 Starting research on: {initial_question}")
     print("-" * 50)
 
