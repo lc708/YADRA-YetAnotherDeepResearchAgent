@@ -131,6 +131,60 @@ function shouldConvertToArtifact(message: Message): boolean {
 }
 
 /**
+ * 根据消息内容和agent类型判断MIME类型
+ */
+function determineMimeType(message: Message): string {
+  const content = message.content?.toLowerCase() || "";
+  const agent = message.agent;
+  
+  // 根据agent类型判断
+  if (agent === "reporter") {
+    return "text/markdown+report";
+  }
+  
+  if (agent === "podcast") {
+    return "audio/mpeg+podcast";
+  }
+  
+  if (agent === "coder") {
+    // 检查是否包含代码
+    if (content.includes("```") || content.includes("function") || content.includes("class")) {
+      return "text/plain+code";
+    }
+    return "text/markdown+analysis";
+  }
+  
+  // 根据内容特征判断
+  if (content.includes("# ") && content.includes("## ")) {
+    // 包含标题结构，可能是报告
+    if (content.includes("研究") || content.includes("分析") || content.includes("报告")) {
+      return "text/markdown+report";
+    }
+    if (content.includes("摘要") || content.includes("总结")) {
+      return "text/markdown+summary";
+    }
+    return "text/markdown+analysis";
+  }
+  
+  // 默认markdown
+  return "text/markdown";
+}
+
+/**
+ * 生成artifact的元数据
+ */
+function generateMetadata(message: Message): Artifact["metadata"] {
+  const content = message.content || "";
+  
+  return {
+    word_count: content.length,
+    language: "zh-CN", // 默认中文
+    processing_status: "completed",
+    source_message_id: message.id,
+  };
+}
+
+/**
  * 将单个Message转换为Artifact
  */
 export function messageToArtifact(
@@ -150,11 +204,12 @@ export function messageToArtifact(
     trace_id: traceId,
     node_name: generateNodeName(message),
     type: artifactType,
-    mime: "text/markdown", // 默认使用markdown格式
+    mime: determineMimeType(message),
     summary: generateSummary(message),
-    payload_url: undefined, // 暂时不使用外部存储
+    payload_url: message.content, // 直接使用消息内容
     created_at: new Date().toISOString(),
     user_id: DEFAULT_USER_ID,
+    metadata: generateMetadata(message),
   };
   
   return artifact;

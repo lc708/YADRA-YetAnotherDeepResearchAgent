@@ -3,10 +3,12 @@
 import { create } from "zustand";
 import { subscribeWithSelector } from "zustand/middleware";
 import { useShallow } from "zustand/react/shallow";
+import { useEffect, useMemo } from "react";
 
-import { workspaceStateAdapter } from "~/core/adapters/state-adapter";
+import { WorkspaceStateAdapter } from "~/core/adapters/state-adapter";
 import type { Message, Option } from "~/core/messages";
 import type { Artifact } from "~/lib/supa";
+import { useStore } from "~/core/store/store";
 
 /**
  * 工作区状态接口
@@ -183,10 +185,53 @@ export const useConversationPanelVisible = () =>
 export const useArtifactsPanelVisible = () => 
   useWorkspaceStore(useShallow((state) => state.artifactsPanelVisible));
 
-export const useWorkspaceArtifacts = (traceId: string | null) => 
-  useWorkspaceStore(useShallow((state) => 
-    traceId ? state.adaptedArtifacts.get(traceId) || [] : []
-  ));
+/**
+ * 获取指定trace的artifacts数据
+ * 从主store获取Message数据，通过state-adapter转换为Artifact格式
+ */
+export const useWorkspaceArtifacts = (traceId: string | null): Artifact[] => {
+  // 从主store获取数据
+  const messages = useStore(useShallow((state) => state.messages));
+  const messageIds = useStore(useShallow((state) => state.messageIds));
+  const researchIds = useStore(useShallow((state) => state.researchIds));
+  const researchPlanIds = useStore(useShallow((state) => state.researchPlanIds));
+  const researchReportIds = useStore(useShallow((state) => state.researchReportIds));
+  const researchActivityIds = useStore(useShallow((state) => state.researchActivityIds));
+  
+  // 创建state adapter实例
+  const adapter = useMemo(() => new WorkspaceStateAdapter(), []);
+  
+  // 转换为artifacts
+  const artifacts = useMemo(() => {
+    if (!traceId) return [];
+    
+    try {
+      return adapter.getArtifactsForTrace(
+        messages,
+        messageIds,
+        researchIds,
+        researchPlanIds,
+        researchReportIds,
+        researchActivityIds,
+        traceId
+      );
+    } catch (error) {
+      console.error("Failed to get artifacts for trace:", error);
+      return [];
+    }
+  }, [
+    adapter,
+    traceId,
+    messages,
+    messageIds,
+    researchIds,
+    researchPlanIds,
+    researchReportIds,
+    researchActivityIds,
+  ]);
+  
+  return artifacts;
+};
 
 export const useWorkspaceFeedback = () => 
   useWorkspaceStore(useShallow((state) => state.feedback));
