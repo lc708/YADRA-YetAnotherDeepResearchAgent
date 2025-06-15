@@ -47,35 +47,70 @@ def handoff_to_planner(
 
 def background_investigation_node(state: State, config: RunnableConfig):
     logger.info("background investigation node is running.")
+    logger.info(f"Research topic: {state.get('research_topic')}")
+    logger.info(f"Selected search engine: {SELECTED_SEARCH_ENGINE}")
+
     configurable = Configuration.from_runnable_config(config)
     query = state.get("research_topic")
     background_investigation_results = None
+
     if SELECTED_SEARCH_ENGINE == SearchEngine.TAVILY.value:
-        searched_content = LoggedTavilySearch(
-            max_results=configurable.max_search_results
-        ).invoke(query)
-        if isinstance(searched_content, list):
-            background_investigation_results = [
-                f"## {elem['title']}\n\n{elem['content']}" for elem in searched_content
-            ]
-            return {
-                "background_investigation_results": "\n\n".join(
-                    background_investigation_results
+        logger.info("Using Tavily search engine")
+        try:
+            searched_content = LoggedTavilySearch(
+                max_results=configurable.max_search_results
+            ).invoke(query)
+            logger.info(
+                f"Tavily search returned: {type(searched_content)}, length: {len(searched_content) if isinstance(searched_content, list) else 'N/A'}"
+            )
+
+            if isinstance(searched_content, list):
+                background_investigation_results = [
+                    f"## {elem['title']}\n\n{elem['content']}"
+                    for elem in searched_content
+                ]
+                result = {
+                    "background_investigation_results": "\n\n".join(
+                        background_investigation_results
+                    )
+                }
+                logger.info(
+                    f"Background investigation completed successfully, result length: {len(result['background_investigation_results'])}"
+                )
+                return result
+            else:
+                logger.error(
+                    f"Tavily search returned malformed response: {searched_content}"
+                )
+        except Exception as e:
+            logger.error(f"Error in Tavily search: {e}")
+            logger.exception("Full traceback:")
+    else:
+        logger.info("Using alternative search engine")
+        try:
+            background_investigation_results = get_web_search_tool(
+                configurable.max_search_results
+            ).invoke(query)
+            logger.info(
+                f"Alternative search completed, result type: {type(background_investigation_results)}"
+            )
+
+            result = {
+                "background_investigation_results": json.dumps(
+                    background_investigation_results, ensure_ascii=False
                 )
             }
-        else:
-            logger.error(
-                f"Tavily search returned malformed response: {searched_content}"
+            logger.info(
+                f"Background investigation completed successfully, result length: {len(result['background_investigation_results'])}"
             )
-    else:
-        background_investigation_results = get_web_search_tool(
-            configurable.max_search_results
-        ).invoke(query)
-    return {
-        "background_investigation_results": json.dumps(
-            background_investigation_results, ensure_ascii=False
-        )
-    }
+            return result
+        except Exception as e:
+            logger.error(f"Error in alternative search: {e}")
+            logger.exception("Full traceback:")
+
+    # 如果所有搜索都失败，返回空结果
+    logger.warning("All search methods failed, returning empty result")
+    return {"background_investigation_results": json.dumps(None)}
 
 
 def planner_node(
@@ -157,6 +192,7 @@ def human_feedback_node(
     current_plan = state.get("current_plan", "")
     # check if the plan is auto accepted
     auto_accepted_plan = state.get("auto_accepted_plan", False)
+
     if not auto_accepted_plan:
         feedback = interrupt("Please Review the Plan.")
 
@@ -172,6 +208,35 @@ def human_feedback_node(
             )
         elif feedback and str(feedback).upper().startswith("[ACCEPTED]"):
             logger.info("Plan is accepted by user.")
+        elif feedback and (
+            str(feedback).upper().startswith("[SKIP_RESEARCH]")
+            or str(feedback).lower() == "skip_research"
+        ):
+            logger.info(
+                "User requested to skip research and generate report immediately."
+            )
+            # Skip research and go directly to reporter
+            plan_iterations = (
+                state["plan_iterations"] if state.get("plan_iterations", 0) else 0
+            )
+            try:
+                current_plan = repair_json_output(current_plan)
+                plan_iterations += 1
+                new_plan = json.loads(current_plan)
+                return Command(
+                    update={
+                        "current_plan": Plan.model_validate(new_plan),
+                        "plan_iterations": plan_iterations,
+                        "locale": new_plan.get("locale", "en-US"),
+                        "observations": ["用户选择跳过研究步骤，直接生成报告。"],
+                        "skipped_research": True,  # 添加标记表示跳过了研究
+                    },
+                    goto="reporter",
+                )
+            except json.JSONDecodeError:
+                logger.warning("Planner response is not a valid JSON")
+                return Command(update={"skipped_research": True}, goto="reporter")
+
         else:
             raise TypeError(f"Interrupt value of {feedback} is not supported.")
 
@@ -217,15 +282,30 @@ def coordinator_node(
     )
     logger.debug(f"Current state messages: {state['messages']}")
 
+    # 添加详细的调试日志
+    logger.info(f"Coordinator LLM response type: {type(response)}")
+    logger.info(f"Coordinator LLM response content: {response.content}")
+    logger.info(f"Coordinator LLM response tool_calls: {response.tool_calls}")
+    logger.info(
+        f"Coordinator LLM response tool_calls length: {len(response.tool_calls)}"
+    )
+    logger.info(
+        f"Enable background investigation: {state.get('enable_background_investigation')}"
+    )
+
     goto = "__end__"
     locale = state.get("locale", "en-US")  # Default locale if not specified
     research_topic = state.get("research_topic", "")
 
     if len(response.tool_calls) > 0:
         goto = "planner"
+        logger.info("Tool calls detected, setting goto to planner")
         if state.get("enable_background_investigation"):
             # if the search_before_planning is True, add the web search tool to the planner agent
             goto = "background_investigator"
+            logger.info(
+                "Background investigation enabled, changing goto to background_investigator"
+            )
         try:
             for tool_call in response.tool_calls:
                 if tool_call.get("name", "") != "handoff_to_planner":
@@ -244,6 +324,7 @@ def coordinator_node(
         )
         logger.debug(f"Coordinator response: {response}")
 
+    logger.info(f"Final goto decision: {goto}")
     return Command(
         update={
             "locale": locale,
@@ -259,6 +340,8 @@ def reporter_node(state: State, config: RunnableConfig):
     logger.info("Reporter write final report")
     configurable = Configuration.from_runnable_config(config)
     current_plan = state.get("current_plan")
+    skipped_research = state.get("skipped_research", False)
+
     input_ = {
         "messages": [
             HumanMessage(
@@ -278,6 +361,15 @@ def reporter_node(state: State, config: RunnableConfig):
         )
     )
 
+    # 如果跳过了研究，添加特殊提示
+    if skipped_research:
+        invoke_messages.append(
+            HumanMessage(
+                content="IMPORTANT: This report is being generated without conducting detailed research steps. Please add a disclaimer at the end of the report stating that the content may be incomplete or less accurate due to skipped research phases. Use this format:\n\n---\n\n**⚠️ 重要提示**：本报告基于有限的信息生成，未进行详细的研究步骤。内容可能不够全面或准确，建议进行进一步的深入研究以获得更可靠的结论。",
+                name="system",
+            )
+        )
+
     for observation in observations:
         invoke_messages.append(
             HumanMessage(
@@ -291,6 +383,53 @@ def reporter_node(state: State, config: RunnableConfig):
     logger.info(f"reporter response: {response_content}")
 
     return {"final_report": response_content}
+
+
+def reask_node(state: State) -> Command[Literal["__end__"]]:
+    """重新提问节点 - 恢复用户原始输入状态"""
+    logger.info("Reask node: preparing to restore original user input")
+
+    original_input = state.get("original_user_input")
+    if not original_input:
+        logger.warning("No original user input found, ending workflow")
+        return Command(
+            update={
+                "messages": [
+                    HumanMessage(
+                        content="无法找到原始输入信息，请重新开始对话。", name="system"
+                    ),
+                ],
+            },
+            goto="__end__",
+        )
+
+    logger.info(f"Restoring original input: {original_input.get('text', 'N/A')}")
+
+    # 创建一个特殊的reask消息来传递原始输入信息
+    reask_message = AIMessage(content="重新提问请求已处理", name="system")
+
+    return Command(
+        update={
+            "messages": [reask_message],  # 添加reask消息
+            "current_plan": None,  # 清空当前计划
+            "observations": [],  # 清空研究结果
+            "plan_iterations": 0,  # 重置计划迭代
+            "final_report": "",  # 清空最终报告
+            "early_termination": None,  # 清空提前终止标记
+            "termination_reason": None,  # 清空终止原因
+            "background_investigation_results": None,  # 清空背景调查结果
+            # 从原始输入恢复用户设置
+            "auto_accepted_plan": (
+                original_input.get("settings", {}).get("auto_accepted_plan", False)
+            ),
+            "enable_background_investigation": (
+                original_input.get("settings", {}).get(
+                    "enable_background_investigation", True
+                )
+            ),
+        },
+        goto="__end__",
+    )
 
 
 def research_team_node(state: State):

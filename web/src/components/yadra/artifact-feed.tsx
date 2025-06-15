@@ -2,62 +2,38 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { FixedSizeList as List } from "react-window";
-import { supabase, type Artifact } from "~/lib/supa";
+import type { Artifact } from "~/lib/supa";
+import { ArtifactUtils } from "~/lib/supa";
 import { ArtifactCard } from "./artifact-card";
 import { ArtifactViewer } from "./artifact-viewer";
+import { useReportOperations } from "./report-operations";
+import { useWorkspaceArtifacts } from "~/core/store/workspace-store";
 import { Input } from "~/components/ui/input";
 import { Search } from "lucide-react";
 import { Button } from "~/components/ui/button";
+
+const ITEM_HEIGHT = 120;
 
 interface ArtifactFeedProps {
   traceId: string;
   className?: string;
 }
 
-const ITEM_HEIGHT = 200;
-const ITEMS_PER_PAGE = 50;
-
 export function ArtifactFeed({ traceId, className }: ArtifactFeedProps) {
-  const [artifacts, setArtifacts] = useState<Artifact[]>([]);
+  // 使用新的数据源：从workspace store获取artifacts
+  const allArtifacts = useWorkspaceArtifacts(traceId);
+  
   const [filteredArtifacts, setFilteredArtifacts] = useState<Artifact[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [typeFilter, setTypeFilter] = useState<"all" | "process" | "result">(
-    "all",
-  );
-  const [loading, setLoading] = useState(true);
-  const [selectedArtifact, setSelectedArtifact] = useState<Artifact | null>(
-    null,
-  );
+  const [typeFilter, setTypeFilter] = useState<"all" | "process" | "result">("all");
+  const [selectedArtifact, setSelectedArtifact] = useState<Artifact | null>(null);
+  
+  // 报告操作钩子
+  const { copyToClipboard, downloadAsMarkdown, downloadFromUrl } = useReportOperations();
 
+  // 过滤逻辑
   useEffect(() => {
-    fetchArtifacts();
-  }, [traceId]);
-
-  useEffect(() => {
-    const channel = supabase
-      .channel("artifacts")
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "artifacts",
-          filter: `trace_id=eq.${traceId}`,
-        },
-        (payload) => {
-          const newArtifact = payload.new as Artifact;
-          setArtifacts((prev) => [...prev, newArtifact]);
-        },
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [traceId]);
-
-  useEffect(() => {
-    let filtered = artifacts;
+    let filtered = allArtifacts;
 
     if (searchQuery) {
       filtered = filtered.filter(
@@ -74,56 +50,18 @@ export function ArtifactFeed({ traceId, className }: ArtifactFeedProps) {
     }
 
     setFilteredArtifacts(filtered);
-  }, [artifacts, searchQuery, typeFilter]);
+  }, [allArtifacts, searchQuery, typeFilter]);
 
-  const fetchArtifacts = async () => {
+  const handleSaveArtifact = useCallback(async (artifact: Artifact, content: string) => {
     try {
-      const { data, error } = await supabase
-        .from("artifacts")
-        .select("*")
-        .eq("trace_id", traceId)
-        .order("created_at", { ascending: false })
-        .limit(ITEMS_PER_PAGE);
-
-      if (error) throw error;
-      setArtifacts(data || []);
+      // 更新本地状态 - 这里可以添加保存到后端的逻辑
+      console.log("Saving artifact:", artifact.id, content);
+      // 注意：由于我们现在使用state-adapter，保存逻辑需要更新到主store
+      // 这个功能将在后续的Phase中完善
     } catch (error) {
-      console.error("Error fetching artifacts:", error);
-      console.warn("🔄 使用Mock数据作为fallback - Supabase连接失败");
-      console.info("📢 通知用户: 正在使用Mock演示数据作为fallback");
-      if (typeof window !== "undefined") {
-        setTimeout(() => {
-          alert("⚠️ 正在使用演示数据 - Supabase连接失败，显示Mock数据作为fallback");
-        }, 1000);
-      }
-      setArtifacts([
-        {
-          id: "demo-1",
-          trace_id: traceId,
-          node_name: "研究规划",
-          type: "process" as const,
-          mime: "text/markdown",
-          summary: "量子计算分析的初始研究计划",
-          payload_url: undefined,
-          created_at: new Date().toISOString(),
-          user_id: "demo-user",
-        },
-        {
-          id: "demo-2",
-          trace_id: traceId,
-          node_name: "量子计算报告",
-          type: "result" as const,
-          mime: "text/markdown",
-          summary: "2024年量子计算发展的综合分析",
-          payload_url: undefined,
-          created_at: new Date().toISOString(),
-          user_id: "demo-user",
-        },
-      ]);
-    } finally {
-      setLoading(false);
+      console.error("Failed to save artifact:", error);
     }
-  };
+  }, []);
 
   const renderItem = useCallback(
     ({ index, style }: { index: number; style: React.CSSProperties }) => {
@@ -132,19 +70,27 @@ export function ArtifactFeed({ traceId, className }: ArtifactFeedProps) {
 
       return (
         <div style={style} className="px-2 py-1">
-          <ArtifactCard artifact={artifact} onView={setSelectedArtifact} />
+          <ArtifactCard 
+            artifact={artifact} 
+            onView={setSelectedArtifact}
+            onEdit={setSelectedArtifact}
+            onCopy={copyToClipboard}
+            onDownload={downloadFromUrl}
+          />
         </div>
       );
     },
-    [filteredArtifacts],
+    [filteredArtifacts, copyToClipboard, downloadFromUrl],
   );
 
-  if (loading) {
+  // 如果没有artifacts，显示等待状态
+  if (allArtifacts.length === 0) {
     return (
-      <div className="flex h-64 items-center justify-center">
-        <div className="space-y-2 text-center">
+      <div className={className}>
+        <div className="text-muted-foreground flex h-64 flex-col items-center justify-center space-y-2">
           <div className="mx-auto h-8 w-8 animate-spin rounded-full border-b-2 border-blue-600"></div>
-          <p className="text-muted-foreground text-sm">加载工件中...</p>
+          <p>研究会话正在启动中...</p>
+          <p className="text-sm">工件将在研究过程中实时显示</p>
         </div>
       </div>
     );
@@ -168,21 +114,21 @@ export function ArtifactFeed({ traceId, className }: ArtifactFeedProps) {
             size="sm"
             onClick={() => setTypeFilter("all")}
           >
-            全部
+            全部 ({allArtifacts.length})
           </Button>
           <Button
             variant={typeFilter === "process" ? "default" : "outline"}
             size="sm"
             onClick={() => setTypeFilter("process")}
           >
-            过程
+            过程 ({allArtifacts.filter(a => a.type === "process").length})
           </Button>
           <Button
             variant={typeFilter === "result" ? "default" : "outline"}
             size="sm"
             onClick={() => setTypeFilter("result")}
           >
-            结果
+            结果 ({allArtifacts.filter(a => a.type === "result").length})
           </Button>
         </div>
       </div>
@@ -200,11 +146,8 @@ export function ArtifactFeed({ traceId, className }: ArtifactFeedProps) {
           </List>
         ) : (
           <div className="text-muted-foreground flex h-full flex-col items-center justify-center space-y-2">
-            <p>研究会话正在启动中...</p>
-            <p className="text-sm">工件将在研究过程中实时显示</p>
-            {artifacts.length > 0 && (
-              <p className="text-xs text-orange-600">⚠️ 当前显示演示数据</p>
-            )}
+            <p>没有找到匹配的工件</p>
+            <p className="text-sm">尝试调整搜索条件或过滤器</p>
           </div>
         )}
       </div>
@@ -213,6 +156,7 @@ export function ArtifactFeed({ traceId, className }: ArtifactFeedProps) {
         artifact={selectedArtifact}
         open={!!selectedArtifact}
         onOpenChange={(open) => !open && setSelectedArtifact(null)}
+        onSave={handleSaveArtifact}
       />
     </div>
   );

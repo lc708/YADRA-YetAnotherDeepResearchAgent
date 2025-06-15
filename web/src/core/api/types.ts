@@ -74,9 +74,24 @@ export interface InterruptEvent
     }
   > {}
 
+export interface ReaskEvent
+  extends GenericEvent<
+    "reask",
+    {
+      original_input: {
+        text: string;
+        locale: string;
+        settings: Record<string, any>;
+        resources: any[];
+        timestamp: string;
+      };
+    }
+  > {}
+
 export type ChatEvent =
   | MessageChunkEvent
   | ToolCallsEvent
   | ToolCallChunksEvent
   | ToolCallResultEvent
-  | InterruptEvent;
+  | InterruptEvent
+  | ReaskEvent;

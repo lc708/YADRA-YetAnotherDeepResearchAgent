@@ -147,4 +147,15 @@ export function setEnableBackgroundInvestigation(value: boolean) {
   }));
   saveSettings();
 }
+
+export function setAutoAcceptedPlan(value: boolean) {
+  useSettingsStore.setState((state) => ({
+    general: {
+      ...state.general,
+      autoAcceptedPlan: value,
+    },
+  }));
+  saveSettings();
+}
+
 loadSettings();

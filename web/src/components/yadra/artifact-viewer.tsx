@@ -7,25 +7,88 @@ import {
 import { Badge } from "~/components/ui/badge";
 import { ScrollArea } from "~/components/ui/scroll-area";
 import { Button } from "~/components/ui/button";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, Edit, Save, X } from "lucide-react";
 import type { Artifact } from "~/lib/supa";
 import ReactMarkdown from "react-markdown";
+import { useState, useCallback, useMemo } from "react";
+import ReportEditor from "~/components/editor";
+import type { Content } from "@tiptap/react";
 
 interface ArtifactViewerProps {
   artifact: Artifact | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onSave?: (artifact: Artifact, content: string) => void;
 }
 
 export function ArtifactViewer({
   artifact,
   open,
   onOpenChange,
+  onSave,
 }: ArtifactViewerProps) {
+  // 所有hooks必须在条件检查之前调用
+  const [isEditing, setIsEditing] = useState(false);
+  const [editContent, setEditContent] = useState("");
+
+  // 将markdown字符串转换为TipTap Content格式
+  const markdownToTiptapContent = useCallback((markdown: string): Content => {
+    if (!markdown || markdown.trim() === "") {
+      return {
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [
+              {
+                type: "text",
+                text: "",
+              },
+            ],
+          },
+        ],
+      };
+    }
+
+    // 简单的markdown到TipTap JSON转换
+    // 这里使用基本的HTML作为中间格式，TipTap可以解析HTML
+    return markdown;
+  }, []);
+
+  const handleEdit = useCallback(() => {
+    if (artifact) {
+      setEditContent(artifact.payload_url || "");
+      setIsEditing(true);
+    }
+  }, [artifact]);
+
+  const handleSave = useCallback(() => {
+    if (onSave && artifact && editContent !== artifact.payload_url) {
+      onSave(artifact, editContent);
+    }
+    setIsEditing(false);
+  }, [onSave, artifact, editContent]);
+
+  const handleCancel = useCallback(() => {
+    setEditContent("");
+    setIsEditing(false);
+  }, []);
+
+  const handleMarkdownChange = useCallback((markdown: string) => {
+    setEditContent(markdown);
+  }, []);
+
+  // 准备编辑器内容
+  const editorContent = useMemo(() => {
+    return markdownToTiptapContent(editContent);
+  }, [editContent, markdownToTiptapContent]);
+
+  // 条件检查放在所有hooks之后
   if (!artifact) return null;
 
   const isMarkdown =
     artifact.mime.includes("markdown") || artifact.mime.includes("text");
+  const isReport = artifact.type === "result" && isMarkdown;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -41,7 +104,29 @@ export function ArtifactViewer({
               >
                 {artifact.type}
               </Badge>
-              {artifact.payload_url && (
+              
+              {/* 编辑模式控制按钮 */}
+              {isReport && !isEditing && (
+                <Button size="sm" variant="outline" onClick={handleEdit}>
+                  <Edit className="mr-1 h-4 w-4" />
+                  Edit
+                </Button>
+              )}
+              
+              {isEditing && (
+                <>
+                  <Button size="sm" variant="outline" onClick={handleSave}>
+                    <Save className="mr-1 h-4 w-4" />
+                    Save
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={handleCancel}>
+                    <X className="mr-1 h-4 w-4" />
+                    Cancel
+                  </Button>
+                </>
+              )}
+              
+              {artifact.payload_url && !isEditing && (
                 <Button size="sm" variant="outline">
                   <ExternalLink className="mr-1 h-4 w-4" />
                   Open
@@ -65,7 +150,16 @@ export function ArtifactViewer({
             <div>
               <h4 className="mb-2 font-medium">Content</h4>
               <div className="rounded-lg border p-4">
-                {isMarkdown ? (
+                {isEditing && isReport ? (
+                  // 编辑模式：使用Novel编辑器
+                  <div className="min-h-[400px]">
+                    <ReportEditor
+                      content={editorContent}
+                      onMarkdownChange={handleMarkdownChange}
+                    />
+                  </div>
+                ) : isMarkdown ? (
+                  // 查看模式：显示Markdown渲染结果
                   <div className="prose prose-sm max-w-none">
                     <ReactMarkdown>
                       {artifact.payload_url ||
@@ -73,6 +167,7 @@ export function ArtifactViewer({
                     </ReactMarkdown>
                   </div>
                 ) : (
+                  // 非Markdown内容
                   <div className="text-muted-foreground py-8 text-center">
                     <p>Preview not available for this content type</p>
                     <p className="mt-1 text-xs">MIME: {artifact.mime}</p>

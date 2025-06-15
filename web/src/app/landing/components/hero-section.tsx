@@ -1,11 +1,14 @@
+"use client";
 
 import { GithubFilled } from "@ant-design/icons";
 import { ChevronRight, Sparkles, FileText, Database, Clock } from "lucide-react";
 import Link from "next/link";
 import React from "react";
+import { motion } from "framer-motion";
 
 import { Button } from "~/components/ui/button";
 import { HeroInput } from "~/components/yadra/hero-input";
+import { DEFAULT_QUESTIONS } from "~/config/questions";
 
 export function HeroSection() {
   return (
@@ -13,7 +16,7 @@ export function HeroSection() {
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-blue-900/20 via-transparent to-transparent"></div>
       <div className="absolute inset-0 bg-grid-white/[0.02] bg-[size:50px_50px]"></div>
       
-      <div className="relative z-10 flex w-full max-w-5xl flex-col items-center justify-center gap-8 text-center sm:gap-12">
+      <div className="relative z-10 flex w-full max-w-6xl flex-col items-center justify-center gap-8 text-center sm:gap-12">
         <div className="space-y-6 sm:space-y-8">
           <div className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/80 backdrop-blur-sm">
             <Sparkles className="mr-2 h-4 w-4" />
@@ -31,8 +34,52 @@ export function HeroSection() {
           </p>
         </div>
 
-        <div className="w-full max-w-3xl space-y-6">
+        <div className="w-full max-w-4xl space-y-8">
           <HeroInput />
+          
+          {/* 示例问题网格 */}
+          <div className="space-y-4">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3, duration: 0.5 }}
+              className="text-center"
+            >
+              <p className="text-sm text-gray-400 mb-4">或者选择以下热门研究主题：</p>
+            </motion.div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-w-5xl mx-auto">
+              {DEFAULT_QUESTIONS.slice(0, 6).map((question, index) => (
+                <motion.div
+                  key={question}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.4 + index * 0.1, duration: 0.5 }}
+                  className="group cursor-pointer"
+                  onClick={() => {
+                    // 触发HeroInput的发送逻辑
+                    const event = new CustomEvent('heroQuestionSelect', { 
+                      detail: { question } 
+                    });
+                    window.dispatchEvent(event);
+                  }}
+                >
+                  <div className="relative overflow-hidden rounded-xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm transition-all duration-300 hover:border-white/20 hover:bg-white/10 hover:scale-105 active:scale-95">
+                    <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-500/10 opacity-0 transition-opacity duration-300 group-hover:opacity-100"></div>
+                    <div className="relative z-10">
+                      <p className="text-sm text-gray-300 group-hover:text-white transition-colors duration-300 overflow-hidden text-ellipsis" style={{
+                        display: '-webkit-box',
+                        WebkitLineClamp: 3,
+                        WebkitBoxOrient: 'vertical'
+                      }}>
+                        {question}
+                      </p>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </div>
           
           <div className="flex flex-wrap items-center justify-center gap-4 text-sm text-gray-400 sm:gap-6">
             <div className="flex items-center gap-2">
@@ -99,6 +146,17 @@ export function HeroSection() {
           >
             <Link href="/chat">
               传统聊天界面 <ChevronRight className="ml-1 h-4 w-4" />
+            </Link>
+          </Button>
+          
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-gray-400 hover:text-white"
+            asChild
+          >
+            <Link href="/test-duplicate">
+              防重复发送测试 <ChevronRight className="ml-1 h-4 w-4" />
             </Link>
           </Button>
           

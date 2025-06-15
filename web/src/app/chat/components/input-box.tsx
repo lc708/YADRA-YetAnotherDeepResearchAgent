@@ -3,7 +3,7 @@
 import { MagicWandIcon } from "@radix-ui/react-icons";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowUp, X } from "lucide-react";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useRef, useState, useEffect, forwardRef, useImperativeHandle } from "react";
 
 import { BorderBeam } from "~/components/magicui/border-beam";
 import { Button } from "~/components/ui/button";
@@ -17,22 +17,23 @@ import { enhancePrompt } from "~/core/api";
 import type { Option, Resource } from "~/core/messages";
 import {
   setEnableBackgroundInvestigation,
+  setAutoAcceptedPlan,
+  setReportStyle,
   useSettingsStore,
 } from "~/core/store";
+import type { OriginalInput } from "~/hooks/use-reask-handler";
 import { cn } from "~/lib/utils";
 
-export function InputBox({
-  className,
-  responding,
-  feedback,
-  onSend,
-  onCancel,
-  onRemoveFeedback,
-}: {
+export interface InputBoxRef {
+  restoreState: (input: OriginalInput) => void;
+}
+
+export const InputBox = forwardRef<InputBoxRef, {
   className?: string;
   size?: "large" | "normal";
   responding?: boolean;
   feedback?: { option: Option } | null;
+  restoredInput?: OriginalInput | null;
   onSend?: (
     message: string,
     options?: {
@@ -42,9 +43,24 @@ export function InputBox({
   ) => void;
   onCancel?: () => void;
   onRemoveFeedback?: () => void;
-}) {
+  onInputRestored?: () => void;
+}>(({
+  className,
+  responding,
+  feedback,
+  restoredInput,
+  onSend,
+  onCancel,
+  onRemoveFeedback,
+  onInputRestored,
+}, ref) => {
   const backgroundInvestigation = useSettingsStore(
     (state) => state.general.enableBackgroundInvestigation,
+  );
+  // Note: autoAcceptedPlan is used in the restoration logic
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const autoAcceptedPlan = useSettingsStore(
+    (state) => state.general.autoAcceptedPlan,
   );
   const reportStyle = useSettingsStore((state) => state.general.reportStyle);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -55,6 +71,61 @@ export function InputBox({
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [isEnhanceAnimating, setIsEnhanceAnimating] = useState(false);
   const [currentPrompt, setCurrentPrompt] = useState("");
+  
+  // Restoration state
+  const [isRestoring, setIsRestoring] = useState(false);
+
+  // Expose ref methods
+  useImperativeHandle(ref, () => ({
+    restoreState: (input: OriginalInput) => {
+      console.log("Restoring input box state:", input);
+      setIsRestoring(true);
+      
+      try {
+        // Clear any existing enhancement state
+        setIsEnhancing(false);
+        setIsEnhanceAnimating(false);
+        
+        // Restore text content
+        if (inputRef.current && input.text) {
+          inputRef.current.setContent(input.text);
+          setCurrentPrompt(input.text);
+        }
+        
+        // Restore settings (only the ones that should be restored)
+        if (input.settings) {
+          if (typeof input.settings.enable_background_investigation === 'boolean') {
+            setEnableBackgroundInvestigation(input.settings.enable_background_investigation);
+          }
+          if (typeof input.settings.auto_accepted_plan === 'boolean') {
+            setAutoAcceptedPlan(input.settings.auto_accepted_plan);
+          }
+          if (input.settings.report_style) {
+            setReportStyle(input.settings.report_style as "academic" | "popular_science" | "news" | "social_media");
+          }
+        }
+        
+        // Focus the input after a short delay
+        setTimeout(() => {
+          inputRef.current?.focus();
+          setIsRestoring(false);
+        }, 500);
+        
+      } catch (error) {
+        console.error("Error during state restoration:", error);
+        setIsRestoring(false);
+      }
+    },
+  }), []);
+
+  // Handle restored input effect
+  useEffect(() => {
+    if (restoredInput) {
+      // This effect is triggered when restoredInput prop changes
+      // The actual restoration is handled by the ref method
+      onInputRestored?.();
+    }
+  }, [restoredInput, onInputRestored]);
 
   const handleSendMessage = useCallback(
     (message: string, resources: Array<Resource>) => {
@@ -188,12 +259,27 @@ export function InputBox({
               </div>
             </motion.div>
           )}
+          {isRestoring && (
+            <motion.div
+              className="bg-background border-brand absolute top-0 left-1/2 mt-2 flex -translate-x-1/2 items-center justify-center gap-2 rounded-2xl border px-3 py-1"
+              initial={{ opacity: 0, scale: 0, y: -10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0, y: -10 }}
+              transition={{ duration: 0.3, ease: "easeInOut" }}
+            >
+              <div className="bg-brand h-2 w-2 animate-pulse rounded-full" />
+              <div className="text-brand text-sm font-medium">
+                正在恢复原始状态...
+              </div>
+            </motion.div>
+          )}
         </AnimatePresence>
         <MessageInput
           className={cn(
             "h-24 px-4 pt-5",
             feedback && "pt-9",
-            isEnhanceAnimating && "transition-all duration-500",
+            isRestoring && "pt-9",
+            (isEnhanceAnimating || isRestoring) && "transition-all duration-500",
           )}
           ref={inputRef}
           onEnter={handleSendMessage}
@@ -288,4 +374,6 @@ export function InputBox({
       )}
     </div>
   );
-}
+});
+
+InputBox.displayName = "InputBox";

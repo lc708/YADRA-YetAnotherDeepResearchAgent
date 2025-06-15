@@ -2,7 +2,8 @@
 
 import { motion } from "framer-motion";
 import { FastForward, Play } from "lucide-react";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useRef, useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 
 import { Button } from "~/components/ui/button";
 import {
@@ -18,10 +19,11 @@ import type { Option, Resource } from "~/core/messages";
 import { useReplay } from "~/core/replay";
 import { sendMessage, useMessageIds, useStore } from "~/core/store";
 import { env } from "~/env";
+import { useReaskHandler, type OriginalInput } from "~/hooks/use-reask-handler";
 import { cn } from "~/lib/utils";
 
 import { ConversationStarter } from "./conversation-starter";
-import { InputBox } from "./input-box";
+import { InputBox, type InputBoxRef } from "./input-box";
 import { MessageListView } from "./message-list-view";
 import { Welcome } from "./welcome";
 
@@ -34,6 +36,11 @@ export function MessagesBlock({ className }: { className?: string }) {
   const [replayStarted, setReplayStarted] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const [feedback, setFeedback] = useState<{ option: Option } | null>(null);
+  const searchParams = useSearchParams();
+  
+  // Reask state management
+  const [restoredInput, setRestoredInput] = useState<OriginalInput | null>(null);
+  const inputBoxRef = useRef<InputBoxRef>(null);
   const handleSend = useCallback(
     async (
       message: string,
@@ -82,6 +89,52 @@ export function MessagesBlock({ className }: { className?: string }) {
     setFastForwarding(!fastForwarding);
     fastForwardReplay(!fastForwarding);
   }, [fastForwarding]);
+
+  // Reask handler
+  const handleReaskRestore = useCallback((originalInput: OriginalInput) => {
+    console.log("Restoring original input:", originalInput);
+    console.log("InputBox ref current:", inputBoxRef.current);
+    setRestoredInput(originalInput);
+    
+    // Restore input box state
+    if (inputBoxRef.current) {
+      console.log("Calling restoreState on InputBox");
+      inputBoxRef.current.restoreState(originalInput);
+    } else {
+      console.warn("InputBox ref is not available");
+    }
+  }, []);
+
+  const handleReaskError = useCallback((error: Error) => {
+    console.error("Reask restore error:", error);
+    // Error handling is already done in the hook with toast
+  }, []);
+
+  useReaskHandler({
+    onRestore: handleReaskRestore,
+    onError: handleReaskError,
+  });
+
+  // 处理从URL参数中的reask数据
+  useEffect(() => {
+    const reaskData = searchParams.get('reask');
+    console.log('URL reask data:', reaskData);
+    if (reaskData) {
+      try {
+        const originalInput = JSON.parse(decodeURIComponent(reaskData));
+        console.log('Parsed reask data:', originalInput);
+        console.log('InputBox ref available:', !!inputBoxRef.current);
+        handleReaskRestore(originalInput);
+        
+        // 清理URL参数
+        const url = new URL(window.location.href);
+        url.searchParams.delete('reask');
+        window.history.replaceState({}, '', url.toString());
+      } catch (error) {
+        console.error('Failed to parse reask data from URL:', error);
+      }
+    }
+  }, [searchParams, handleReaskRestore]);
   return (
     <div className={cn("flex h-full flex-col", className)}>
       <MessageListView
@@ -98,12 +151,15 @@ export function MessagesBlock({ className }: { className?: string }) {
             />
           )}
           <InputBox
+            ref={inputBoxRef}
             className="h-full w-full"
             responding={responding}
             feedback={feedback}
             onSend={handleSend}
             onCancel={handleCancel}
             onRemoveFeedback={handleRemoveFeedback}
+            restoredInput={restoredInput}
+            onInputRestored={() => setRestoredInput(null)}
           />
         </div>
       ) : (
