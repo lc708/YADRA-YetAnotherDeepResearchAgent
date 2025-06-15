@@ -207,10 +207,17 @@ export async function sendMessage(
         updateMessage(message);
       }
     }
-  } catch {
-    toast("An error occurred while generating the response. Please try again.");
+  } catch (error) {
+    // 改进错误处理，区分AbortError和其他错误
+    if (error instanceof Error && error.name === 'AbortError') {
+      console.log("Request was aborted");
+      // AbortError是正常的取消操作，不需要显示错误提示
+    } else {
+      console.error("Error in sendMessage:", error);
+      toast("An error occurred while generating the response. Please try again.");
+    }
+    
     // Update message status.
-    // TODO: const isAborted = (error as Error).name === "AbortError";
     if (messageId != null) {
       const message = getMessage(messageId);
       if (message?.isStreaming) {
@@ -219,6 +226,11 @@ export async function sendMessage(
       }
     }
     useStore.getState().setOngoingResearch(null);
+    
+    // 重新抛出非AbortError，让调用方处理
+    if (!(error instanceof Error && error.name === 'AbortError')) {
+      throw error;
+    }
   } finally {
     setResponding(false);
   }

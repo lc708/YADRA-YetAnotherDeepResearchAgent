@@ -1,0 +1,7 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+开发过程中，尝试运行代码来验证实现情况，请使用根路径的脚本开启前后端：./bootstrap.sh --dev 
+如果./bootstrap.sh --dev 运行有问题，请检查./bootstrap.sh的实现

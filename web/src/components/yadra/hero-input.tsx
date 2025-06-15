@@ -81,6 +81,27 @@ export function HeroInput({ className }: HeroInputProps) {
     [router, reportStyle],
   );
 
+  // 监听示例问题选择事件
+  useEffect(() => {
+    const handleQuestionSelect = (event: CustomEvent) => {
+      const { question } = event.detail;
+      if (question && inputRef.current) {
+        inputRef.current.setContent(question);
+        setCurrentPrompt(question);
+        // 自动发送选中的问题
+        setTimeout(() => {
+          handleSendMessage(question, []);
+        }, 100);
+      }
+    };
+
+    window.addEventListener('heroQuestionSelect', handleQuestionSelect as EventListener);
+    
+    return () => {
+      window.removeEventListener('heroQuestionSelect', handleQuestionSelect as EventListener);
+    };
+  }, [handleSendMessage]);
+
   const handleEnhancePrompt = useCallback(async () => {
     if (currentPrompt.trim() === "" || isEnhancing) {
       return;

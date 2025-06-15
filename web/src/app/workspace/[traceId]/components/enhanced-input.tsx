@@ -16,6 +16,7 @@ import {
   useWorkspaceActions, 
   useWorkspaceFeedback 
 } from "~/core/store/workspace-store";
+
 import { cn } from "~/lib/utils";
 
 // 导入反馈系统组件
@@ -32,7 +33,7 @@ interface EnhancedInputProps {
 }
 
 export function EnhancedInput({
-  traceId: _traceId,
+  traceId,
   className,
   placeholder = "继续对话...",
   onSendMessage,
@@ -51,6 +52,8 @@ export function EnhancedInput({
   // 从workspace store获取反馈状态和操作
   const feedback = useWorkspaceFeedback();
   const { removeFeedback } = useWorkspaceActions();
+  
+
 
   // 自动调整textarea高度
   const adjustTextareaHeight = useCallback(() => {

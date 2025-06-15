@@ -47,34 +47,62 @@ def handoff_to_planner(
 
 def background_investigation_node(state: State, config: RunnableConfig):
     logger.info("background investigation node is running.")
+    logger.info(f"Research topic: {state.get('research_topic')}")
+    logger.info(f"Selected search engine: {SELECTED_SEARCH_ENGINE}")
+    
     configurable = Configuration.from_runnable_config(config)
     query = state.get("research_topic")
     background_investigation_results = None
+    
     if SELECTED_SEARCH_ENGINE == SearchEngine.TAVILY.value:
-        searched_content = LoggedTavilySearch(
-            max_results=configurable.max_search_results
-        ).invoke(query)
-        if isinstance(searched_content, list):
-            background_investigation_results = [
-                f"## {elem['title']}\n\n{elem['content']}" for elem in searched_content
-            ]
-            return {
-                "background_investigation_results": "\n\n".join(
-                    background_investigation_results
+        logger.info("Using Tavily search engine")
+        try:
+            searched_content = LoggedTavilySearch(
+                max_results=configurable.max_search_results
+            ).invoke(query)
+            logger.info(f"Tavily search returned: {type(searched_content)}, length: {len(searched_content) if isinstance(searched_content, list) else 'N/A'}")
+            
+            if isinstance(searched_content, list):
+                background_investigation_results = [
+                    f"## {elem['title']}\n\n{elem['content']}" for elem in searched_content
+                ]
+                result = {
+                    "background_investigation_results": "\n\n".join(
+                        background_investigation_results
+                    )
+                }
+                logger.info(f"Background investigation completed successfully, result length: {len(result['background_investigation_results'])}")
+                return result
+            else:
+                logger.error(
+                    f"Tavily search returned malformed response: {searched_content}"
+                )
+        except Exception as e:
+            logger.error(f"Error in Tavily search: {e}")
+            logger.exception("Full traceback:")
+    else:
+        logger.info("Using alternative search engine")
+        try:
+            background_investigation_results = get_web_search_tool(
+                configurable.max_search_results
+            ).invoke(query)
+            logger.info(f"Alternative search completed, result type: {type(background_investigation_results)}")
+            
+            result = {
+                "background_investigation_results": json.dumps(
+                    background_investigation_results, ensure_ascii=False
                 )
             }
-        else:
-            logger.error(
-                f"Tavily search returned malformed response: {searched_content}"
-            )
-    else:
-        background_investigation_results = get_web_search_tool(
-            configurable.max_search_results
-        ).invoke(query)
+            logger.info(f"Background investigation completed successfully, result length: {len(result['background_investigation_results'])}")
+            return result
+        except Exception as e:
+            logger.error(f"Error in alternative search: {e}")
+            logger.exception("Full traceback:")
+    
+    # 如果所有搜索都失败，返回空结果
+    logger.warning("All search methods failed, returning empty result")
     return {
-        "background_investigation_results": json.dumps(
-            background_investigation_results, ensure_ascii=False
-        )
+        "background_investigation_results": ""
     }
 
 
@@ -243,15 +271,24 @@ def coordinator_node(
     )
     logger.debug(f"Current state messages: {state['messages']}")
 
+    # 添加详细的调试日志
+    logger.info(f"Coordinator LLM response type: {type(response)}")
+    logger.info(f"Coordinator LLM response content: {response.content}")
+    logger.info(f"Coordinator LLM response tool_calls: {response.tool_calls}")
+    logger.info(f"Coordinator LLM response tool_calls length: {len(response.tool_calls)}")
+    logger.info(f"Enable background investigation: {state.get('enable_background_investigation')}")
+
     goto = "__end__"
     locale = state.get("locale", "en-US")  # Default locale if not specified
     research_topic = state.get("research_topic", "")
 
     if len(response.tool_calls) > 0:
         goto = "planner"
+        logger.info("Tool calls detected, setting goto to planner")
         if state.get("enable_background_investigation"):
             # if the search_before_planning is True, add the web search tool to the planner agent
             goto = "background_investigator"
+            logger.info("Background investigation enabled, changing goto to background_investigator")
         try:
             for tool_call in response.tool_calls:
                 if tool_call.get("name", "") != "handoff_to_planner":
@@ -270,6 +307,7 @@ def coordinator_node(
         )
         logger.debug(f"Coordinator response: {response}")
 
+    logger.info(f"Final goto decision: {goto}")
     return Command(
         update={
             "locale": locale,

@@ -1,34 +1,22 @@
 # Copyright (c) 2025 YADRA
 
-
 """
-Built-in questions for YADRA.
+Built-in questions configuration for YADRA.
+
+📋 管理策略更新：
+- 示例问题已迁移到前端专用配置 (web/src/config/questions.ts)
+- 命令行用户为专业用户，不需要示例问题引导
+- 此文件保留用于未来可能的扩展需求
+
+🔄 历史记录：
+- 原本用于命令行交互模式的示例问题选择
+- 已简化命令行体验，移除示例问题选择步骤
 """
 
-# English built-in questions
-BUILT_IN_QUESTIONS = [
-    "What factors are influencing AI adoption in healthcare?",
-    "How does quantum computing impact cryptography?",
-    "What are the latest developments in renewable energy technology?",
-    "How is climate change affecting global agriculture?",
-    "What are the ethical implications of artificial intelligence?",
-    "What are the current trends in cybersecurity?",
-    "How is blockchain technology being used outside of cryptocurrency?",
-    "What advances have been made in natural language processing?",
-    "How is machine learning transforming the financial industry?",
-    "What are the environmental impacts of electric vehicles?",
-]
+# 注意：示例问题已迁移到前端配置
+# 如果未来需要在后端使用示例问题，可以通过API从前端获取
+# 或者重新在此处定义
 
-# Chinese built-in questions
-BUILT_IN_QUESTIONS_ZH_CN = [
-    "人工智能在医疗保健领域的应用有哪些因素影响?",
-    "量子计算如何影响密码学?",
-    "可再生能源技术的最新发展是什么?",
-    "气候变化如何影响全球农业?",
-    "人工智能的伦理影响是什么?",
-    "网络安全的当前趋势是什么?",
-    "区块链技术在加密货币之外如何应用?",
-    "自然语言处理领域有哪些进展?",
-    "机器学习如何改变金融行业?",
-    "电动汽车对环境有什么影响?",
-]
+# 保留空的配置以避免导入错误
+BUILT_IN_QUESTIONS = []
+BUILT_IN_QUESTIONS_ZH_CN = []
