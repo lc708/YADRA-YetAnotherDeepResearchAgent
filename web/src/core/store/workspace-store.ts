@@ -20,6 +20,8 @@ export interface WorkspaceState {
   // UI状态控制
   conversationPanelVisible: boolean;
   artifactsPanelVisible: boolean;
+  historyPanelVisible: boolean;
+  podcastPanelVisible: boolean;
   
   // 反馈系统状态
   feedback: { option: Option } | null;
@@ -41,8 +43,12 @@ export interface WorkspaceActions {
   // UI面板控制
   toggleConversationPanel: () => void;
   toggleArtifactsPanel: () => void;
+  toggleHistoryPanel: () => void;
+  togglePodcastPanel: () => void;
   setConversationPanelVisible: (visible: boolean) => void;
   setArtifactsPanelVisible: (visible: boolean) => void;
+  setHistoryPanelVisible: (visible: boolean) => void;
+  setPodcastPanelVisible: (visible: boolean) => void;
   
   // 反馈系统操作
   setFeedback: (feedback: { option: Option } | null) => void;
@@ -78,6 +84,8 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
     currentTraceId: null,
     conversationPanelVisible: true,
     artifactsPanelVisible: true,
+    historyPanelVisible: false,
+    podcastPanelVisible: false,
     feedback: null,
     adaptedArtifacts: new Map(),
     lastUpdateTime: new Map(),
@@ -99,12 +107,32 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       }));
     },
     
+    toggleHistoryPanel: () => {
+      set((state) => ({
+        historyPanelVisible: !state.historyPanelVisible,
+      }));
+    },
+    
+    togglePodcastPanel: () => {
+      set((state) => ({
+        podcastPanelVisible: !state.podcastPanelVisible,
+      }));
+    },
+    
     setConversationPanelVisible: (visible: boolean) => {
       set({ conversationPanelVisible: visible });
     },
     
     setArtifactsPanelVisible: (visible: boolean) => {
       set({ artifactsPanelVisible: visible });
+    },
+    
+    setHistoryPanelVisible: (visible: boolean) => {
+      set({ historyPanelVisible: visible });
+    },
+    
+    setPodcastPanelVisible: (visible: boolean) => {
+      set({ podcastPanelVisible: visible });
     },
     
     setFeedback: (feedback: { option: Option } | null) => {
@@ -185,6 +213,12 @@ export const useConversationPanelVisible = () =>
 export const useArtifactsPanelVisible = () => 
   useWorkspaceStore(useShallow((state) => state.artifactsPanelVisible));
 
+export const useHistoryPanelVisible = () => 
+  useWorkspaceStore(useShallow((state) => state.historyPanelVisible));
+
+export const usePodcastPanelVisible = () => 
+  useWorkspaceStore(useShallow((state) => state.podcastPanelVisible));
+
 /**
  * 获取指定trace的artifacts数据
  * 从主store获取Message数据，通过state-adapter转换为Artifact格式
@@ -244,8 +278,12 @@ export const useWorkspaceActions = () => {
     setCurrentTraceId: state.setCurrentTraceId,
     toggleConversationPanel: state.toggleConversationPanel,
     toggleArtifactsPanel: state.toggleArtifactsPanel,
+    toggleHistoryPanel: state.toggleHistoryPanel,
+    togglePodcastPanel: state.togglePodcastPanel,
     setConversationPanelVisible: state.setConversationPanelVisible,
     setArtifactsPanelVisible: state.setArtifactsPanelVisible,
+    setHistoryPanelVisible: state.setHistoryPanelVisible,
+    setPodcastPanelVisible: state.setPodcastPanelVisible,
     setFeedback: state.setFeedback,
     removeFeedback: state.removeFeedback,
     refreshArtifactsForTrace: state.refreshArtifactsForTrace,

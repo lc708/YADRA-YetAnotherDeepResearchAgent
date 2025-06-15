@@ -94,8 +94,14 @@ function generateNodeName(message: Message): string {
     return AGENT_TO_NODE_NAME[message.agent]!;
   }
   
-  // 用户消息处理
+  // 用户消息处理 - 根据source区分指令和查询
   if (message.role === "user") {
+    if (message.source === "button") {
+      return "用户指令";
+    } else if (message.source === "input") {
+      return "用户查询";
+    }
+    // 兼容旧数据，默认为查询
     return "用户查询";
   }
   

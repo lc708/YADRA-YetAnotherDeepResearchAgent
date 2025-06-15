@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
-import { Eye, Download, Edit, Copy, FileText, Code, Music, Image } from "lucide-react";
+import { Eye, Download, Edit, Copy, FileText, Code, Music, Image, Headphones } from "lucide-react";
 import { cn } from "~/lib/utils";
 import type { Artifact } from "~/lib/supa";
 import { ArtifactUtils } from "~/lib/supa";
@@ -12,6 +12,7 @@ interface ArtifactCardProps {
   onEdit?: (artifact: Artifact) => void;
   onCopy?: (artifact: Artifact) => void;
   onDownload?: (artifact: Artifact) => void;
+  onGeneratePodcast?: (artifact: Artifact) => void;
   className?: string;
 }
 
@@ -21,12 +22,25 @@ export function ArtifactCard({
   onEdit,
   onCopy,
   onDownload,
+  onGeneratePodcast,
   className,
 }: ArtifactCardProps) {
   const isProcess = artifact.type === "process";
   const isReport = ArtifactUtils.isReport(artifact);
   const isCode = ArtifactUtils.isCode(artifact);
   const isMedia = ArtifactUtils.isMedia(artifact);
+  
+  // 判断是否支持预览 - 只有内容丰富的结果类型才支持预览
+  const canPreview = (): boolean => {
+    if (artifact.type !== "result") return false;
+    if (!artifact.payload_url || artifact.payload_url.length < 100) return false;
+    return isReport || isCode;
+  };
+  
+  // 判断是否支持播客生成 - 只有报告类型支持
+  const canGeneratePodcast = (): boolean => {
+    return isReport && artifact.type === "result" && !!onGeneratePodcast;
+  };
   
   // 获取图标
   const getIcon = () => {
@@ -90,23 +104,45 @@ export function ArtifactCard({
           </div>
           
           <div className="flex items-center gap-1">
-            {/* 查看按钮 - 所有类型都支持 */}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onView?.(artifact)}
-              className="h-8 w-8 p-0"
-            >
-              <Eye className="h-3 w-3" />
-            </Button>
+            {/* 查看按钮 - 仅支持预览的类型显示 */}
+            {canPreview() && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onView?.(artifact)}
+                className="h-8 w-8 p-0"
+                title="预览内容"
+              >
+                <Eye className="h-3 w-3" />
+              </Button>
+            )}
             
-            {/* 编辑按钮 - 只有报告类型支持 */}
-            {isReport && onEdit && (
+            {/* 播客生成按钮 - 仅报告类型支持 */}
+            {canGeneratePodcast() && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  if (onGeneratePodcast) {
+                    onGeneratePodcast(artifact);
+                  }
+                }}
+                className="h-8 w-8 p-0"
+                title="生成播客"
+              >
+                <Headphones className="h-3 w-3" />
+              </Button>
+            )}
+            
+            {/* 编辑按钮 - 暂时禁用，等待Supabase支持 */}
+            {false && isReport && onEdit && (
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => onEdit(artifact)}
                 className="h-8 w-8 p-0"
+                disabled
+                title="编辑功能正在开发中"
               >
                 <Edit className="h-3 w-3" />
               </Button>
@@ -119,6 +155,7 @@ export function ArtifactCard({
                 size="sm"
                 onClick={() => onCopy(artifact)}
                 className="h-8 w-8 p-0"
+                title="复制到剪贴板"
               >
                 <Copy className="h-3 w-3" />
               </Button>
@@ -131,6 +168,7 @@ export function ArtifactCard({
                 size="sm"
                 onClick={() => onDownload(artifact)}
                 className="h-8 w-8 p-0"
+                title="下载文件"
               >
                 <Download className="h-3 w-3" />
               </Button>
