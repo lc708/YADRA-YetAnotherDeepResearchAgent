@@ -15,6 +15,7 @@ from .nodes import (
     coder_node,
     human_feedback_node,
     background_investigation_node,
+    reask_node,
 )
 
 
@@ -46,6 +47,7 @@ def _build_base_graph():
     builder.add_node("researcher", researcher_node)
     builder.add_node("coder", coder_node)
     builder.add_node("human_feedback", human_feedback_node)
+    builder.add_node("reask", reask_node)  # 添加重新提问节点
     builder.add_edge("background_investigator", "planner")
     builder.add_conditional_edges(
         "research_team",
@@ -53,6 +55,7 @@ def _build_base_graph():
         ["planner", "researcher", "coder"],
     )
     builder.add_edge("reporter", END)
+    builder.add_edge("reask", END)  # 重新提问节点连接到结束
     return builder
 
 

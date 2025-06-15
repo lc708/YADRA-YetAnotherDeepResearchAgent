@@ -208,7 +208,7 @@ function MessageListItem({
   }
 }
 
-function MessageBubble({
+export function MessageBubble({
   className,
   message,
   children,
@@ -231,7 +231,7 @@ function MessageBubble({
   );
 }
 
-function ResearchCard({
+export function ResearchCard({
   className,
   researchId,
   onToggleResearch,
@@ -294,7 +294,7 @@ function ResearchCard({
 }
 
 const GREETINGS = ["Cool", "Sounds great", "Looks good", "Great", "Awesome"];
-function PlanCard({
+export function PlanCard({
   className,
   message,
   interruptMessage,
@@ -362,31 +362,80 @@ function PlanCard({
         )}
       </CardContent>
       <CardFooter className="flex justify-end">
-        {!message.isStreaming && interruptMessage?.options?.length && (
+        {/* 调试信息 */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="text-xs text-gray-500 mr-4">
+            Debug: interruptMessage={interruptMessage ? 'exists' : 'null'}, 
+            options={interruptMessage?.options?.length || 0}, 
+            isStreaming={message.isStreaming ? 'true' : 'false'}
+          </div>
+        )}
+        {!message.isStreaming && (
           <motion.div
             className="flex gap-2"
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: 0.3 }}
           >
-            {interruptMessage?.options.map((option) => (
-              <Button
-                key={option.value}
-                variant={option.value === "accepted" ? "default" : "outline"}
-                disabled={!waitForFeedback}
-                onClick={() => {
-                  if (option.value === "accepted") {
-                    void handleAccept();
-                  } else {
-                    onFeedback?.({
-                      option,
-                    });
-                  }
-                }}
-              >
-                {option.text}
-              </Button>
-            ))}
+            <Button
+              variant="destructive"
+              onClick={(e) => {
+                console.log("=== 重新提问按钮点击 ===");
+                console.log("message.originalInput:", message.originalInput);
+                
+                // 阻止事件冒泡
+                e.preventDefault();
+                e.stopPropagation();
+                
+                // 获取原始输入文字
+                const originalText = message.originalInput?.text || "";
+                console.log("原始输入文字:", originalText);
+                
+                // 直接导航回首页，带上原始输入文字作为URL参数
+                const params = new URLSearchParams();
+                if (originalText) {
+                  params.set('reask', originalText);
+                }
+                
+                const targetUrl = `/${params.toString() ? '?' + params.toString() : ''}`;
+                console.log("导航到:", targetUrl);
+                
+                // 使用window.location进行导航
+                window.location.href = targetUrl;
+              }}
+            >
+              重新提问
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                onFeedback?.({
+                  option: { value: "edit_plan", text: "编辑计划" }
+                });
+              }}
+            >
+              编辑计划
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (onSendMessage) {
+                  onSendMessage("立刻输出报告，跳过研究步骤。", {
+                    interruptFeedback: "skip_research",
+                  });
+                }
+              }}
+            >
+              立刻输出报告
+            </Button>
+            <Button
+              variant="default"
+              onClick={() => {
+                void handleAccept();
+              }}
+            >
+              开始研究
+            </Button>
           </motion.div>
         )}
       </CardFooter>
@@ -394,7 +443,7 @@ function PlanCard({
   );
 }
 
-function PodcastCard({
+export function PodcastCard({
   className,
   message,
 }: {

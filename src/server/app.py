@@ -131,20 +131,40 @@ async def _astream_workflow_generator(
     ):
         if isinstance(event_data, dict):
             if "__interrupt__" in event_data:
-                yield _make_event(
-                    "interrupt",
-                    {
-                        "thread_id": thread_id,
-                        "id": event_data["__interrupt__"][0].ns[0],
-                        "role": "assistant",
-                        "content": event_data["__interrupt__"][0].value,
-                        "finish_reason": "interrupt",
-                        "options": [
-                            {"text": "Edit plan", "value": "edit_plan"},
-                            {"text": "Start research", "value": "accepted"},
-                        ],
-                    },
-                )
+                interrupt_data = event_data["__interrupt__"][0]
+                interrupt_value = interrupt_data.value
+                
+                # 检查是否是reask类型的interrupt
+                if isinstance(interrupt_value, tuple) and len(interrupt_value) == 2 and interrupt_value[0] == "reask":
+                    # 处理reask interrupt
+                    original_input = interrupt_value[1]
+                    yield _make_event(
+                        "reask",
+                        {
+                            "thread_id": thread_id,
+                            "id": interrupt_data.ns[0],
+                            "role": "assistant",
+                            "content": "正在恢复原始输入状态...",
+                            "finish_reason": "reask",
+                            "original_input": original_input,
+                        },
+                    )
+                else:
+                    # 处理标准interrupt
+                    yield _make_event(
+                        "interrupt",
+                        {
+                            "thread_id": thread_id,
+                            "id": interrupt_data.ns[0],
+                            "role": "assistant",
+                            "content": interrupt_value,
+                            "finish_reason": "interrupt",
+                            "options": [
+                                {"text": "Edit plan", "value": "edit_plan"},
+                                {"text": "Start research", "value": "accepted"},
+                            ],
+                        },
+                    )
             continue
         message_chunk, message_metadata = cast(
             tuple[BaseMessage, dict[str, any]], event_data

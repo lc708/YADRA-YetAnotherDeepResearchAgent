@@ -3,7 +3,6 @@
 import "~/styles/globals.css";
 
 import { type Metadata } from "next";
-import { Geist } from "next/font/google";
 import Script from "next/script";
 
 import { ThemeProviderWrapper } from "~/components/yadra/theme-provider-wrapper";
@@ -18,16 +17,17 @@ export const metadata: Metadata = {
   icons: [{ rel: "icon", url: "/favicon.ico" }],
 };
 
-const geist = Geist({
-  subsets: ["latin"],
-  variable: "--font-geist-sans",
-});
+// 临时禁用Google字体以解决Turbopack问题
+// const geist = Geist({
+//   subsets: ["latin"],
+//   variable: "--font-geist-sans",
+// });
 
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${geist.variable}`} suppressHydrationWarning>
+    <html lang="en" className="font-sans" suppressHydrationWarning>
       <head>
         <Script id="markdown-it-fix" strategy="beforeInteractive">
           {`

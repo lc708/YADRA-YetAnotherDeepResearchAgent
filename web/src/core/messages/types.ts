@@ -18,9 +18,16 @@ export interface Message {
   contentChunks: string[];
   toolCalls?: ToolCallRuntime[];
   options?: Option[];
-  finishReason?: "stop" | "interrupt" | "tool_calls";
+  finishReason?: "stop" | "interrupt" | "tool_calls" | "reask";
   interruptFeedback?: string;
   resources?: Array<Resource>;
+  originalInput?: {
+    text: string;
+    locale: string;
+    settings: Record<string, any>;
+    resources: any[];
+    timestamp: string;
+  };
 }
 
 export interface Option {

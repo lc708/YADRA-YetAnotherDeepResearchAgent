@@ -38,6 +38,7 @@ export const useStore = create<{
   setOngoingResearch: (researchId: string | null) => void;
   addArtifact: (artifact: Artifact) => void;
   updateArtifact: (artifact: Artifact) => void;
+  clearConversation: () => void;
 }>((set) => ({
   responding: false,
   threadId: THREAD_ID,
@@ -99,6 +100,18 @@ export const useStore = create<{
       artifacts: new Map(state.artifacts).set(artifact.id, artifact),
     }));
   },
+  clearConversation() {
+    set({
+      messageIds: [],
+      messages: new Map<string, Message>(),
+      researchIds: [],
+      researchPlanIds: new Map<string, string>(),
+      researchReportIds: new Map<string, string>(),
+      researchActivityIds: new Map<string, string[]>(),
+      ongoingResearchId: null,
+      openResearchId: null,
+    });
+  },
 }));
 
 export async function sendMessage(
@@ -113,6 +126,7 @@ export async function sendMessage(
   options: { abortSignal?: AbortSignal } = {},
 ) {
   if (content != null) {
+    const settings = getChatStreamSettings();
     appendMessage({
       id: nanoid(),
       threadId: THREAD_ID,
@@ -120,6 +134,17 @@ export async function sendMessage(
       content: content,
       contentChunks: [content],
       resources,
+      originalInput: {
+        text: content,
+        locale: 'zh-CN', // 默认语言，可以根据需要调整
+        settings: {
+          enable_background_investigation: settings.enableBackgroundInvestigation ?? true,
+          auto_accepted_plan: settings.autoAcceptedPlan,
+          report_style: settings.reportStyle,
+        },
+        resources: resources || [],
+        timestamp: new Date().toISOString(),
+      },
     });
   }
 
@@ -152,6 +177,17 @@ export async function sendMessage(
       if (type === "tool_call_result") {
         message = findMessageByToolCallId(data.tool_call_id);
       } else if (!existsMessage(messageId)) {
+        // 查找最近的用户消息以获取originalInput
+        let originalInput: any = undefined;
+        const messageIds = useStore.getState().messageIds;
+        for (let i = messageIds.length - 1; i >= 0; i--) {
+          const msg = getMessage(messageIds[i]!);
+          if (msg?.role === "user" && msg.originalInput) {
+            originalInput = msg.originalInput;
+            break;
+          }
+        }
+        
         message = {
           id: messageId,
           threadId: data.thread_id,
@@ -161,6 +197,7 @@ export async function sendMessage(
           contentChunks: [],
           isStreaming: true,
           interruptFeedback,
+          originalInput, // 继承用户消息的originalInput
         };
         appendMessage(message);
       }
@@ -420,4 +457,119 @@ export function useToolCalls() {
         .flat();
     }),
   );
+}
+
+// ============================================================================
+// Workspace适配器集成
+// ============================================================================
+
+import { workspaceStateAdapter } from "~/core/adapters/state-adapter";
+import { useWorkspaceStore } from "~/core/store/workspace-store";
+
+/**
+ * 同步主store状态到workspace store的适配器函数
+ */
+export function syncStateToWorkspace(traceId: string) {
+  const mainState = useStore.getState();
+  
+  // 使用适配器生成artifacts
+  const artifacts = workspaceStateAdapter.getArtifactsForTrace(
+    mainState.messages,
+    mainState.messageIds,
+    mainState.researchIds,
+    mainState.researchPlanIds,
+    mainState.researchReportIds,
+    mainState.researchActivityIds,
+    traceId
+  );
+  
+  // 更新workspace store
+  const workspaceState = useWorkspaceStore.getState();
+  const newAdaptedArtifacts = new Map(workspaceState.adaptedArtifacts);
+  const newLastUpdateTime = new Map(workspaceState.lastUpdateTime);
+  
+  newAdaptedArtifacts.set(traceId, artifacts);
+  newLastUpdateTime.set(traceId, Date.now());
+  
+  useWorkspaceStore.setState({
+    adaptedArtifacts: newAdaptedArtifacts,
+    lastUpdateTime: newLastUpdateTime,
+  });
+  
+  // 同时更新主store的artifacts映射
+  const artifactMap = new Map(mainState.artifacts);
+  const artifactsByTraceMap = new Map(mainState.artifactsByTrace);
+  
+  artifacts.forEach(artifact => {
+    artifactMap.set(artifact.id, artifact);
+  });
+  
+  artifactsByTraceMap.set(traceId, artifacts.map(a => a.id));
+  
+  useStore.setState({
+    artifacts: artifactMap,
+    artifactsByTrace: artifactsByTraceMap,
+  });
+}
+
+/**
+ * 监听主store变化并自动同步到workspace
+ */
+let isSubscribed = false;
+
+export function enableWorkspaceSync() {
+  if (isSubscribed) return;
+  
+  isSubscribed = true;
+  
+  // 监听消息变化
+  let lastMessageCount = 0;
+  useStore.subscribe((state) => {
+    const currentTraceId = useWorkspaceStore.getState().currentTraceId;
+    if (currentTraceId && state.messageIds.length !== lastMessageCount) {
+      lastMessageCount = state.messageIds.length;
+      // 延迟同步，避免在消息流式传输过程中频繁更新
+      setTimeout(() => {
+        syncStateToWorkspace(currentTraceId);
+      }, 100);
+    }
+  });
+  
+  // 监听研究状态变化
+  let lastResearchCount = 0;
+  useStore.subscribe((state) => {
+    const currentTraceId = useWorkspaceStore.getState().currentTraceId;
+    if (currentTraceId && state.researchIds.length !== lastResearchCount) {
+      lastResearchCount = state.researchIds.length;
+      setTimeout(() => {
+        syncStateToWorkspace(currentTraceId);
+      }, 100);
+    }
+  });
+}
+
+/**
+ * 获取当前workspace的artifacts
+ */
+export function useWorkspaceArtifacts() {
+  const currentTraceId = useWorkspaceStore((state) => state.currentTraceId);
+  const artifacts = useWorkspaceStore((state) => 
+    currentTraceId ? state.adaptedArtifacts.get(currentTraceId) || [] : []
+  );
+  
+  return { artifacts, traceId: currentTraceId };
+}
+
+/**
+ * 初始化workspace集成
+ * 应该在应用启动时调用
+ */
+export function initializeWorkspaceIntegration() {
+  enableWorkspaceSync();
+  
+  // 如果已经有当前traceId，立即同步一次
+  const currentTraceId = useWorkspaceStore.getState().currentTraceId;
+  if (currentTraceId) {
+    syncStateToWorkspace(currentTraceId);
+  }
 }

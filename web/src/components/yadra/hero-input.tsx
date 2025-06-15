@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { nanoid } from "nanoid";
 import { Send, Paperclip } from "lucide-react";
 import { MagicWandIcon } from "@radix-ui/react-icons";
@@ -31,6 +31,7 @@ interface HeroInputProps {
 
 export function HeroInput({ className }: HeroInputProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [currentPlaceholder, setCurrentPlaceholder] = useState(0);
   const [currentPrompt, setCurrentPrompt] = useState("");
   const [isEnhancing, setIsEnhancing] = useState(false);
@@ -39,6 +40,18 @@ export function HeroInput({ className }: HeroInputProps) {
   
   const inputRef = useRef<MessageInputRef>(null);
   const reportStyle = useSettingsStore((state) => state.general.reportStyle);
+
+  useEffect(() => {
+    const reaskText = searchParams.get('reask');
+    if (reaskText && inputRef.current) {
+      console.log("检测到reask参数:", reaskText);
+      inputRef.current.setContent(reaskText);
+      setCurrentPrompt(reaskText);
+      
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, '', newUrl);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     const interval = setInterval(() => {

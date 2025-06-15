@@ -7,6 +7,7 @@ import type {
   ToolCallChunksEvent,
   ToolCallResultEvent,
   ToolCallsEvent,
+  ReaskEvent,
 } from "../api";
 import { deepClone } from "../utils/deep-clone";
 
@@ -21,6 +22,8 @@ export function mergeMessage(message: Message, event: ChatEvent) {
     mergeToolCallResultMessage(message, event);
   } else if (event.type === "interrupt") {
     mergeInterruptMessage(message, event);
+  } else if (event.type === "reask") {
+    mergeReaskMessage(message, event);
   }
   if (event.data.finish_reason) {
     message.finishReason = event.data.finish_reason;
@@ -92,4 +95,9 @@ function mergeToolCallResultMessage(
 function mergeInterruptMessage(message: Message, event: InterruptEvent) {
   message.isStreaming = false;
   message.options = event.data.options;
+}
+
+function mergeReaskMessage(message: Message, event: ReaskEvent) {
+  message.isStreaming = false;
+  message.originalInput = event.data.original_input;
 }
