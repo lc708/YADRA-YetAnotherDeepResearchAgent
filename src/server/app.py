@@ -5,10 +5,10 @@ import base64
 import json
 import logging
 import os
-from typing import Annotated, List, cast
+from typing import Annotated, List, cast, Optional
 from uuid import uuid4
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, StreamingResponse
 from langchain_core.messages import AIMessageChunk, ToolMessage, BaseMessage
@@ -41,6 +41,27 @@ from src.server.rag_request import (
 from src.server.config_request import ConfigResponse
 from src.llms.llm import get_configured_llm_models
 from src.tools import VolcengineTTS
+# Old auth_api imports removed - now using supabase_auth_api
+
+# Import Supabase authentication functions
+from src.server.supabase_auth_api import (
+    UserSignUpRequest,
+    UserSignInRequest,
+    UserUpdateRequest,
+    UserResponse,
+    AuthResponse,
+    TaskResponse,
+    sign_up_user,
+    sign_in_user,
+    sign_out_user,
+    get_user_info,
+    get_current_user,
+    get_current_user_email,
+    get_user_tasks,
+    create_or_update_task,
+    setup_user_tables,
+    update_user_profile,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -65,10 +86,27 @@ graph = build_graph_with_memory()
 
 
 @app.post("/api/chat/stream")
-async def chat_stream(request: ChatRequest):
+async def chat_stream(
+    request: ChatRequest, 
+    authorization: Optional[str] = Header(None)
+):
+    # 尝试获取当前用户，但不强制要求
+    current_user = None
+    if authorization:
+        try:
+            current_user = await get_current_user(authorization)
+        except:
+            # 如果认证失败，仍然允许匿名访问
+            pass
+    
     thread_id = request.thread_id
     if thread_id == "__default__":
         thread_id = str(uuid4())
+    
+    # 如果有用户登录，创建或更新任务记录
+    if current_user:
+        await create_or_update_task(current_user['user_id'], thread_id)
+    
     return StreamingResponse(
         _astream_workflow_generator(
             request.model_dump()["messages"],
@@ -83,6 +121,7 @@ async def chat_stream(request: ChatRequest):
             request.enable_background_investigation,
             request.report_style,
             request.enable_deep_thinking,
+            user_id=current_user['user_id'] if current_user else None,
         ),
         media_type="text/event-stream",
     )
@@ -101,6 +140,7 @@ async def _astream_workflow_generator(
     enable_background_investigation: bool,
     report_style: ReportStyle,
     enable_deep_thinking: bool,
+    user_id: Optional[str] = None,
 ):
     input_ = {
         "messages": messages,
@@ -219,6 +259,9 @@ async def _astream_workflow_generator(
             else:
                 # AI Message - Raw message tokens
                 yield _make_event("message_chunk", event_stream_message)
+    
+    # 添加流式响应结束标志
+    yield _make_event("done", {"thread_id": thread_id, "status": "completed"})
 
 
 def _make_event(event_type: str, data: dict[str, any]):
@@ -445,3 +488,58 @@ async def config():
         rag=RAGConfigResponse(provider=SELECTED_RAG_PROVIDER),
         models=get_configured_llm_models(),
     )
+
+
+# User Authentication API Endpoints
+@app.post("/api/auth/register", response_model=AuthResponse)
+async def register_user(user_data: UserSignUpRequest):
+    """注册新用户 - 使用 Supabase Auth"""
+    return await sign_up_user(user_data)
+
+@app.post("/api/auth/login", response_model=AuthResponse)
+async def login(login_data: UserSignInRequest):
+    """用户登录 - 使用 Supabase Auth"""
+    return await sign_in_user(login_data)
+
+@app.post("/api/auth/logout")
+async def logout(current_user: dict = Depends(get_current_user)):
+    """用户登出"""
+    return await sign_out_user(current_user["user"]["access_token"])
+
+@app.get("/api/auth/me", response_model=UserResponse)
+async def get_me(current_user: dict = Depends(get_current_user)):
+    """获取当前登录用户信息 - 使用 Supabase Auth"""
+    return await get_user_info(current_user)
+
+@app.put("/api/auth/me", response_model=UserResponse)
+async def update_me(
+    update_data: UserUpdateRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """更新当前用户信息"""
+    return await update_user_profile(current_user["user_id"], update_data)
+
+# Task Management API
+@app.get("/api/tasks", response_model=List[TaskResponse])
+async def get_tasks(
+    status: Optional[str] = Query(None, description="Filter by status: active, completed, paused"),
+    current_user: dict = Depends(get_current_user)
+):
+    """获取用户任务列表"""
+    return await get_user_tasks(current_user['user_id'], status)
+
+@app.post("/api/tasks/{thread_id}", response_model=TaskResponse)
+async def create_task(
+    thread_id: str,
+    task_name: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """创建或更新任务"""
+    return await create_or_update_task(current_user['user_id'], thread_id, task_name)
+
+# 启动时设置用户表
+@app.on_event("startup")
+async def startup_event():
+    """应用启动时执行"""
+    await setup_user_tables()
+    logger.info("✅ Application startup completed")
