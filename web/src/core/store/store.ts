@@ -156,6 +156,7 @@ export async function sendMessage(
       interrupt_feedback: interruptFeedback,
       resources,
       auto_accepted_plan: settings.autoAcceptedPlan,
+      enable_deep_thinking: settings.enableDeepThinking ?? false,
       enable_background_investigation:
         settings.enableBackgroundInvestigation ?? true,
       max_plan_iterations: settings.maxPlanIterations,
@@ -195,6 +196,8 @@ export async function sendMessage(
           role: data.role,
           content: "",
           contentChunks: [],
+          reasoningContent: "",
+          reasoningContentChunks: [],
           isStreaming: true,
           interruptFeedback,
           originalInput, // 继承用户消息的originalInput
@@ -372,6 +375,8 @@ export async function listenToPodcast(researchId: string) {
         agent: "podcast",
         content: JSON.stringify(podcastObject),
         contentChunks: [],
+        reasoningContent: "",
+        reasoningContentChunks: [],
         isStreaming: true,
       };
       appendMessage(podcastMessage);

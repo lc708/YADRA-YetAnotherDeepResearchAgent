@@ -6,6 +6,7 @@ import { type Metadata } from "next";
 import Script from "next/script";
 
 import { ThemeProviderWrapper } from "~/components/yadra/theme-provider-wrapper";
+import { loadConfig } from "~/core/api/config";
 import { env } from "~/env";
 
 import { Toaster } from "../components/yadra/toaster";
@@ -23,12 +24,14 @@ export const metadata: Metadata = {
 //   variable: "--font-geist-sans",
 // });
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  const conf = await loadConfig();
   return (
     <html lang="en" className="font-sans" suppressHydrationWarning>
       <head>
+      <script>{`window.__yadraConfig = ${JSON.stringify(conf)}`}</script>
         <Script id="markdown-it-fix" strategy="beforeInteractive">
           {`
             if (typeof window !== 'undefined' && typeof window.isSpace === 'undefined') {

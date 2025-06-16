@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
 import { nanoid } from "nanoid";
-import { Send, Paperclip } from "lucide-react";
+import { Send, Paperclip, Lightbulb, ChevronDown, GraduationCap, BookOpen, Newspaper, MessageCircle, Brain, User } from "lucide-react";
 import { MagicWandIcon } from "@radix-ui/react-icons";
 import { AnimatePresence, motion } from "framer-motion";
 import { cn } from "~/lib/utils";
@@ -13,7 +14,8 @@ import MessageInput, { type MessageInputRef } from "~/components/yadra/message-i
 import { ReportStyleDialog } from "~/components/yadra/report-style-dialog";
 import { Tooltip } from "~/components/yadra/tooltip";
 import { enhancePrompt } from "~/core/api/prompt-enhancer";
-import { useSettingsStore, setEnableBackgroundInvestigation } from "~/core/store";
+import { getConfig } from "~/core/api/config";
+import { useSettingsStore, setEnableBackgroundInvestigation, setEnableDeepThinking, setReportStyle } from "~/core/store";
 import type { Resource } from "~/core/messages";
 
 const PLACEHOLDER_TEXTS = [
@@ -23,6 +25,38 @@ const PLACEHOLDER_TEXTS = [
   "研究AI对医疗保健的影响...",
   "调查可持续城市规划策略...",
   "探索区块链在金融领域的应用...",
+];
+
+// 报告风格配置 - 使用简洁明确的图标
+const REPORT_STYLES = [
+  {
+    value: "academic" as const,
+    label: "学术报告",
+    description: "严谨客观，逻辑缜密，适合研究分析",
+    icon: GraduationCap,
+    color: "text-emerald-400",
+  },
+  {
+    value: "popular_science" as const,
+    label: "科普解读", 
+    description: "通俗易懂，深入浅出，适合大众传播",
+    icon: BookOpen,
+    color: "text-blue-400",
+  },
+  {
+    value: "news" as const,
+    label: "新闻资讯",
+    description: "事实为准，简洁明了，适合快速阅读",
+    icon: Newspaper,
+    color: "text-orange-400",
+  },
+  {
+    value: "social_media" as const,
+    label: "社交媒体",
+    description: "生动有趣，观点鲜明，适合分享传播",
+    icon: MessageCircle,
+    color: "text-purple-400",
+  },
 ];
 
 interface HeroInputProps {
@@ -36,10 +70,53 @@ export function HeroInput({ className }: HeroInputProps) {
   const [currentPrompt, setCurrentPrompt] = useState("");
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [isEnhanceAnimating, setIsEnhanceAnimating] = useState(false);
-  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showStyleDropdown, setShowStyleDropdown] = useState(false);
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
   
   const inputRef = useRef<MessageInputRef>(null);
+  const styleButtonRef = useRef<HTMLButtonElement>(null);
   const reportStyle = useSettingsStore((state) => state.general.reportStyle);
+  const enableDeepThinking = useSettingsStore((state) => state.general.enableDeepThinking);
+
+  // 检测basic和reasoning model配置
+  const [basicModel, setBasicModel] = useState<string | null>(null);
+  const [reasoningModel, setReasoningModel] = useState<string | null>(null);
+  
+  // 判断是否可以操作（有输入内容）
+  const canOperate = currentPrompt.trim() !== "";
+
+  // 计算下拉框位置
+  const calculateDropdownPosition = useCallback(() => {
+    if (!styleButtonRef.current) return;
+    
+    const rect = styleButtonRef.current.getBoundingClientRect();
+    setDropdownPosition({
+      top: rect.bottom + 8, // 按钮下方8px
+      left: rect.left,
+    });
+  }, []);
+
+  // 显示下拉框时计算位置
+  const handleShowDropdown = useCallback((show: boolean) => {
+    if (show) {
+      calculateDropdownPosition();
+    }
+    setShowStyleDropdown(show);
+  }, [calculateDropdownPosition]);
+  
+  useEffect(() => {
+    try {
+      const config = getConfig();
+      const basic = config.models.basic?.[0];
+      const reasoning = config.models.reasoning?.[0];
+      setBasicModel(basic || null);
+      setReasoningModel(reasoning || null);
+    } catch (error) {
+      // Config not loaded yet or no models configured
+      setBasicModel(null);
+      setReasoningModel(null);
+    }
+  }, []);
 
   useEffect(() => {
     const reaskText = searchParams.get('reask');
@@ -64,6 +141,36 @@ export function HeroInput({ className }: HeroInputProps) {
     setEnableBackgroundInvestigation(true);
   }, []);
 
+  // 点击外部关闭下拉菜单
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (styleButtonRef.current && !styleButtonRef.current.contains(event.target as Node)) {
+        setShowStyleDropdown(false);
+      }
+    };
+    
+    if (showStyleDropdown) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [showStyleDropdown]);
+
+  // 监听窗口resize和scroll，重新计算位置
+  useEffect(() => {
+    if (!showStyleDropdown) return;
+
+    const handleResize = () => calculateDropdownPosition();
+    const handleScroll = () => calculateDropdownPosition();
+
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('scroll', handleScroll, true);
+    
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('scroll', handleScroll, true);
+    };
+  }, [showStyleDropdown, calculateDropdownPosition]);
+
   const handleSendMessage = useCallback(
     (message: string, resources: Array<Resource>) => {
       if (!message?.trim()) return;
@@ -72,13 +179,14 @@ export function HeroInput({ className }: HeroInputProps) {
       const params = new URLSearchParams({
         q: message,
         investigation: "true",
+        ...(enableDeepThinking && { enable_deep_thinking: "true" }),
         ...(reportStyle && { style: reportStyle }),
         ...(resources.length > 0 && { resources: JSON.stringify(resources) }),
       });
       
       router.push(`/workspace/${traceId}?${params.toString()}`);
     },
-    [router, reportStyle],
+    [router, reportStyle, enableDeepThinking],
   );
 
   // 监听示例问题选择事件
@@ -133,6 +241,77 @@ export function HeroInput({ className }: HeroInputProps) {
       setIsEnhancing(false);
     }
   }, [currentPrompt, isEnhancing, reportStyle]);
+
+  // 获取当前选择的风格
+  const currentStyleConfig = REPORT_STYLES.find((style) => style.value === reportStyle) || REPORT_STYLES[0]!;
+  const CurrentStyleIcon = currentStyleConfig.icon;
+
+  // Portal 下拉框组件
+  const StyleDropdown = () => {
+    if (!showStyleDropdown) return null;
+    
+    return createPortal(
+      <AnimatePresence>
+        <motion.div
+          initial={{ opacity: 0, y: -10, scale: 0.95 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: -10, scale: 0.95 }}
+          transition={{ duration: 0.15 }}
+          className="w-56 border border-white/20 bg-white/5 backdrop-blur-xl rounded-xl shadow-2xl overflow-hidden"
+          style={{ 
+            position: 'fixed',
+            top: dropdownPosition.top,
+            left: dropdownPosition.left,
+            zIndex: 99999,
+          }}
+          onMouseEnter={() => setShowStyleDropdown(true)}
+          onMouseLeave={() => setShowStyleDropdown(false)}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="p-2 space-y-1">
+            {REPORT_STYLES.map((style) => {
+              const StyleIcon = style.icon;
+              const isSelected = reportStyle === style.value;
+              
+              return (
+                <button
+                  key={style.value}
+                  onClick={() => {
+                    setReportStyle(style.value);
+                    setShowStyleDropdown(false);
+                  }}
+                  className={cn(
+                    "w-full flex items-center gap-3 p-3 rounded-lg text-left transition-all duration-200",
+                    "backdrop-blur-sm border",
+                    isSelected 
+                      ? "bg-blue-500/20 text-blue-300 border-blue-400/30 shadow-[0_0_20px_rgba(59,130,246,0.2)]" 
+                      : "text-gray-300 hover:bg-white/5 hover:text-white border-transparent hover:border-white/10"
+                  )}
+                >
+                  <div className={cn(
+                    "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border backdrop-blur-sm transition-all duration-300",
+                    isSelected 
+                      ? "border-blue-400/50 bg-blue-500/20" 
+                      : "border-white/20 bg-white/10"
+                  )}>
+                    <StyleIcon className={cn(
+                      "h-4 w-4 transition-colors duration-300",
+                      isSelected ? "text-blue-300" : style.color
+                    )} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium">{style.label}</div>
+                    <div className="text-xs text-gray-400 truncate">{style.description}</div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </motion.div>
+      </AnimatePresence>,
+      document.body
+    );
+  };
 
   return (
     <div className={cn("mx-auto w-full max-w-4xl", className)}>
@@ -192,60 +371,166 @@ export function HeroInput({ className }: HeroInputProps) {
             onEnter={handleSendMessage}
           />
           
-          <div className="flex items-center justify-between border-t border-white/10 px-4 py-3 sm:px-6">
+          {/* 去掉分割线，统一按钮高度为 h-9 */}
+          <div className="flex items-center justify-between px-4 py-3 sm:px-6">
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setShowAdvanced(!showAdvanced)}
-                className="flex items-center gap-2 text-sm text-gray-400 hover:text-white transition-colors"
-              >
-                <Paperclip className="h-4 w-4" />
-                <span className="hidden sm:inline">高级选项</span>
-              </button>
-              
-              {showAdvanced && (
-                <motion.div
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  className="flex items-center gap-2"
+              {/* 风格选择按钮 - 只显示图标，去掉外框 */}
+              <div className="relative">
+                <button
+                  ref={styleButtonRef}
+                  type="button"
+                  onMouseEnter={() => handleShowDropdown(true)}
+                  onMouseLeave={() => handleShowDropdown(false)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleShowDropdown(!showStyleDropdown);
+                  }}
+                  className={cn(
+                    "group relative overflow-hidden rounded-lg h-9 px-3 text-xs font-medium transition-all duration-300",
+                    "backdrop-blur-sm flex items-center gap-2",
+                    showStyleDropdown
+                      ? "bg-blue-500/20 text-blue-300"
+                      : "bg-white/5 text-gray-300 hover:bg-white/10 hover:text-white"
+                  )}
                 >
-                  <ReportStyleDialog />
-                </motion.div>
+                  <CurrentStyleIcon className={cn(
+                    "h-4 w-4 transition-colors duration-300",
+                    showStyleDropdown ? "text-blue-300" : currentStyleConfig.color
+                  )} />
+                  <span className="hidden sm:inline">写作风格</span>
+                  <span className="sm:hidden">风格</span>
+                  <ChevronDown className={cn(
+                    "h-3 w-3 transition-transform duration-200",
+                    showStyleDropdown && "rotate-180"
+                  )} />
+                  
+                  {/* hover 光效 */}
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100"></div>
+                </button>
+              </div>
+
+              {/* 推理模式 Toggle 按钮 - 仅在配置了reasoning model时显示，去掉外框 */}
+              {reasoningModel && (
+                <Tooltip
+                  delayDuration={300}
+                  side="bottom"
+                  sideOffset={8}
+                  className="max-w-xs border border-white/20 bg-black/90 backdrop-blur-sm text-white shadow-xl"
+                  title={
+                    <div className="p-2">
+                      <p className="mb-2 font-medium text-blue-300">
+                        {enableDeepThinking ? "推理模式" : "常规模式"}
+                      </p>
+                      <p className="text-xs text-gray-300 leading-relaxed">
+                        {enableDeepThinking 
+                          ? "AI将进行深度思考和推理，生成更加深思熟虑的研究计划"
+                          : "AI将以常规模式处理您的问题，快速生成研究计划"
+                        }
+                      </p>
+                      <div className="mt-2 pt-2 border-t border-white/10">
+                        <p className="text-xs text-gray-400">
+                          使用模型：{enableDeepThinking ? reasoningModel : basicModel}
+                        </p>
+                      </div>
+                    </div>
+                  }
+                >
+                  <button
+                    type="button"
+                    onClick={() => setEnableDeepThinking(!enableDeepThinking)}
+                    className="group relative overflow-hidden rounded-lg h-9 px-1 transition-all duration-300 backdrop-blur-sm flex items-center hover:bg-white/5"
+                  >
+                    {/* Toggle 滑块背景 - 去掉外框 */}
+                    <div className="relative w-12 h-6 rounded-full bg-white/10">
+                      {/* 滑块 */}
+                      <motion.div
+                        className={cn(
+                          "absolute top-1/2 -translate-y-1/2 w-5 h-5 rounded-full transition-all duration-300 flex items-center justify-center",
+                          enableDeepThinking 
+                            ? "left-[26px] bg-gradient-to-r from-purple-500 to-pink-500 shadow-[0_0_15px_rgba(168,85,247,0.6)]" 
+                            : "left-[2px] bg-blue-400"
+                        )}
+                        layout
+                      >
+                        {enableDeepThinking ? (
+                          <Brain className="h-4 w-4 text-white" />
+                        ) : (
+                          <User className="h-4 w-4 text-white" />
+                        )}
+                      </motion.div>
+                    </div>
+                    
+                    {/* hover 光效 */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100"></div>
+                  </button>
+                </Tooltip>
               )}
             </div>
             
             <div className="flex items-center gap-2">
-              <Tooltip title="AI增强提示">
+              {/* 提示词优化按钮 - 主题色底色，白色图标 */}
+              <Tooltip 
+                delayDuration={300}
+                side="bottom"
+                sideOffset={8}
+                className="border border-white/20 bg-black/90 backdrop-blur-sm text-white shadow-xl"
+                title="AI增强提示 - 让AI优化您的问题描述"
+              >
                 <Button
                   variant="ghost"
                   size="sm"
                   className={cn(
-                    "h-8 w-8 p-0",
-                    isEnhancing && "animate-pulse",
+                    "h-9 w-9 p-0 border transition-all duration-300",
+                    canOperate
+                      ? "border-blue-500/50 bg-blue-600/80 hover:bg-blue-600 hover:shadow-[0_0_20px_rgba(59,130,246,0.4)]"
+                      : "border-gray-400/20 bg-gray-500/20 cursor-not-allowed",
+                    isEnhancing && "animate-pulse border-blue-400/50 bg-blue-500/20"
                   )}
                   onClick={handleEnhancePrompt}
-                  disabled={isEnhancing || currentPrompt.trim() === ""}
+                  disabled={!canOperate || isEnhancing}
                 >
                   {isEnhancing ? (
-                    <div className="h-3 w-3 animate-bounce rounded-full bg-white/70" />
+                    <div className="h-3 w-3 animate-bounce rounded-full bg-white shadow-[0_0_10px_rgba(255,255,255,0.8)]" />
                   ) : (
-                    <MagicWandIcon className="h-4 w-4 text-blue-400" />
+                    <MagicWandIcon className={cn(
+                      "h-4 w-4 transition-colors",
+                      canOperate ? "text-white" : "text-gray-500"
+                    )} />
                   )}
                 </Button>
               </Tooltip>
               
-              <Button
-                onClick={() => inputRef.current?.submit()}
-                disabled={!currentPrompt.trim()}
-                className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-all hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              {/* 发送按钮 - 主题色底色，白色箭头图标 */}
+              <Tooltip
+                delayDuration={300}
+                side="bottom"
+                sideOffset={8}
+                className="border border-white/20 bg-black/90 backdrop-blur-sm text-white shadow-xl"
+                title={canOperate ? "发送消息" : "请输入消息"}
               >
-                <Send className="h-4 w-4" />
-                <span className="hidden sm:inline">发送</span>
-              </Button>
+                <Button
+                  onClick={() => inputRef.current?.submit()}
+                  disabled={!canOperate}
+                  className={cn(
+                    "h-9 w-9 p-0 rounded-lg border transition-all duration-300",
+                    canOperate
+                      ? "border-blue-500/50 bg-blue-600/80 hover:bg-blue-600 hover:shadow-[0_0_20px_rgba(59,130,246,0.4)]"
+                      : "border-gray-400/20 bg-gray-500/20 cursor-not-allowed"
+                  )}
+                >
+                  <Send className={cn(
+                    "h-4 w-4 transition-colors",
+                    canOperate ? "text-white" : "text-gray-500"
+                  )} />
+                </Button>
+              </Tooltip>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Portal 渲染的下拉框 */}
+      <StyleDropdown />
     </div>
   );
 }

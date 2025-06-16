@@ -7,7 +7,7 @@ import { env } from "~/env";
 import { useReplay } from "../replay";
 
 import { fetchReplayTitle } from "./chat";
-import { getRAGConfig } from "./rag";
+import { getConfig } from "./config";
 
 export function useReplayMetadata() {
   const { isReplay } = useReplay();
@@ -51,15 +51,8 @@ export function useRAGProvider() {
       setLoading(false);
       return;
     }
-    getRAGConfig()
-      .then(setProvider)
-      .catch((e) => {
-        setProvider(null);
-        console.error("Failed to get RAG provider", e);
-      })
-      .finally(() => {
-        setLoading(false);
-      });
+    setProvider(getConfig().rag.provider);
+    setLoading(false);
   }, []);
 
   return { provider, loading };
