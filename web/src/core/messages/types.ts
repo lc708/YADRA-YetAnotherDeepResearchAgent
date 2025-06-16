@@ -2,6 +2,8 @@
 
 export type MessageRole = "user" | "assistant" | "tool";
 
+export type MessageSource = "input" | "button" | "system";
+
 export interface Message {
   id: string;
   threadId: string;
@@ -16,11 +18,14 @@ export interface Message {
   isStreaming?: boolean;
   content: string;
   contentChunks: string[];
+  reasoningContent?: string;
+  reasoningContentChunks?: string[];
   toolCalls?: ToolCallRuntime[];
   options?: Option[];
   finishReason?: "stop" | "interrupt" | "tool_calls" | "reask";
   interruptFeedback?: string;
   resources?: Array<Resource>;
+  source?: MessageSource;
   originalInput?: {
     text: string;
     locale: string;

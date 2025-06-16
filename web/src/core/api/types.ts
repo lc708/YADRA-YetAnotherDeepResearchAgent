@@ -37,6 +37,7 @@ export interface MessageChunkEvent
     "message_chunk",
     {
       content?: string;
+      reasoning_content?: string;
     }
   > {}
 

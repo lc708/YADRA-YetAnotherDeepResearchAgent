@@ -2,8 +2,8 @@
 
 import { MagicWandIcon } from "@radix-ui/react-icons";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowUp, X } from "lucide-react";
-import { useCallback, useRef, useState, useEffect, forwardRef, useImperativeHandle } from "react";
+import { ArrowUp, Lightbulb, X } from "lucide-react";
+import { useCallback, useMemo, useRef, useState } from "react";
 
 import { BorderBeam } from "~/components/magicui/border-beam";
 import { Button } from "~/components/ui/button";
@@ -14,8 +14,10 @@ import MessageInput, {
 import { ReportStyleDialog } from "~/components/yadra/report-style-dialog";
 import { Tooltip } from "~/components/yadra/tooltip";
 import { enhancePrompt } from "~/core/api";
+import { getConfig } from "~/core/api/config";
 import type { Option, Resource } from "~/core/messages";
 import {
+  setEnableDeepThinking,
   setEnableBackgroundInvestigation,
   setAutoAcceptedPlan,
   setReportStyle,
@@ -54,9 +56,13 @@ export const InputBox = forwardRef<InputBoxRef, {
   onRemoveFeedback,
   onInputRestored,
 }, ref) => {
+  const enableDeepThinking = useSettingsStore(
+    (state) => state.general.enableDeepThinking,
+  );
   const backgroundInvestigation = useSettingsStore(
     (state) => state.general.enableBackgroundInvestigation,
   );
+  const reasoningModel = useMemo(() => getConfig().models.reasoning?.[0], []);
   // Note: autoAcceptedPlan is used in the restoration logic
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const autoAcceptedPlan = useSettingsStore(
@@ -288,6 +294,36 @@ export const InputBox = forwardRef<InputBoxRef, {
       </div>
       <div className="flex items-center px-4 py-2">
         <div className="flex grow gap-2">
+        {reasoningModel && (
+            <Tooltip
+              className="max-w-60"
+              title={
+                <div>
+                  <h3 className="mb-2 font-bold">
+                    Deep Thinking Mode: {enableDeepThinking ? "On" : "Off"}
+                  </h3>
+                  <p>
+                    When enabled, YADRA will use reasoning model (
+                    {reasoningModel}) to generate more thoughtful plans.
+                  </p>
+                </div>
+              }
+            >
+              <Button
+                className={cn(
+                  "rounded-2xl",
+                  enableDeepThinking && "!border-brand !text-brand",
+                )}
+                variant="outline"
+                onClick={() => {
+                  setEnableDeepThinking(!enableDeepThinking);
+                }}
+              >
+                <Lightbulb /> Deep Thinking
+              </Button>
+            </Tooltip>
+          )}
+
           <Tooltip
             className="max-w-60"
             title={

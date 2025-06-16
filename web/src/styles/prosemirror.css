@@ -18,6 +18,11 @@
 
 .ProseMirror {
   line-height: 1.75;
+  text-align: left;
+}
+
+.ProseMirror p {
+  text-align: left;
 }
 
 .ProseMirror .is-editor-empty:first-child::before {
