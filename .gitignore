@@ -6,6 +6,7 @@ dist/
 wheels/
 *.egg-info
 .coverage
+.coverage.*
 agent_history.gif
 static/browser_history/*.gif
 
@@ -28,3 +29,6 @@ coverage/
 
 # temporary files
 todos/
+
+#misc
+.DS_Store
