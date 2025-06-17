@@ -18,6 +18,8 @@ import { getConfig } from "~/core/api/config";
 import { useSettingsStore, setEnableBackgroundInvestigation, setEnableDeepThinking, setReportStyle } from "~/core/store";
 import type { Resource } from "~/core/messages";
 import { sendMessageAndGetThreadId } from "~/core/api/chat";
+import { createResearchStream, isNavigationEvent, buildResearchConfig } from "~/core/api/research-stream";
+import { generateInitialQuestionIDs, getVisitorId } from "~/core/utils";
 
 import { FeedbackSystem } from "~/app/workspace/[traceId]/components/feedback-system";
 import { Detective } from "~/components/yadra/icons/detective";
@@ -228,30 +230,46 @@ export function HeroInput({
         setIsSubmitting(true);
         
         try {
-          // 发送消息（不指定 thread_id，让后端生成）
-          const response = await sendMessageAndGetThreadId(currentPrompt, {
-            resources: [],
-            enableBackgroundInvestigation: true,
-            reportStyle: reportStyle || undefined,
-            enableDeepThinking: enableDeepThinking,
+          // 生成前端ID
+          const ids = generateInitialQuestionIDs();
+          const visitorId = getVisitorId();
+          
+          // 构建研究配置
+          const settings = useSettingsStore.getState().general;
+          const researchConfig = buildResearchConfig({
+            enableBackgroundInvestigation: settings.enableBackgroundInvestigation,
+            reportStyle: settings.reportStyle,
+            enableDeepThinking: settings.enableDeepThinking,
+            maxPlanIterations: settings.maxPlanIterations,
+            maxStepNum: settings.maxStepNum,
+            maxSearchResults: settings.maxSearchResults,
           });
           
-          if (response.threadId) {
-            // 构建查询参数
-            const params = new URLSearchParams({
-              q: currentPrompt,
-              investigation: "true",
-              ...(enableDeepThinking && { enable_deep_thinking: "true" }),
-              ...(reportStyle && { style: reportStyle }),
-            });
-            
-            // 使用后端返回的 thread_id 跳转
-            router.push(`/workspace/${response.threadId}?${params.toString()}`);
-          } else {
-            alert('Failed to get thread ID from server');
-            setIsSubmitting(false);
+          // 准备请求参数
+          const request = {
+            action: 'create' as const,
+            message: currentPrompt,
+            frontendUuid: ids.frontend_uuid,
+            frontendContextUuid: ids.frontend_context_uuid,
+            visitorId: visitorId,
+            userId: undefined, // TODO: 从认证状态获取
+            config: researchConfig,
+          };
+          
+          // 调用新的研究流式API
+          const stream = createResearchStream(request);
+          
+          // 监听第一个navigation事件
+          for await (const event of stream) {
+            if (isNavigationEvent(event)) {
+              const { workspaceUrl } = event.data;
+              router.push(workspaceUrl);
+              break; // 跳转后停止处理流
+            }
           }
+          
         } catch (error: any) {
+          console.error("Research stream error:", error);
           alert(`Error: ${error.message || 'Unknown error'}`);
           setIsSubmitting(false);
         }

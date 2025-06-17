@@ -104,6 +104,10 @@ async def get_graph_instance():
 # from src.server.checkpoint_api import router as checkpoint_router
 # app.include_router(checkpoint_router)
 
+# Import and include research stream router
+from src.server.research_stream_api import router as research_stream_router
+app.include_router(research_stream_router)
+
 
 @app.post("/api/chat/stream")
 async def chat_stream(
