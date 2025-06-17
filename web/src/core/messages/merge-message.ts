@@ -14,22 +14,24 @@ import { deepClone } from "../utils/deep-clone";
 import type { Message } from "./types";
 
 export function mergeMessage(message: Message, event: ChatEvent) {
+  const clonedMessage = deepClone(message);
+  
   if (event.type === "message_chunk") {
-    mergeTextMessage(message, event);
+    mergeTextMessage(clonedMessage, event);
   } else if (event.type === "tool_calls" || event.type === "tool_call_chunks") {
-    mergeToolCallMessage(message, event);
+    mergeToolCallMessage(clonedMessage, event);
   } else if (event.type === "tool_call_result") {
-    mergeToolCallResultMessage(message, event);
+    mergeToolCallResultMessage(clonedMessage, event);
   } else if (event.type === "interrupt") {
-    mergeInterruptMessage(message, event);
+    mergeInterruptMessage(clonedMessage, event);
   } else if (event.type === "reask") {
-    mergeReaskMessage(message, event);
+    mergeReaskMessage(clonedMessage, event);
   }
   if (event.data.finish_reason) {
-    message.finishReason = event.data.finish_reason;
-    message.isStreaming = false;
-    if (message.toolCalls) {
-      message.toolCalls.forEach((toolCall) => {
+    clonedMessage.finishReason = event.data.finish_reason;
+    clonedMessage.isStreaming = false;
+    if (clonedMessage.toolCalls) {
+      clonedMessage.toolCalls.forEach((toolCall) => {
         if (toolCall.argsChunks?.length) {
           toolCall.args = JSON.parse(toolCall.argsChunks.join(""));
           delete toolCall.argsChunks;
@@ -37,18 +39,17 @@ export function mergeMessage(message: Message, event: ChatEvent) {
       });
     }
   }
-  return deepClone(message);
+  return clonedMessage;
 }
 
 function mergeTextMessage(message: Message, event: MessageChunkEvent) {
   if (event.data.content) {
-    message.content += event.data.content;
-    message.contentChunks.push(event.data.content);
+    message.content = (message.content || "") + event.data.content;
+    message.contentChunks = [...(message.contentChunks || []), event.data.content];
   }
   if (event.data.reasoning_content) {
     message.reasoningContent = (message.reasoningContent ?? "") + event.data.reasoning_content;
-    message.reasoningContentChunks = message.reasoningContentChunks ?? [];
-    message.reasoningContentChunks.push(event.data.reasoning_content);
+    message.reasoningContentChunks = [...(message.reasoningContentChunks ?? []), event.data.reasoning_content];
   }
 }
 

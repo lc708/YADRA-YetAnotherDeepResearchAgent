@@ -180,7 +180,7 @@ export default function WorkspacePage() {
     } else {
       setInitialized(true);
     }
-  }, [searchParams, traceId, initialized]);
+  }, [searchParams, traceId]);
 
   // 清理函数
   useEffect(() => {
@@ -194,7 +194,7 @@ export default function WorkspacePage() {
   // 设置当前traceId
   useEffect(() => {
     setCurrentTraceId(traceId);
-  }, [traceId, setCurrentTraceId]);
+  }, [traceId]);
 
   return (
     <div className="flex h-screen flex-col bg-gradient-to-br from-slate-900 via-slate-800 to-black">

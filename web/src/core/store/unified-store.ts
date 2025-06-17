@@ -326,21 +326,28 @@ export const useCurrentThread = () => {
 };
 
 export const useThreadMessages = (threadId?: string) => {
-  const actualThreadId = threadId || useUnifiedStore((state) => state.currentThreadId);
-  const messages = useUnifiedStore(
-    (state) => {
-      if (!actualThreadId) return [];
-      const thread = state.threads.get(actualThreadId);
-      return thread?.messages || [];
-    }
-  );
-  return messages;
+  const currentThreadId = useUnifiedStore((state) => state.currentThreadId);
+  const threads = useUnifiedStore((state) => state.threads);
+  
+  const actualThreadId = threadId || currentThreadId;
+  
+  return React.useMemo(() => {
+    if (!actualThreadId) return [];
+    const thread = threads.get(actualThreadId);
+    return thread?.messages || [];
+  }, [actualThreadId, threads]);
 };
 
 export const useThreadArtifacts = (threadId?: string) => {
-  const actualThreadId = threadId || useUnifiedStore((state) => state.currentThreadId);
+  const currentThreadId = useUnifiedStore((state) => state.currentThreadId);
   const getArtifacts = useUnifiedStore((state) => state.getArtifacts);
-  return actualThreadId ? getArtifacts(actualThreadId) : [];
+  
+  const actualThreadId = threadId || currentThreadId;
+  
+  return React.useMemo(() => {
+    if (!actualThreadId) return [];
+    return getArtifacts(actualThreadId);
+  }, [actualThreadId, getArtifacts]);
 };
 
 export const useWorkspaceState = () => {
@@ -364,8 +371,8 @@ export const useMessageIds = (threadId?: string) => {
 };
 
 export const useMessage = (messageId: string, threadId?: string) => {
-  const actualThreadId = threadId || useUnifiedStore((state) => state.currentThreadId);
   return useUnifiedStore((state) => {
+    const actualThreadId = threadId || state.currentThreadId;
     if (!actualThreadId) return undefined;
     const thread = state.threads.get(actualThreadId);
     return thread?.messages.find(m => m.id === messageId);
@@ -466,4 +473,4 @@ export const useWorkspaceActions = () => {
       setWorkspaceState({ feedback: null });
     },
   }), [setWorkspaceState]);
-}; 
+};                          
