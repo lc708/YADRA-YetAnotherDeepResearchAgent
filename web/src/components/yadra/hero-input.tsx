@@ -17,6 +17,7 @@ import { enhancePrompt } from "~/core/api/prompt-enhancer";
 import { getConfig } from "~/core/api/config";
 import { useSettingsStore, setEnableBackgroundInvestigation, setEnableDeepThinking, setReportStyle } from "~/core/store";
 import type { Resource } from "~/core/messages";
+import { sendMessageAndGetThreadId } from "~/core/api/chat";
 
 const PLACEHOLDER_TEXTS = [
   "YADRA能帮助你今天做什么？",
@@ -70,6 +71,7 @@ export function HeroInput({ className }: HeroInputProps) {
   const [currentPrompt, setCurrentPrompt] = useState("");
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [isEnhanceAnimating, setIsEnhanceAnimating] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [showStyleDropdown, setShowStyleDropdown] = useState(false);
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
   
@@ -171,44 +173,63 @@ export function HeroInput({ className }: HeroInputProps) {
     };
   }, [showStyleDropdown, calculateDropdownPosition]);
 
-  const handleSendMessage = useCallback(
-    (message: string, resources: Array<Resource>) => {
-      if (!message?.trim()) return;
+  const handleSubmit = useCallback(
+    async (e?: React.FormEvent) => {
+      if (e) e.preventDefault();
+      if (!currentPrompt.trim() || !canOperate || isSubmitting) return;
 
-      const traceId = nanoid();
+      setIsSubmitting(true);
+      
+      try {
+        // 发送消息（不指定 thread_id，让后端生成）
+        const response = await sendMessageAndGetThreadId(currentPrompt, {
+          resources: [],
+          enableBackgroundInvestigation: true,
+          reportStyle: reportStyle || undefined,
+          enableDeepThinking: enableDeepThinking,
+        });
+        
+        if (response.threadId) {
+          // 构建查询参数
       const params = new URLSearchParams({
-        q: message,
+            q: currentPrompt,
         investigation: "true",
         ...(enableDeepThinking && { enable_deep_thinking: "true" }),
         ...(reportStyle && { style: reportStyle }),
-        ...(resources.length > 0 && { resources: JSON.stringify(resources) }),
-      });
-      
-      router.push(`/workspace/${traceId}?${params.toString()}`);
+          });
+          
+          // 使用后端返回的 thread_id 跳转
+          router.push(`/workspace/${response.threadId}?${params.toString()}`);
+        } else {
+          alert('Failed to get thread ID from server');
+          setIsSubmitting(false);
+        }
+      } catch (error: any) {
+        alert(`Error: ${error.message || 'Unknown error'}`);
+        setIsSubmitting(false);
+      }
     },
-    [router, reportStyle, enableDeepThinking],
+    [currentPrompt, canOperate, reportStyle, enableDeepThinking, router, isSubmitting]
   );
 
   // 监听示例问题选择事件
   useEffect(() => {
-    const handleQuestionSelect = (event: CustomEvent) => {
+    const handleQuestionSelect = (event: CustomEvent<{ question: string }>) => {
       const { question } = event.detail;
-      if (question && inputRef.current) {
-        inputRef.current.setContent(question);
+      if (question) {
         setCurrentPrompt(question);
         // 自动发送选中的问题
         setTimeout(() => {
-          handleSendMessage(question, []);
+          handleSubmit();
         }, 100);
       }
     };
 
     window.addEventListener('heroQuestionSelect', handleQuestionSelect as EventListener);
-    
     return () => {
       window.removeEventListener('heroQuestionSelect', handleQuestionSelect as EventListener);
     };
-  }, [handleSendMessage]);
+  }, [handleSubmit]);
 
   const handleEnhancePrompt = useCallback(async () => {
     if (currentPrompt.trim() === "" || isEnhancing) {
@@ -368,7 +389,7 @@ export function HeroInput({ className }: HeroInputProps) {
             className="min-h-[80px] px-4 py-4 sm:px-6 sm:py-6"
             placeholder={PLACEHOLDER_TEXTS[currentPlaceholder]}
             onChange={setCurrentPrompt}
-            onEnter={handleSendMessage}
+            onEnter={() => handleSubmit()}
           />
           
           {/* 去掉分割线，统一按钮高度为 h-9 */}
@@ -506,22 +527,26 @@ export function HeroInput({ className }: HeroInputProps) {
                 side="bottom"
                 sideOffset={8}
                 className="border border-white/20 bg-black/90 backdrop-blur-sm text-white shadow-xl"
-                title={canOperate ? "发送消息" : "请输入消息"}
+                title={canOperate ? (isSubmitting ? "正在处理..." : "发送消息") : "请输入消息"}
               >
                 <Button
-                  onClick={() => inputRef.current?.submit()}
-                  disabled={!canOperate}
+                  onClick={() => handleSubmit()}
+                  disabled={!canOperate || isSubmitting}
                   className={cn(
                     "h-9 w-9 p-0 rounded-lg border transition-all duration-300",
-                    canOperate
+                    canOperate && !isSubmitting
                       ? "border-blue-500/50 bg-blue-600/80 hover:bg-blue-600 hover:shadow-[0_0_20px_rgba(59,130,246,0.4)]"
                       : "border-gray-400/20 bg-gray-500/20 cursor-not-allowed"
                   )}
                 >
+                  {isSubmitting ? (
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  ) : (
                   <Send className={cn(
                     "h-4 w-4 transition-colors",
                     canOperate ? "text-white" : "text-gray-500"
                   )} />
+                  )}
                 </Button>
               </Tooltip>
             </div>

@@ -7,8 +7,7 @@ import { ArtifactUtils } from "~/lib/supa";
 import { ArtifactCard } from "./artifact-card";
 import { ArtifactViewer } from "./artifact-viewer";
 import { useReportOperations } from "./report-operations";
-import { useWorkspaceArtifacts } from "~/core/store/workspace-store";
-import { listenToPodcast, useStore } from "~/core/store/store";
+import { useThreadArtifacts, useCurrentThread } from "~/core/store/unified-store";
 import { Input } from "~/components/ui/input";
 import { Search } from "lucide-react";
 import { Button } from "~/components/ui/button";
@@ -22,8 +21,8 @@ interface ArtifactFeedProps {
 }
 
 export function ArtifactFeed({ traceId, className }: ArtifactFeedProps) {
-  // 使用新的数据源：从workspace store获取artifacts
-  const allArtifacts = useWorkspaceArtifacts(traceId);
+  // 使用新的数据源：从unified store获取artifacts
+  const allArtifacts = useThreadArtifacts(traceId);
   
   const [filteredArtifacts, setFilteredArtifacts] = useState<Artifact[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -38,8 +37,9 @@ export function ArtifactFeed({ traceId, className }: ArtifactFeedProps) {
   const { copyToClipboard, downloadAsMarkdown, downloadFromUrl } = useReportOperations();
   
   // 获取研究状态数据，用于播客生成
-  const researchIds = useStore((state) => state.researchIds);
-  const researchReportIds = useStore((state) => state.researchReportIds);
+  const threadData = useCurrentThread();
+  const researchIds = threadData?.metadata.researchIds || [];
+  const researchReportIds = threadData?.metadata.reportMessageIds || new Map();
   
   // 播客生成处理函数
   const handleGeneratePodcast = useCallback(async (artifact: Artifact) => {
@@ -83,7 +83,8 @@ export function ArtifactFeed({ traceId, className }: ArtifactFeedProps) {
       }
       
       toast.success("开始生成播客...");
-      await listenToPodcast(researchId);
+      // TODO: 实现 listenToPodcast
+      // await listenToPodcast(researchId);
       
     } catch (error) {
       console.error("Failed to generate podcast:", error);

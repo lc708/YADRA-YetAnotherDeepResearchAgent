@@ -32,3 +32,6 @@ todos/
 
 #misc
 .DS_Store
+
+# cursor
+.cursor/

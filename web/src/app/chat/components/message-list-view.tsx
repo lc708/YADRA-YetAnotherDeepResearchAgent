@@ -1,4 +1,4 @@
-// Copyright (c) 2025 YADRA
+"use client";
 
 import { LoadingOutlined } from "@ant-design/icons";
 import { motion } from "framer-motion";
@@ -33,86 +33,111 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "~/components/ui/collapsible";
-import type { Message, Option } from "~/core/messages";
+import type { Message, Option, Resource } from "~/core/messages";
+import {
+  useMessageIds,
+  useMessage,
+  useCurrentThread,
+  useUnifiedStore,
+} from "~/core/store/unified-store";
 import {
   closeResearch,
   openResearch,
   useLastFeedbackMessageId,
   useLastInterruptMessage,
-  useMessage,
-  useMessageIds,
   useResearchMessage,
   useStore,
 } from "~/core/store";
 import { parseJSON } from "~/core/utils";
 import { cn } from "~/lib/utils";
 
-export function MessageListView({
-  className,
-  onFeedback,
-  onSendMessage,
-}: {
+import { ResearchActivitiesBlock } from "./research-activities-block";
+
+interface MessageListViewProps {
   className?: string;
   onFeedback?: (feedback: { option: Option }) => void;
   onSendMessage?: (
     message: string,
-    options?: { interruptFeedback?: string },
+    options?: { interruptFeedback?: string; resources?: Resource[] },
   ) => void;
-}) {
+  onToggleResearch?: () => void;
+}
+
+export function MessageListView({
+  className,
+  onFeedback,
+  onSendMessage,
+  onToggleResearch,
+}: MessageListViewProps) {
   const scrollContainerRef = useRef<ScrollContainerRef>(null);
   const messageIds = useMessageIds();
-  const interruptMessage = useLastInterruptMessage();
-  const waitingForFeedbackMessageId = useLastFeedbackMessageId();
-  const responding = useStore((state) => state.responding);
-  const noOngoingResearch = useStore(
-    (state) => state.ongoingResearchId === null,
-  );
-  const ongoingResearchIsOpen = useStore(
-    (state) => state.ongoingResearchId === state.openResearchId,
-  );
+  const threadData = useCurrentThread();
+  
+  // Get last interrupt message
+  const interruptMessage = threadData?.ui.lastInterruptMessageId 
+    ? useMessage(threadData.ui.lastInterruptMessageId) 
+    : null;
+  
+  // Get waiting for feedback message ID
+  const waitingForFeedbackMessageId = threadData?.ui.waitingForFeedbackMessageId || null;
+  
+  const responding = useUnifiedStore((state) => state.responding);
+  const noOngoingResearch = !threadData?.metadata.ongoingResearchId;
+  const ongoingResearchIsOpen = threadData?.metadata.ongoingResearchId === threadData?.metadata.openResearchId;
 
   const handleToggleResearch = useCallback(() => {
-    // Fix the issue where auto-scrolling to the bottom
-    // occasionally fails when toggling research.
-    const timer = setTimeout(() => {
-      if (scrollContainerRef.current) {
-        scrollContainerRef.current.scrollToBottom();
-      }
-    }, 500);
-    return () => {
-      clearTimeout(timer);
-    };
-  }, []);
+    if (!threadData) return;
+    
+    const currentThreadId = useUnifiedStore.getState().currentThreadId;
+    if (!currentThreadId) return;
+    
+    const openResearch = useUnifiedStore.getState().openResearch;
+    
+    if (ongoingResearchIsOpen) {
+      openResearch(currentThreadId, null);
+    } else if (threadData.metadata.ongoingResearchId) {
+      openResearch(currentThreadId, threadData.metadata.ongoingResearchId);
+    }
+    
+    onToggleResearch?.();
+  }, [threadData, ongoingResearchIsOpen, onToggleResearch]);
+
+  const handleSendMessage = useCallback(
+    (message: string, options?: { interruptFeedback?: string; resources?: Resource[] }) => {
+      onSendMessage?.(message, options);
+      scrollContainerRef.current?.scrollToBottom();
+    },
+    [onSendMessage],
+  );
 
   return (
     <ScrollContainer
-      className={cn("flex h-full w-full flex-col overflow-hidden", className)}
-      scrollShadowColor="var(--app-background)"
-      autoScrollToBottom
       ref={scrollContainerRef}
+      className={cn("h-full", className)}
     >
       <ul className="flex flex-col">
         {messageIds.map((messageId) => (
-          <MessageListItem
+          <MessageItem
             key={messageId}
             messageId={messageId}
             waitForFeedback={waitingForFeedbackMessageId === messageId}
-            interruptMessage={interruptMessage}
+            interruptMessage={
+              waitingForFeedbackMessageId === messageId
+                ? interruptMessage
+                : null
+            }
             onFeedback={onFeedback}
-            onSendMessage={onSendMessage}
+            onSendMessage={handleSendMessage}
             onToggleResearch={handleToggleResearch}
           />
         ))}
-        <div className="flex h-8 w-full shrink-0"></div>
       </ul>
-      {responding && (noOngoingResearch || !ongoingResearchIsOpen) && (
-        <LoadingAnimation className="ml-4" />
-      )}
+      <div className="h-24" />
     </ScrollContainer>
   );
 }
 
-function MessageListItem({
+function MessageItem({
   className,
   messageId,
   waitForFeedback,
@@ -128,12 +153,13 @@ function MessageListItem({
   interruptMessage?: Message | null;
   onSendMessage?: (
     message: string,
-    options?: { interruptFeedback?: string },
+    options?: { interruptFeedback?: string; resources?: Resource[] },
   ) => void;
   onToggleResearch?: () => void;
 }) {
   const message = useMessage(messageId);
-  const researchIds = useStore((state) => state.researchIds);
+  const threadData = useCurrentThread();
+  const researchIds = threadData?.metadata.researchIds || [];
   const startOfResearch = useMemo(() => {
     return researchIds.includes(messageId);
   }, [researchIds, messageId]);
@@ -251,18 +277,20 @@ export function ResearchCard({
   researchId: string;
   onToggleResearch?: () => void;
 }) {
-  const reportId = useStore((state) => state.researchReportIds.get(researchId));
-  const hasReport = reportId !== undefined;
-  const reportGenerating = useStore(
-    (state) => hasReport && state.messages.get(reportId)!.isStreaming,
+  const message = useMessage(researchId);
+  const threadData = useCurrentThread();
+  const reportId = threadData?.metadata.reportMessageIds.get(researchId);
+  const reportMessage = useMessage(reportId || "");
+  const reportGenerating = useUnifiedStore((state) =>
+    state.responding && threadData?.metadata.ongoingResearchId === researchId
   );
-  const openResearchId = useStore((state) => state.openResearchId);
+  const openResearchId = threadData?.metadata.openResearchId;
   const state = useMemo(() => {
-    if (hasReport) {
-      return reportGenerating ? "Generating report..." : "Report generated";
+    if (reportGenerating) {
+      return "Generating report...";
     }
     return "Researching...";
-  }, [hasReport, reportGenerating]);
+  }, [reportGenerating]);
   const msg = useResearchMessage(researchId);
   const title = useMemo(() => {
     if (msg) {
@@ -282,7 +310,7 @@ export function ResearchCard({
     <Card className={cn("w-full", className)}>
       <CardHeader>
         <CardTitle>
-          <RainbowText animated={state !== "Report generated"}>
+          <RainbowText animated={state !== "Generating report..."}>
             {title !== undefined && title !== "" ? title : "Deep Research"}
           </RainbowText>
         </CardTitle>
@@ -427,7 +455,7 @@ export function PlanCard({
   onFeedback?: (feedback: { option: Option }) => void;
   onSendMessage?: (
     message: string,
-    options?: { interruptFeedback?: string },
+    options?: { interruptFeedback?: string; resources?: Resource[] },
   ) => void;
   waitForFeedback?: boolean;
 }) {

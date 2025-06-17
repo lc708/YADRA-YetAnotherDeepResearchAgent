@@ -16,7 +16,7 @@ from langgraph.types import Command
 
 from src.config.report_style import ReportStyle
 from src.config.tools import SELECTED_RAG_PROVIDER
-from src.graph.builder import build_graph_with_memory
+from src.graph.async_builder import create_graph, cleanup_async_resources
 from src.podcast.graph.builder import build_graph as build_podcast_graph
 from src.ppt.graph.builder import build_graph as build_ppt_graph
 from src.prose.graph.builder import build_graph as build_prose_graph
@@ -82,7 +82,21 @@ app.add_middleware(
     allow_headers=["*"],  # Allows all headers
 )
 
-graph = build_graph_with_memory()
+# Cache the graph instance
+_graph_instance = None
+
+async def get_graph_instance():
+    """Get or create the graph instance."""
+    global _graph_instance
+    if _graph_instance is None:
+        _graph_instance = await create_graph()
+    return _graph_instance
+
+
+# Import and include checkpoint router
+# TODO: Fix circular import issue
+# from src.server.checkpoint_api import router as checkpoint_router
+# app.include_router(checkpoint_router)
 
 
 @app.post("/api/chat/stream")
@@ -99,16 +113,26 @@ async def chat_stream(
             # 如果认证失败，仍然允许匿名访问
             pass
     
+    # 后端生成 thread_id
     thread_id = request.thread_id
-    if thread_id == "__default__":
+    if thread_id == "__default__" or not thread_id:
         thread_id = str(uuid4())
     
     # 如果有用户登录，创建或更新任务记录
     if current_user:
         await create_or_update_task(current_user['user_id'], thread_id)
     
-    return StreamingResponse(
-        _astream_workflow_generator(
+    # Get graph instance
+    graph_instance = await get_graph_instance()
+    
+    async def stream_response():
+        """Stream response."""
+        # 首先发送 thread_id 事件
+        yield _make_event("thread_created", {"thread_id": thread_id})
+        
+        # Stream the workflow
+        async for event in _astream_workflow_generator(
+            graph_instance,
             request.model_dump()["messages"],
             thread_id,
             request.resources,
@@ -122,12 +146,17 @@ async def chat_stream(
             request.report_style,
             request.enable_deep_thinking,
             user_id=current_user['user_id'] if current_user else None,
-        ),
+        ):
+            yield event
+    
+    return StreamingResponse(
+        stream_response(),
         media_type="text/event-stream",
     )
 
 
 async def _astream_workflow_generator(
+    graph_instance,
     messages: List[dict],
     thread_id: str,
     resources: List[Resource],
@@ -158,18 +187,24 @@ async def _astream_workflow_generator(
         if messages:
             resume_msg += f" {messages[-1]['content']}"
         input_ = Command(resume=resume_msg)
-    async for agent, _, event_data in graph.astream(
-        input_,
-        config={
+    
+    # Use configurable for thread_id
+    config = {
+        "configurable": {
             "thread_id": thread_id,
-            "resources": resources,
-            "max_plan_iterations": max_plan_iterations,
-            "max_step_num": max_step_num,
-            "max_search_results": max_search_results,
-            "mcp_settings": mcp_settings,
-            "report_style": report_style.value,
-            "enable_deep_thinking": enable_deep_thinking,
         },
+        "resources": resources,
+        "max_plan_iterations": max_plan_iterations,
+        "max_step_num": max_step_num,
+        "max_search_results": max_search_results,
+        "mcp_settings": mcp_settings,
+        "report_style": report_style.value,
+        "enable_deep_thinking": enable_deep_thinking,
+    }
+    
+    async for agent, _, event_data in graph_instance.astream(
+        input_,
+        config=config,
         stream_mode=["messages", "updates"],
         subgraphs=True,
     ):
@@ -199,23 +234,32 @@ async def _astream_workflow_generator(
                     )
                 else:
                     # 处理标准interrupt
+                    # 检查 interrupt_value 是否包含 options
+                    if isinstance(interrupt_value, dict) and "options" in interrupt_value:
+                        message_content = interrupt_value.get("message", "Please Review the Plan.")
+                        options = interrupt_value.get("options", [])
+                    else:
+                        # 兼容旧格式
+                        message_content = str(interrupt_value)
+                        options = [
+                            {"text": "Edit plan", "value": "edit_plan"},
+                            {"text": "Start research", "value": "accepted"},
+                            {
+                                "text": "Generate report now",
+                                "value": "skip_research",
+                            },
+                            {"text": "Cancel plan", "value": "cancel"},
+                        ]
+                    
                     yield _make_event(
                         "interrupt",
                         {
                             "thread_id": thread_id,
                             "id": interrupt_data.ns[0],
                             "role": "assistant",
-                            "content": interrupt_value,
+                            "content": message_content,
                             "finish_reason": "interrupt",
-                            "options": [
-                                {"text": "Edit plan", "value": "edit_plan"},
-                                {"text": "Start research", "value": "accepted"},
-                                {
-                                    "text": "Generate report now",
-                                    "value": "skip_research",
-                                },
-                                {"text": "Cancel plan", "value": "cancel"},
-                            ],
+                            "options": options,
                         },
                     )
             continue
@@ -540,6 +584,23 @@ async def create_task(
 # 启动时设置用户表
 @app.on_event("startup")
 async def startup_event():
-    """应用启动时执行"""
+    """Initialize resources on startup."""
+    # Setup user tables
     await setup_user_tables()
-    logger.info("✅ Application startup completed")
+    
+    # Pre-create the graph instance
+    await get_graph_instance()
+    
+    logger.info("Server startup complete")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Shutdown event handler."""
+    # Cleanup async resources
+    await cleanup_async_resources()
+    
+    # Cleanup sync resources
+    from src.graph.builder import cleanup_postgres_resources
+    cleanup_postgres_resources()
+    
+    logger.info("Server shutdown complete")

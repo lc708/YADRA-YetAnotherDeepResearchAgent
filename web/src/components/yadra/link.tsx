@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useStore, useToolCalls } from "~/core/store";
+import { useUnifiedStore } from "~/core/store/unified-store";
 import { Tooltip } from "./tooltip";
 import { WarningFilled } from "@ant-design/icons";
 
@@ -12,25 +12,15 @@ export const Link = ({
   children: React.ReactNode;
   checkLinkCredibility: boolean;
 }) => {
-  const toolCalls = useToolCalls();
-  const responding = useStore((state) => state.responding);
+  const responding = useUnifiedStore((state) => state.responding);
 
   const credibleLinks = useMemo(() => {
     const links = new Set<string>();
     if (!checkLinkCredibility) return links;
 
-    (toolCalls || []).forEach((call) => {
-      if (call && call.name === "web_search" && call.result) {
-        const result = JSON.parse(call.result) as Array<{ url: string }>;
-        result.forEach((r) => {
-          // encodeURI is used to handle the case where the link contains chinese or other special characters
-          links.add(encodeURI(r.url));
-          links.add(r.url);
-        });
-      }
-    });
+    // TODO: Implement toolCalls tracking in unified store if needed
     return links;
-  }, [toolCalls]);
+  }, [checkLinkCredibility]);
 
   const isCredible = useMemo(() => {
     return checkLinkCredibility && href && !responding
@@ -45,10 +35,19 @@ export const Link = ({
       </a>
       {!isCredible && (
         <Tooltip
-          title="This link might be a hallucination from AI model and may not be reliable."
+          title={
+            <div className="flex flex-col items-center">
+              <p className="text-center">
+                This link is not mentioned in the research results
+              </p>
+              <p className="text-center">
+                It may not be a credible source
+              </p>
+            </div>
+          }
           delayDuration={300}
         >
-          <WarningFilled className="text-sx transition-colors hover:!text-yellow-500" />
+          <WarningFilled className="text-yellow-500" />
         </Tooltip>
       )}
     </span>

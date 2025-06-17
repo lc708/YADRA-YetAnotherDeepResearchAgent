@@ -9,17 +9,23 @@ import { cn } from "~/lib/utils";
 import { Button } from "~/components/ui/button";
 import { ArtifactFeed } from "~/components/yadra/artifact-feed";
 import type { Resource, Option } from "~/core/messages";
-import { setEnableBackgroundInvestigation, setReportStyle } from "~/core/store";
-import { sendMessage, useMessageIds } from "~/core/store/store";
 import { 
-  useWorkspaceActions, 
+  setEnableBackgroundInvestigation, 
+  setReportStyle, 
+  setCurrentThreadId, 
+  sendMessage, 
+  useMessageIds, 
+  useStore,
+  useWorkspaceActions,
   useConversationPanelVisible,
   useArtifactsPanelVisible,
   useHistoryPanelVisible,
   usePodcastPanelVisible,
   useWorkspaceFeedback
-} from "~/core/store/workspace-store";
-
+} from "~/core/store";
+import { sendMessageAndGetThreadId } from "~/core/api/chat";
+import { parseJSON } from "~/core/utils";
+import { useToast } from "~/hooks/use-toast";
 
 // 导入组件
 import { ConversationPanel } from "./components/conversation-panel";
@@ -40,6 +46,21 @@ export default function WorkspacePage() {
   // 获取消息状态
   const messageIds = useMessageIds();
   const hasMessages = messageIds.length > 0;
+  
+  // 在组件挂载时设置 threadId
+  useEffect(() => {
+    if (traceId) {
+      // 设置当前 threadId（不清理其他线程的数据）
+      setCurrentThreadId(traceId);
+    }
+  }, [traceId]);
+
+  // 组件卸载时不清理，保留历史记录
+  useEffect(() => {
+    return () => {
+      // 组件卸载时不清理，以便用户可以回到之前的对话
+    };
+  }, []);
 
   // Workspace状态管理
   const { 
@@ -179,68 +200,69 @@ export default function WorkspacePage() {
     <div className="flex h-screen flex-col bg-gradient-to-br from-slate-900 via-slate-800 to-black">
       {/* 顶部导航栏 - 固定高度 */}
       <div className="flex-shrink-0 flex items-center justify-between border-b border-white/20 bg-black/20 px-4 py-3 backdrop-blur-sm">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" asChild>
+        <div className="flex items-center gap-4 min-w-0 flex-1">
+          <Button variant="ghost" size="sm" asChild className="flex-shrink-0">
             <Link href="/">
               <ArrowLeft className="mr-2 h-4 w-4" />
-              返回首页
+              <span className="hidden sm:inline">返回首页</span>
+              <span className="sm:hidden">返回</span>
             </Link>
           </Button>
           
-          <div className="h-6 w-px bg-white/20" />
+          <div className="h-6 w-px bg-white/20 flex-shrink-0" />
           
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 flex-1 max-w-md">
             <h1 className="text-lg font-semibold text-white">研究工作区</h1>
-            <p className="text-xs text-gray-400 truncate">
-              {query ? `查询: ${query}` : `会话: ${traceId.slice(0, 8)}...`}
+            <p className="text-xs text-gray-400 truncate" title={query || `会话: ${traceId}`}>
+              {query ? `查询: ${query.length > 30 ? query.substring(0, 30) + '...' : query}` : `会话: ${traceId.slice(0, 8)}...`}
             </p>
           </div>
         </div>
 
         {/* 面板控制按钮 */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 flex-shrink-0">
           <Button
             variant={conversationVisible ? "default" : "outline"}
             size="sm"
             onClick={toggleConversationPanel}
-            className="gap-2"
+            className="gap-1"
           >
             <MessageSquare className="h-4 w-4" />
-            对话
-            {conversationVisible ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}
+            <span className="hidden lg:inline">对话</span>
+            {conversationVisible ? <Minimize2 className="h-3 w-3 hidden sm:inline" /> : <Maximize2 className="h-3 w-3 hidden sm:inline" />}
           </Button>
           
           <Button
             variant={artifactVisible ? "default" : "outline"}
             size="sm"
             onClick={toggleArtifactsPanel}
-            className="gap-2"
+            className="gap-1"
           >
             <FileText className="h-4 w-4" />
-            工件
-            {artifactVisible ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}
+            <span className="hidden lg:inline">工件</span>
+            {artifactVisible ? <Minimize2 className="h-3 w-3 hidden sm:inline" /> : <Maximize2 className="h-3 w-3 hidden sm:inline" />}
           </Button>
           
           <Button
             variant={historyVisible ? "default" : "outline"}
             size="sm"
             onClick={toggleHistoryPanel}
-            className="gap-2"
+            className="gap-1"
           >
             <History className="h-4 w-4" />
-            历史
-            {historyVisible ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}
+            <span className="hidden lg:inline">历史</span>
+            {historyVisible ? <Minimize2 className="h-3 w-3 hidden sm:inline" /> : <Maximize2 className="h-3 w-3 hidden sm:inline" />}
           </Button>
           
           <Button
             variant={podcastVisible ? "default" : "outline"}
             size="sm"
             onClick={togglePodcastPanel}
-            className="gap-2"
+            className="gap-1"
           >
             <Headphones className="h-4 w-4" />
-            播客
-            {podcastVisible ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}
+            <span className="hidden lg:inline">播客</span>
+            {podcastVisible ? <Minimize2 className="h-3 w-3 hidden sm:inline" /> : <Maximize2 className="h-3 w-3 hidden sm:inline" />}
           </Button>
         </div>
       </div>

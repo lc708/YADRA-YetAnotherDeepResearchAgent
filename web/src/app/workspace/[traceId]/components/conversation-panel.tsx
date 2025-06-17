@@ -25,19 +25,12 @@ import {
 } from "~/components/yadra/scroll-container";
 import type { Message, Option, Resource } from "~/core/messages";
 import {
-  useLastFeedbackMessageId,
-  useLastInterruptMessage,
-  useMessage,
   useMessageIds,
-  useStore,
-  initializeWorkspaceIntegration,
-  syncStateToWorkspace,
-  sendMessage,
-} from "~/core/store";
-import { 
-  useWorkspaceActions, 
-  useConversationPanelVisible,
-} from "~/core/store/workspace-store";
+  useMessage,
+  useCurrentThread,
+  useUnifiedStore,
+  useWorkspaceState,
+} from "~/core/store/unified-store";
 import { cn } from "~/lib/utils";
 
 // 复用MessageListView的子组件
@@ -60,19 +53,20 @@ export function ConversationPanel({
 }: ConversationPanelProps) {
   const scrollContainerRef = useRef<ScrollContainerRef>(null);
   const messageIds = useMessageIds();
-  const interruptMessage = useLastInterruptMessage();
-  const waitingForFeedbackMessageId = useLastFeedbackMessageId();
-  const responding = useStore((state) => state.responding);
-  const noOngoingResearch = useStore(
-    (state) => state.ongoingResearchId === null,
-  );
-  const ongoingResearchIsOpen = useStore(
-    (state) => state.ongoingResearchId === state.openResearchId,
-  );
+  const threadData = useCurrentThread();
+  const interruptMessage = threadData?.ui.lastInterruptMessageId 
+    ? useMessage(threadData.ui.lastInterruptMessageId) 
+    : null;
+  const waitingForFeedbackMessageId = threadData?.ui.waitingForFeedbackMessageId || null;
+  const responding = useUnifiedStore((state) => state.responding);
+  const openResearchId = threadData?.metadata.openResearchId;
+  const noOngoingResearch = !threadData?.metadata.ongoingResearchId;
+  const ongoingResearchIsOpen = threadData?.metadata.ongoingResearchId === openResearchId;
 
   // Workspace状态管理
-  const { setCurrentTraceId, setFeedback } = useWorkspaceActions();
-  const conversationVisible = useConversationPanelVisible();
+  const workspaceState = useWorkspaceState();
+  const setWorkspaceState = useUnifiedStore((state) => state.setWorkspaceState);
+  const conversationVisible = workspaceState.conversationVisible;
 
   // 实现消息发送处理函数
   const handleSendMessage = useCallback(
@@ -84,11 +78,8 @@ export function ConversationPanel({
         if (onSendMessage) {
           onSendMessage(message, options);
         } else {
-          // 如果没有传递onSendMessage，使用默认的sendMessage
-          await sendMessage(message, {
-            interruptFeedback: options?.interruptFeedback,
-            resources: options?.resources,
-          });
+          // TODO: 实现 sendMessage
+          console.warn("sendMessage not implemented yet");
         }
       } catch (error) {
         console.error("Failed to send message:", error);
@@ -101,41 +92,25 @@ export function ConversationPanel({
   const handleFeedback = useCallback(
     (feedback: { option: Option }) => {
       // 将反馈状态保存到workspace store
-      setFeedback(feedback);
+      setWorkspaceState({ feedback });
       
       if (onFeedback) {
         onFeedback(feedback);
       }
     },
-    [onFeedback, setFeedback]
+    [onFeedback, setWorkspaceState]
   );
 
   // 初始化workspace集成
   useEffect(() => {
-    initializeWorkspaceIntegration();
-    setCurrentTraceId(traceId);
-    
-    // 立即同步一次状态
-    if (traceId) {
-      syncStateToWorkspace(traceId);
-    }
+    const store = useUnifiedStore.getState();
+    store.setCurrentThread(traceId);
+    store.setWorkspaceState({ currentTraceId: traceId });
 
     return () => {
       // 清理时不重置traceId，保持状态
     };
-  }, [traceId, setCurrentTraceId]);
-
-  // 监听消息变化，自动同步状态
-  useEffect(() => {
-    if (traceId && messageIds.length > 0) {
-      // 延迟同步，确保消息状态稳定
-      const timer = setTimeout(() => {
-        syncStateToWorkspace(traceId);
-      }, 200);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [messageIds, traceId]);
+  }, [traceId]);
 
   const handleToggleResearch = useCallback(() => {
     // Fix the issue where auto-scrolling to the bottom
@@ -262,7 +237,8 @@ function ConversationMessageItem({
   onToggleResearch?: () => void;
 }) {
   const message = useMessage(messageId);
-  const researchIds = useStore((state) => state.researchIds);
+  const threadData = useCurrentThread();
+  const researchIds = threadData?.metadata.researchIds || [];
   const startOfResearch = useMemo(() => {
     return researchIds.includes(messageId);
   }, [researchIds, messageId]);

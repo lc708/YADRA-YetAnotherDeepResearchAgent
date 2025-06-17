@@ -74,8 +74,8 @@ export function ArtifactCard({
 
   return (
     <Card className={cn("transition-all hover:shadow-md", className)}>
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between">
+      <CardHeader className="pb-2 pt-3">
+        <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0 flex-1">
             {getIcon()}
             <CardTitle className="text-sm font-medium truncate">
@@ -85,16 +85,16 @@ export function ArtifactCard({
           {getTypeBadge()}
         </div>
         {artifact.summary && (
-          <p className="text-xs text-muted-foreground line-clamp-2">
+          <p className="text-xs text-muted-foreground line-clamp-1 mt-1">
             {artifact.summary}
           </p>
         )}
       </CardHeader>
       
-      <CardContent className="pt-0">
+      <CardContent className="pt-0 pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1 text-xs text-muted-foreground">
-            <span>{artifact.mime}</span>
+            <span className="truncate max-w-[120px]">{artifact.mime}</span>
             {artifact.metadata?.word_count && (
               <>
                 <span>•</span>
@@ -103,14 +103,14 @@ export function ArtifactCard({
             )}
           </div>
           
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-0.5">
             {/* 查看按钮 - 仅支持预览的类型显示 */}
             {canPreview() && (
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => onView?.(artifact)}
-                className="h-8 w-8 p-0"
+                className="h-7 w-7 p-0"
                 title="预览内容"
               >
                 <Eye className="h-3 w-3" />
@@ -118,16 +118,12 @@ export function ArtifactCard({
             )}
             
             {/* 播客生成按钮 - 仅报告类型支持 */}
-            {canGeneratePodcast() && (
+            {canGeneratePodcast() && onGeneratePodcast && (
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => {
-                  if (onGeneratePodcast) {
-                    onGeneratePodcast(artifact);
-                  }
-                }}
-                className="h-8 w-8 p-0"
+                onClick={() => onGeneratePodcast(artifact)}
+                className="h-7 w-7 p-0"
                 title="生成播客"
               >
                 <Headphones className="h-3 w-3" />
@@ -140,7 +136,7 @@ export function ArtifactCard({
                 variant="ghost"
                 size="sm"
                 onClick={() => onEdit(artifact)}
-                className="h-8 w-8 p-0"
+                className="h-7 w-7 p-0"
                 disabled
                 title="编辑功能正在开发中"
               >
@@ -154,7 +150,7 @@ export function ArtifactCard({
                 variant="ghost"
                 size="sm"
                 onClick={() => onCopy(artifact)}
-                className="h-8 w-8 p-0"
+                className="h-7 w-7 p-0"
                 title="复制到剪贴板"
               >
                 <Copy className="h-3 w-3" />
@@ -167,7 +163,7 @@ export function ArtifactCard({
                 variant="ghost"
                 size="sm"
                 onClick={() => onDownload(artifact)}
-                className="h-8 w-8 p-0"
+                className="h-7 w-7 p-0"
                 title="下载文件"
               >
                 <Download className="h-3 w-3" />
@@ -178,7 +174,7 @@ export function ArtifactCard({
         
         {/* 批次信息 - 如果有多个结果 */}
         {artifact.metadata?.batch_id && (
-          <div className="mt-2 text-xs text-muted-foreground">
+          <div className="mt-1 text-xs text-muted-foreground">
             批次: {artifact.metadata.batch_id}
             {artifact.metadata.sequence && ` (${artifact.metadata.sequence})`}
           </div>

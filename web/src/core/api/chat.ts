@@ -10,6 +10,24 @@ import { sleep } from "../utils";
 
 import { resolveServiceURL } from "./resolve-service-url";
 import type { ChatEvent } from "./types";
+import { getChatStreamSettings } from "~/core/store/settings-store";
+
+export type ReportStyle = "academic" | "popular_science" | "news" | "social_media";
+
+export interface ChatRequest {
+  messages: Array<{ role: string; content: string }>;
+  thread_id?: string;
+  resources: Resource[];
+  auto_accepted_plan: boolean;
+  max_plan_iterations: number;
+  max_step_num: number;
+  max_search_results: number;
+  enable_background_investigation: boolean;
+  report_style: ReportStyle;
+  enable_deep_thinking: boolean;
+  mcp_settings: Record<string, any>;
+  interrupt_feedback?: string;
+}
 
 export async function* chatStream(
   userMessage: string,
@@ -191,4 +209,76 @@ export async function sleepInReplay(ms: number) {
 let fastForwardReplaying = false;
 export function fastForwardReplay(value: boolean) {
   fastForwardReplaying = value;
+}
+
+export async function sendMessageAndGetThreadId(
+  content: string,
+  options: {
+    resources?: Array<Resource>;
+    enableBackgroundInvestigation?: boolean;
+    reportStyle?: string;
+    enableDeepThinking?: boolean;
+  } = {}
+): Promise<{ threadId: string }> {
+  const settings = getChatStreamSettings();
+  
+  // 准备请求数据
+  const requestData: ChatRequest = {
+    messages: [{ role: "user", content }],
+    thread_id: undefined, // 让后端生成
+    resources: options.resources || [],
+    auto_accepted_plan: false,
+    max_plan_iterations: 3,
+    max_step_num: 10,
+    max_search_results: 10,
+    enable_background_investigation: options.enableBackgroundInvestigation ?? settings.enableBackgroundInvestigation ?? true,
+    report_style: (options.reportStyle || settings.reportStyle || "academic") as ReportStyle,
+    enable_deep_thinking: options.enableDeepThinking ?? settings.enableDeepThinking ?? false,
+    mcp_settings: {},
+  };
+
+  // 创建新的 AbortController
+  const abortController = new AbortController();
+  
+  // 设置超时
+  const timeoutId = setTimeout(() => {
+    abortController.abort();
+  }, 10000); // 10秒超时
+
+  try {
+    const stream = fetchStream(resolveServiceURL("chat/stream"), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(requestData),
+      signal: abortController.signal,
+    });
+    
+    // 遍历 AsyncIterable
+    for await (const event of stream) {
+      if (event.event === 'thread_created' && event.data) {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.thread_id) {
+            clearTimeout(timeoutId);
+            // 立即返回 thread_id
+            return { threadId: data.thread_id };
+          }
+        } catch (e) {
+          console.error('Failed to parse thread_created event:', e);
+        }
+      }
+    }
+    
+    clearTimeout(timeoutId);
+    // 如果没有收到 thread_id，则拒绝
+    throw new Error('No thread_id received from server');
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    if (error.name === 'AbortError') {
+      throw new Error('Request timeout');
+    }
+    throw error;
+  }
 }

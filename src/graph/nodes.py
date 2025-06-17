@@ -190,13 +190,21 @@ def planner_node(
 
 def human_feedback_node(
     state,
-) -> Command[Literal["planner", "research_team", "reporter", "__end__"]]:
+) -> Command[Literal["planner", "research_team", "reporter", "__end__", "reask"]]:
     current_plan = state.get("current_plan", "")
     # check if the plan is auto accepted
     auto_accepted_plan = state.get("auto_accepted_plan", False)
 
     if not auto_accepted_plan:
-        feedback = interrupt("Please Review the Plan.")
+        # 定义选项
+        options = [
+            {"text": "开始研究", "value": "accepted"},
+            {"text": "立即生成报告", "value": "skip_research"},
+            {"text": "编辑计划", "value": "edit_plan"},
+            {"text": "重新提问", "value": "reask"}
+        ]
+        
+        feedback = interrupt(value={"message": "Please Review the Plan.", "options": options})
 
         # if the feedback is not accepted, return the planner node
         if feedback and str(feedback).upper().startswith("[EDIT_PLAN]"):
@@ -254,6 +262,12 @@ def human_feedback_node(
                 },
                 goto="__end__",
             )
+        elif feedback and (
+            str(feedback).upper().startswith("[REASK]")
+            or str(feedback).lower() == "reask"
+        ):
+            logger.info("User requested to reask.")
+            return Command(goto="reask")
         else:
             raise TypeError(f"Interrupt value of {feedback} is not supported.")
 

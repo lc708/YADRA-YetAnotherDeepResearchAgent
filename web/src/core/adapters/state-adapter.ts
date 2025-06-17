@@ -231,6 +231,11 @@ export function messagesToArtifacts(
 ): Artifact[] {
   const artifacts: Artifact[] = [];
   
+  // 防御性检查
+  if (!messages || !messageIds || !Array.isArray(messageIds)) {
+    return artifacts;
+  }
+  
   for (const messageId of messageIds) {
     const message = messages.get(messageId);
     if (message) {

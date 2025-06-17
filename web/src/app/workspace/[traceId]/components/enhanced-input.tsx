@@ -13,17 +13,19 @@ import { Tooltip } from "~/components/yadra/tooltip";
 import { Detective } from "~/components/yadra/icons/detective";
 import { ReportStyleDialog } from "~/components/yadra/report-style-dialog";
 import type { Resource } from "~/core/messages";
-import { sendMessage, useStore } from "~/core/store";
+import { 
+  sendMessage, 
+  useMessageIds,
+  useWorkspaceActions, 
+  useWorkspaceFeedback 
+} from "~/core/store";
 import {
   setEnableDeepThinking,
   setEnableBackgroundInvestigation,
   useSettingsStore,
 } from "~/core/store";
+import { useUnifiedStore } from "~/core/store/unified-store";
 import { getConfig } from "~/core/api/config";
-import { 
-  useWorkspaceActions, 
-  useWorkspaceFeedback 
-} from "~/core/store/workspace-store";
 
 import { cn } from "~/lib/utils";
 
@@ -50,12 +52,8 @@ export function EnhancedInput({
   const [resources, setResources] = useState<Resource[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   
-  const { responding, messageIds } = useStore(
-    useShallow((state) => ({
-      responding: state.responding,
-      messageIds: state.messageIds,
-    }))
-  );
+  const responding = useUnifiedStore((state) => state.responding);
+  const messageIds = useMessageIds();
 
   // 从workspace store获取反馈状态和操作
   const feedback = useWorkspaceFeedback();

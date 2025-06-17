@@ -2,162 +2,136 @@
 
 "use client";
 
-import { useEffect, useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { toast } from "sonner";
-import { useStore } from "~/core/store";
+import { useUnifiedStore } from "~/core/store/unified-store";
 
 interface OriginalInput {
-  text: string;
-  locale: string;
-  settings: {
-    enable_background_investigation: boolean;
-    auto_accepted_plan: boolean;
-    report_style: string;
-    [key: string]: unknown;
-  };
-  resources: unknown[];
-  timestamp: string;
+  thread_id: string;
+  original_input: string;
 }
 
-interface ReaskHandlerOptions {
-  onRestore?: (originalInput: OriginalInput) => void;
-  onError?: (error: Error) => void;
-}
-
-export function useReaskHandler(options: ReaskHandlerOptions = {}) {
-  const { onRestore, onError } = options;
-  const isHandlingRef = useRef(false);
+export function useReaskHandler() {
   const router = useRouter();
   const pathname = usePathname();
-  const clearConversation = useStore((state) => state.clearConversation);
+  const currentThreadId = useUnifiedStore((state) => state.currentThreadId);
+  const clearThread = useUnifiedStore((state) => state.clearThread);
+  const originalInputRef = useRef<string | null>(null);
 
   const handleReaskEvent = useCallback((event: CustomEvent<OriginalInput>) => {
-    // 防止重复处理
-    if (isHandlingRef.current) {
-      console.warn("Reask event already being handled, ignoring duplicate");
-      return;
-    }
-
-    isHandlingRef.current = true;
-
-    try {
-      const originalInput = event.detail;
-      
-      if (!originalInput) {
-        throw new Error("No original input data received");
+    const { thread_id, original_input } = event.detail;
+    
+    // 保存原始输入
+    originalInputRef.current = original_input;
+    
+    // 如果在 workspace 页面，导航到新的页面
+    if (pathname.startsWith("/workspace/")) {
+      // 清除当前会话
+      if (currentThreadId) {
+        clearThread(currentThreadId);
       }
-
-      console.log("Handling reask event:", originalInput);
-
-      // 验证必要字段
-      if (!originalInput.text || typeof originalInput.text !== 'string') {
-        throw new Error("Invalid original input: missing or invalid text");
-      }
-
-      if (!originalInput.locale || typeof originalInput.locale !== 'string') {
-        throw new Error("Invalid original input: missing or invalid locale");
-      }
-
-      // 清空当前对话状态
-      clearConversation();
-
-      // 如果当前在workspace页面，需要导航到chat页面
-      if (pathname.startsWith('/workspace/')) {
-        const reaskData = encodeURIComponent(JSON.stringify(originalInput));
-        router.push(`/chat?reask=${reaskData}`);
-        return; // 导航后不需要继续处理
-      }
-
-      // 如果已经在chat页面，直接调用恢复回调
-      onRestore?.(originalInput);
-
-      // 显示成功提示
-      toast.success("已恢复到原始输入状态", {
-        description: "您可以修改查询内容后重新提交",
-        duration: 3000,
-      });
-
-    } catch (error) {
-      console.error("Error handling reask event:", error);
       
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      // 导航到聊天页面，准备新的会话
+      router.push("/chat");
       
-      // 调用错误回调
-      onError?.(error instanceof Error ? error : new Error(errorMessage));
-      
-      // 显示错误提示
-      toast.error("恢复原始状态失败", {
-        description: errorMessage,
-        duration: 5000,
-      });
-    } finally {
-      // 延迟重置标志，避免快速连续事件
+      // 延迟一下，确保页面已经导航
       setTimeout(() => {
-        isHandlingRef.current = false;
-      }, 1000);
+        // 触发新的消息发送
+        const inputElement = document.querySelector('textarea[name="message"]') as HTMLTextAreaElement;
+        if (inputElement) {
+          inputElement.value = original_input;
+          inputElement.dispatchEvent(new Event('input', { bubbles: true }));
+          
+          // 模拟提交
+          const form = inputElement.closest('form');
+          if (form) {
+            form.dispatchEvent(new Event('submit', { bubbles: true }));
+      }
+        }
+      }, 500);
+    } else {
+      // 如果在聊天页面，直接发送新消息
+      const inputElement = document.querySelector('textarea[name="message"]') as HTMLTextAreaElement;
+      if (inputElement) {
+        inputElement.value = original_input;
+        inputElement.dispatchEvent(new Event('input', { bubbles: true }));
+        
+        // 模拟提交
+        const form = inputElement.closest('form');
+        if (form) {
+          form.dispatchEvent(new Event('submit', { bubbles: true }));
+        }
+      }
     }
-  }, [onRestore, onError, clearConversation, pathname, router]);
+    
+    toast.success("正在使用原始输入重新开始研究...");
+  }, [router, pathname, currentThreadId, clearThread]);
+      
+  const handleClearAndRestart = useCallback(() => {
+    if (originalInputRef.current) {
+      // 清除当前会话
+      if (currentThreadId) {
+        clearThread(currentThreadId);
+      }
+      
+      // 导航到聊天页面
+      router.push("/chat");
+      
+      // 延迟一下，确保页面已经导航
+      setTimeout(() => {
+        // 触发新的消息发送
+        const inputElement = document.querySelector('textarea[name="message"]') as HTMLTextAreaElement;
+        if (inputElement && originalInputRef.current) {
+          inputElement.value = originalInputRef.current;
+          inputElement.dispatchEvent(new Event('input', { bubbles: true }));
+          
+          // 模拟提交
+          const form = inputElement.closest('form');
+          if (form) {
+            form.dispatchEvent(new Event('submit', { bubbles: true }));
+          }
+        }
+      }, 500);
+      
+      toast.success("已清除会话，正在重新开始...");
+    } else {
+      toast.error("没有找到原始输入");
+    }
+  }, [router, currentThreadId, clearThread]);
 
   useEffect(() => {
-    console.log("=== useReaskHandler: 设置事件监听器 ===");
-    
-    const handleReask = (event: CustomEvent) => {
-      console.log("=== handleReask: 接收到reask事件 ===");
-      console.log("Event:", event);
-      console.log("Event detail:", event.detail);
-      
-      try {
-        const originalInput = event.detail;
-        
-        if (!originalInput) {
-          console.error("handleReask: originalInput为空");
-          return;
-        }
-        
-        console.log("handleReask: 准备清除对话");
-        // 清除当前对话
-        clearConversation();
-        
-        console.log("handleReask: 准备导航到聊天页面");
-        // 导航到聊天页面并传递原始输入数据
-        const params = new URLSearchParams({
-          reask: 'true',
-          originalInput: JSON.stringify(originalInput)
-        });
-        
-        const url = `/chat?${params.toString()}`;
-        console.log("handleReask: 导航URL:", url);
-        
-        router.push(url);
-        console.log("handleReask: 导航完成");
-        
-      } catch (error) {
-        console.error("handleReask: 处理reask事件时出错:", error);
-      }
-      
-      console.log("=== handleReask: 处理完成 ===");
+    // 监听 reask 事件
+    const handleEvent = (event: Event) => {
+      handleReaskEvent(event as CustomEvent<OriginalInput>);
     };
-
-    // 添加事件监听器到window和document
-    console.log("添加window事件监听器");
-    window.addEventListener('reask', handleReask as EventListener);
     
-    console.log("添加document事件监听器");
-    document.addEventListener('reask', handleReask as EventListener);
-
-    // 清理函数
+    window.addEventListener("reask", handleEvent);
+    
     return () => {
-      console.log("=== useReaskHandler: 清理事件监听器 ===");
-      window.removeEventListener('reask', handleReask as EventListener);
-      document.removeEventListener('reask', handleReask as EventListener);
+      window.removeEventListener("reask", handleEvent);
     };
-  }, [router, clearConversation]);
+  }, [handleReaskEvent]);
+
+  // 监听键盘快捷键
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Cmd/Ctrl + Shift + R 清除并重新开始
+      if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key === 'R') {
+        event.preventDefault();
+        handleClearAndRestart();
+      }
+    };
+    
+    window.addEventListener("keydown", handleKeyDown);
+    
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [handleClearAndRestart]);
 
   return {
-    isHandling: isHandlingRef.current,
+    originalInput: originalInputRef.current,
+    handleClearAndRestart,
   };
 }
-
-// 导出类型供其他组件使用
-export type { OriginalInput, ReaskHandlerOptions }; 

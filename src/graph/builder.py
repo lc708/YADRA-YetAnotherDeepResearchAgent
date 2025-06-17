@@ -4,8 +4,9 @@ import os
 import logging
 from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.postgres import PostgresSaver
-from langgraph.checkpoint.memory import MemorySaver
 from src.prompts.planner_model import StepType
+import psycopg
+from psycopg.rows import dict_row
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +52,7 @@ def _build_base_graph():
     builder.add_node("researcher", researcher_node)
     builder.add_node("coder", coder_node)
     builder.add_node("human_feedback", human_feedback_node)
-    builder.add_node("reask", reask_node)  # 添加重新提问节点
+    builder.add_node("reask", reask_node)
     builder.add_edge("background_investigator", "planner")
     builder.add_conditional_edges(
         "research_team",
@@ -59,75 +60,73 @@ def _build_base_graph():
         ["planner", "researcher", "coder"],
     )
     builder.add_edge("reporter", END)
-    builder.add_edge("reask", END)  # 重新提问节点连接到结束
+    builder.add_edge("reask", END)
     return builder
 
 
-def _setup_postgres_tables():
-    """Setup PostgreSQL tables if DATABASE_URL is available."""
-    database_url = os.getenv('DATABASE_URL')
+# Global PostgresSaver connection
+_global_connection = None
+_global_checkpointer = None
+
+
+def _get_postgres_checkpointer():
+    """Get or create PostgreSQL checkpointer."""
+    global _global_checkpointer, _global_connection
     
-    if not database_url:
-        logger.warning("⚠️  DATABASE_URL not found, skipping PostgreSQL setup")
-        return False
+    if _global_checkpointer is None:
+        database_url = os.getenv('DATABASE_URL')
+        if not database_url:
+            raise ValueError("DATABASE_URL environment variable is required")
+        
+        logger.info("🔄 Initializing PostgresSaver...")
+        
+        # Create a persistent connection with proper settings
+        _global_connection = psycopg.connect(
+            database_url,
+            autocommit=True,
+            row_factory=dict_row
+        )
+        
+        # Create checkpointer with the connection
+        _global_checkpointer = PostgresSaver(_global_connection)
+        _global_checkpointer.setup()
+        
+        logger.info("✅ PostgresSaver initialized successfully")
     
-    try:
-        # 使用context manager确保正确的资源管理
-        with PostgresSaver.from_conn_string(database_url) as checkpointer:
-            checkpointer.setup()  # 创建必要的表
-            logger.info("✅ PostgreSQL tables setup completed")
-        return True
-    except Exception as e:
-        logger.error(f"❌ Failed to setup PostgreSQL tables: {e}")
-        return False
+    return _global_checkpointer
 
 
 def build_graph_with_memory():
     """Build and return the agent workflow graph with persistent memory."""
-    # 使用全局管理的checkpointer
-    global _global_checkpointer
-    
-    if _global_checkpointer is None:
-        _initialize_global_checkpointer()
-    
-    # build state graph
+    checkpointer = _get_postgres_checkpointer()
     builder = _build_base_graph()
-    return builder.compile(checkpointer=_global_checkpointer)
+    return builder.compile(checkpointer=checkpointer)
 
 
 def build_graph():
     """Build and return the agent workflow graph without memory."""
-    # build state graph
     builder = _build_base_graph()
     return builder.compile()
 
 
-# 全局变量用于管理长期连接
-_global_checkpointer = None
-
-def _initialize_global_checkpointer():
-    """初始化全局checkpointer，用于整个应用生命周期"""
-    global _global_checkpointer
+def cleanup_postgres_resources():
+    """Cleanup PostgreSQL resources."""
+    global _global_connection, _global_checkpointer
     
-    database_url = os.getenv('DATABASE_URL')
-    
-    # 临时使用MemorySaver直到完成AsyncPostgresSaver迁移
-    logger.warning("🔄 Using MemorySaver temporarily - PostgreSQL async integration in progress")
-    _global_checkpointer = MemorySaver()
-    return _global_checkpointer
-    
-    # TODO: 实现AsyncPostgresSaver集成
-    # 当前问题：同步PostgresSaver在异步环境中导致NotImplementedError
-    # 需要：使用AsyncPostgresSaver + 异步graph构建模式
-    # if not database_url:
-    #     logger.warning("🔄 Using MemorySaver - DATABASE_URL not found")
-    #     _global_checkpointer = MemorySaver()
-    #     return _global_checkpointer
+    if _global_connection:
+        _global_connection.close()
+        _global_connection = None
+        _global_checkpointer = None
+        logger.info("✅ PostgreSQL resources cleaned up")
 
-# 初始化PostgreSQL表（如果可用）
-_setup_postgres_tables()
 
-# 初始化全局checkpointer
-_initialize_global_checkpointer()
+# Initialize on module load
+try:
+    _get_postgres_checkpointer()
+    logger.info("✅ PostgreSQL checkpointer initialized on module load")
+except Exception as e:
+    logger.error(f"❌ Failed to initialize PostgreSQL checkpointer: {e}")
+    raise
 
+# Create default graph instance
 graph = build_graph()
