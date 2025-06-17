@@ -108,7 +108,7 @@ export function HeroSection() {
               className="border-white/20 bg-white/5 text-white hover:bg-white/10"
               asChild
             >
-              <Link href="/chat">
+              <Link href="https://github.com/lc708/YADRA-YetAnotherDeepResearchAgent" target="_blank">
                 <GithubFilled className="mr-2 h-4 w-4" />
                 GitHub
               </Link>
@@ -119,7 +119,7 @@ export function HeroSection() {
               className="border-white/20 bg-white/5 text-white hover:bg-white/10"
               asChild
             >
-              <Link href="/chat">
+              <Link href="https://github.com/lc708/YADRA-YetAnotherDeepResearchAgent/blob/main/README.md" target="_blank">
                 <FileText className="mr-2 h-4 w-4" />
                 文档
               </Link>

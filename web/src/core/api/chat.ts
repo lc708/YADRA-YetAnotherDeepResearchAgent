@@ -306,18 +306,34 @@ export async function sendMessageAndGetThreadId(
         signal: abortController.signal,
       });
       
-      // 遍历 AsyncIterable
+      // 遍历 AsyncIterable，只等待 thread_created 事件
       for await (const event of stream) {
         if (event.event === 'thread_created' && event.data) {
           try {
             const data = JSON.parse(event.data);
             if (data.thread_id) {
               clearTimeout(timeoutId);
-              // 立即返回 thread_id
+              // 🔧 关键修复：获取到thread_id后立即返回，不继续处理对话流
+              // 这样首页只负责创建thread，不执行实际对话
+              console.log('✅ Thread created, returning thread_id:', data.thread_id);
               return { threadId: data.thread_id };
             }
           } catch (e) {
             console.error('Failed to parse thread_created event:', e);
+          }
+        }
+        // 🔧 如果是其他事件类型，说明对话已经开始，我们不应该到这里
+        // 这表明后端可能没有发送 thread_created 事件，我们需要从其他事件中提取 thread_id
+        else if (event.event === 'message_chunk' && event.data) {
+          try {
+            const data = JSON.parse(event.data);
+            if (data.thread_id) {
+              clearTimeout(timeoutId);
+              console.log('✅ Thread ID extracted from message_chunk:', data.thread_id);
+              return { threadId: data.thread_id };
+            }
+          } catch (e) {
+            console.error('Failed to parse message_chunk event:', e);
           }
         }
       }
