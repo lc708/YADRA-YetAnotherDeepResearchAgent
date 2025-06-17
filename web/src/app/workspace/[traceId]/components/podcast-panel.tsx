@@ -11,7 +11,7 @@ import { ScrollArea } from "~/components/ui/scroll-area";
 import { Tooltip } from "~/components/yadra/tooltip";
 import { RainbowText } from "~/components/yadra/rainbow-text";
 import { LoadingOutlined } from "@ant-design/icons";
-import { useStore, useMessage } from "~/core/store/store";
+import { useThreadMessages } from "~/core/store";
 import { cn } from "~/lib/utils";
 import type { Message } from "~/core/messages";
 
@@ -31,18 +31,15 @@ export function PodcastPanel({ traceId, className }: PodcastPanelProps) {
   const [currentlyPlaying, setCurrentlyPlaying] = useState<string | null>(null);
   const [audioElements, setAudioElements] = useState<Map<string, HTMLAudioElement>>(new Map());
   
-  // 获取所有播客消息
-  const messageIds = useStore((state) => state.messageIds);
-  const messages = useStore((state) => state.messages);
+  // 获取当前线程的消息
+  const messages = useThreadMessages();
   
   // 过滤出播客消息
   const podcastMessages = useMemo(() => {
-    return messageIds
-      .map(id => messages.get(id))
-      .filter((message): message is Message => 
+    return messages.filter((message): message is Message => 
         message !== undefined && message.agent === "podcast"
       );
-  }, [messageIds, messages]);
+  }, [messages]);
   
   // 解析播客数据
   const podcastList = useMemo(() => {

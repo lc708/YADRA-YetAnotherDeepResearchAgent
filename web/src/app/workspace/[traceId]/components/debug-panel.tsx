@@ -8,12 +8,12 @@ import { useMemo } from "react";
 import { Badge } from "~/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { 
-  useStore, 
   useMessageIds, 
-  useLastInterruptMessage, 
-  useLastFeedbackMessageId 
-} from "~/core/store";
-import { useWorkspaceFeedback } from "~/core/store/workspace-store";
+  useCurrentThread,
+  useUnifiedStore,
+  useWorkspaceState,
+  useThreadMessages,
+} from "~/core/store/unified-store";
 import { cn } from "~/lib/utils";
 
 interface DebugPanelProps {
@@ -22,10 +22,13 @@ interface DebugPanelProps {
 
 export function DebugPanel({ className }: DebugPanelProps) {
   const messageIds = useMessageIds();
-  const interruptMessage = useLastInterruptMessage();
-  const waitingForFeedbackMessageId = useLastFeedbackMessageId();
-  const feedback = useWorkspaceFeedback();
-  const responding = useStore((state) => state.responding);
+  const messages = useThreadMessages();
+  const threadData = useCurrentThread();
+  const interruptMessage = threadData?.ui.lastInterruptMessageId || null;
+  const waitingForFeedbackMessageId = threadData?.ui.waitingForFeedbackMessageId || null;
+  const workspaceState = useWorkspaceState();
+  const feedback = workspaceState.feedback;
+  const responding = useUnifiedStore((state) => state.responding);
   
   const diagnostics = useMemo(() => {
     const issues = [];
@@ -39,12 +42,9 @@ export function DebugPanel({ className }: DebugPanelProps) {
     }
     
     // 检查重复消息
-    const messageContents = messageIds.map(id => {
-      const msg = useStore.getState().messages.get(id);
-      return msg?.content?.substring(0, 100);
-    });
+    const messageContents = messages.map(msg => msg?.content?.substring(0, 100));
     const duplicates = messageContents.filter((content, index) => 
-      messageContents.indexOf(content) !== index
+      content && messageContents.indexOf(content) !== index
     );
     if (duplicates.length > 0) {
       issues.push(`检测到 ${duplicates.length} 条重复消息`);
@@ -52,10 +52,11 @@ export function DebugPanel({ className }: DebugPanelProps) {
     
     // 检查中断消息状态
     if (interruptMessage) {
-      if (!interruptMessage.options?.length) {
+      const msg = messages.find(m => m.id === interruptMessage);
+      if (!msg?.options?.length) {
         issues.push("中断消息存在但没有选项");
       } else {
-        info.push(`中断消息正常，有 ${interruptMessage.options.length} 个选项`);
+        info.push(`中断消息正常，有 ${msg.options.length} 个选项`);
       }
     }
     
@@ -74,7 +75,7 @@ export function DebugPanel({ className }: DebugPanelProps) {
     }
     
     return { issues, info };
-  }, [messageIds, interruptMessage, waitingForFeedbackMessageId, feedback, responding]);
+  }, [messageIds, messages, interruptMessage, waitingForFeedbackMessageId, feedback, responding]);
   
   if (process.env.NODE_ENV !== 'development') {
     return null;
