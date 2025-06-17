@@ -129,7 +129,6 @@ export default function WorkspacePage() {
     }
 
     const q = searchParams.get("q");
-    const from = searchParams.get("from");
     const investigation = searchParams.get("investigation");
     const style = searchParams.get("style");
     const resourcesParam = searchParams.get("resources");
@@ -153,10 +152,13 @@ export default function WorkspacePage() {
         }
       }
 
-      // 🔧 修复重复请求问题：只有从首页跳转来的才发送初始消息
-      if (from === "home") {
+      // 🔧 修复重复请求问题：检查是否已有消息，避免重复发送
+      const existingMessages = messageIds.length > 0;
+      
+      if (!existingMessages) {
+        // 只有在没有现有消息时才发送初始消息
         const sendInitialMessage = async () => {
-          console.log("[WorkspacePage] Sending initial message from home:", q);
+          console.log("[WorkspacePage] Sending initial message:", q);
           
           // 创建AbortController
           const abortController = new AbortController();
@@ -165,34 +167,29 @@ export default function WorkspacePage() {
           try {
             await sendMessage(q, { resources }, { abortSignal: abortController.signal });
             console.log("[WorkspacePage] Initial message sent successfully");
-            
-            // 🔧 发送成功后，移除from参数避免刷新时重复发送
-            const newParams = new URLSearchParams(searchParams);
-            newParams.delete("from");
-            const newUrl = `${window.location.pathname}?${newParams.toString()}`;
-            window.history.replaceState({}, "", newUrl);
-            
             setInitialized(true);
           } catch (error) {
             if (error instanceof Error && error.name !== 'AbortError') {
               console.error("Failed to send initial message:", error);
             } else if (error instanceof DOMException && error.message === 'Component unmounted') {
+              // 组件卸载导致的中止是正常行为，不需要记录错误
               console.log("[WorkspacePage] Request aborted due to component unmount");
             }
+            // 即使出错也设置为已初始化，避免无限重试
             setInitialized(true);
           }
         };
 
         void sendInitialMessage();
       } else {
-        // 不是从首页来的（直接访问、刷新等），直接标记为已初始化
-        console.log("[WorkspacePage] Not from home, skipping initial message");
+        // 如果已有消息（从首页跳转来的情况），直接标记为已初始化
+        console.log("[WorkspacePage] Messages already exist, skipping initial message send");
         setInitialized(true);
       }
     } else {
       setInitialized(true);
     }
-  }, [searchParams, initialized]); // 移除traceId和messageIds.length依赖，避免无限循环
+  }, [searchParams, traceId, messageIds.length]);
 
   // 清理函数
   useEffect(() => {

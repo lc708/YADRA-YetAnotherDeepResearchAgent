@@ -32,6 +32,7 @@ import type { Message } from "../messages";
 import { mergeMessage } from "../messages/merge-message";
 import { chatStream, buildChatStreamParams } from "../api/chat";
 
+
 import { useUnifiedStore } from "./unified-store";
 
 // Legacy store compatibility - create a selector-based hook
