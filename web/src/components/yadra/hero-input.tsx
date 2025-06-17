@@ -204,61 +204,30 @@ export function HeroInput({
     };
   }, [showStyleDropdown, calculateDropdownPosition]);
 
-  const handleSubmit = useCallback(
-    async (e?: React.FormEvent) => {
-      if (e) e.preventDefault();
-      if (!currentPrompt.trim() || !canOperate || isSubmitting || responding) return;
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentPrompt.trim() || isSubmitting) return;
 
-      if (context === 'workspace' && onSendMessage) {
-        try {
-          await onSendMessage(currentPrompt, {
-            resources,
-            interruptFeedback: feedback?.option.value,
-          });
-          setCurrentPrompt("");
-          setResources([]);
-          
-          if (feedback) {
-            removeFeedback();
-          }
-        } catch (error) {
-          console.error("Failed to send message:", error);
-        }
-      } else {
-        setIsSubmitting(true);
-        
-        try {
-          // 发送消息（不指定 thread_id，让后端生成）
-          const response = await sendMessageAndGetThreadId(currentPrompt, {
-            resources: [],
-            enableBackgroundInvestigation: true,
-            reportStyle: reportStyle || undefined,
-            enableDeepThinking: enableDeepThinking,
-          });
-          
-          if (response.threadId) {
-            // 构建查询参数
-            const params = new URLSearchParams({
-              q: currentPrompt,
-              investigation: "true",
-              ...(enableDeepThinking && { enable_deep_thinking: "true" }),
-              ...(reportStyle && { style: reportStyle }),
-            });
-            
-            // 使用后端返回的 thread_id 跳转
-            router.push(`/workspace/${response.threadId}?${params.toString()}`);
-          } else {
-            alert('Failed to get thread ID from server');
-            setIsSubmitting(false);
-          }
-        } catch (error: any) {
-          alert(`Error: ${error.message || 'Unknown error'}`);
-          setIsSubmitting(false);
-        }
-      }
-    },
-    [currentPrompt, canOperate, reportStyle, enableDeepThinking, router, isSubmitting, responding, context, onSendMessage, resources, feedback, removeFeedback]
-  );
+    setIsSubmitting(true);
+    try {
+      // 🔧 修复重复请求问题：使用URL参数标记来源
+      const params = new URLSearchParams({
+        from: "home", // 标记来源，避免刷新时重复发送
+        q: currentPrompt,
+        investigation: "true",
+        ...(enableDeepThinking && { enable_deep_thinking: "true" }),
+        ...(reportStyle && { style: reportStyle }),
+      });
+
+      // 跳转到workspace，使用 'new' 作为占位符thread_id
+      router.push(`/workspace/new?${params.toString()}`);
+    } catch (error) {
+      console.error("❌ Error during navigation:", error);
+      alert("跳转失败，请重试");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   // 监听示例问题选择事件
   useEffect(() => {
@@ -266,10 +235,10 @@ export function HeroInput({
       const { question } = event.detail;
       if (question) {
         setCurrentPrompt(question);
-        // 自动发送选中的问题
-        setTimeout(() => {
-          handleSubmit();
-        }, 100);
+                  // 自动发送选中的问题
+          setTimeout(() => {
+            handleSubmit({ preventDefault: () => {} } as React.FormEvent);
+          }, 100);
       }
     };
 
@@ -575,7 +544,7 @@ export function HeroInput({
             className="min-h-[80px] px-4 py-4 sm:px-6 sm:py-6"
             placeholder={context === 'homepage' ? PLACEHOLDER_TEXTS[currentPlaceholder] : (customPlaceholder || "继续对话...")}
             onChange={setCurrentPrompt}
-            onEnter={() => handleSubmit()}
+                         onEnter={() => handleSubmit({ preventDefault: () => {} } as React.FormEvent)}
           />
           
           {/* 去掉分割线，统一按钮高度为 h-9 */}
@@ -732,7 +701,7 @@ export function HeroInput({
                 title={responding ? "停止生成" : (canOperate ? (isSubmitting ? "正在处理..." : "发送消息") : "请输入消息")}
               >
                 <Button
-                  onClick={responding ? () => {} : () => handleSubmit()}
+                                     onClick={responding ? () => {} : () => handleSubmit({ preventDefault: () => {} } as React.FormEvent)}
                   disabled={!canOperate || (isSubmitting && !responding)}
                   className={cn(
                     "h-9 w-9 p-0 rounded-lg border transition-all duration-300",

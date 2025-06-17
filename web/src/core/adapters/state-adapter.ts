@@ -118,11 +118,6 @@ function generateNodeName(message: Message): string {
  * 判断Message是否应该转换为Artifact
  */
 function shouldConvertToArtifact(message: Message): boolean {
-  // 跳过正在流式传输的消息
-  if (message.isStreaming) {
-    return false;
-  }
-  
   // 跳过空内容的消息
   if (!message.content || message.content.trim() === "") {
     return false;
@@ -133,7 +128,19 @@ function shouldConvertToArtifact(message: Message): boolean {
     return false;
   }
   
-  return true;
+  // 对于已完成的消息，无论之前是否是流式的，都应该转换为工件
+  if (!message.isStreaming) {
+    return true;
+  }
+  
+  // 对于正在流式传输的消息，如果内容已经足够丰富，也应该转换为工件
+  // 这样用户可以实时看到进展
+  if (message.isStreaming && message.content.trim().length >= 50) {
+    return true;
+  }
+  
+  // 跳过内容太少的流式消息
+  return false;
 }
 
 /**
@@ -368,4 +375,4 @@ export class WorkspaceStateAdapter {
 /**
  * 全局适配器实例
  */
-export const workspaceStateAdapter = new WorkspaceStateAdapter(); 
+export const workspaceStateAdapter = new WorkspaceStateAdapter();

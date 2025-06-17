@@ -15,8 +15,6 @@ export {
   addMessage,
   updateMessage,
   setResponding,
-  openResearch,
-  closeResearch,
   // Add workspace UI hooks
   useConversationPanelVisible,
   useArtifactsPanelVisible,
@@ -28,22 +26,24 @@ export {
 
 // TODO: These need to be migrated to unified-store
 // For now, create temporary implementations
-import { useUnifiedStore } from "./unified-store";
-import type { Message } from "../messages";
-import { chatStream } from "../api/chat";
-import { getChatStreamSettings } from "./settings-store";
 import { nanoid } from "nanoid";
-import { mergeMessage } from "../messages/merge-message";
 
-export const useStore = () => {
-  // Return a minimal compatibility layer
+import type { Message } from "../messages";
+import { mergeMessage } from "../messages/merge-message";
+import { chatStream, buildChatStreamParams } from "../api/chat";
+
+import { useUnifiedStore } from "./unified-store";
+
+// Legacy store compatibility - create a selector-based hook
+export const useStore = <T>(selector?: (state: ReturnType<typeof createLegacyState>) => T): T extends undefined ? ReturnType<typeof createLegacyState> : T => {
   const currentThreadId = useUnifiedStore((state) => state.currentThreadId);
   const thread = useUnifiedStore((state) => 
     currentThreadId ? state.threads.get(currentThreadId) : null
   );
+  const responding = useUnifiedStore((state) => state.responding);
   
-  return {
-    responding: useUnifiedStore((state) => state.responding),
+  const legacyState = {
+    responding,
     messageIds: thread?.messages.map(m => m.id) || [],
     messages: new Map(thread?.messages.map(m => [m.id, m]) || []),
     researchIds: thread?.metadata.researchIds || [],
@@ -53,6 +53,67 @@ export const useStore = () => {
     ongoingResearchId: thread?.metadata.ongoingResearchId || null,
     openResearchId: thread?.metadata.openResearchId || null,
   };
+  
+  if (selector) {
+    return selector(legacyState) as any;
+  }
+  
+  return legacyState as any;
+};
+
+// Helper function to create the legacy state type
+function createLegacyState() {
+  return {
+    responding: false as boolean,
+    messageIds: [] as string[],
+    messages: new Map() as Map<string, Message>,
+    researchIds: [] as string[],
+    researchPlanIds: new Map() as Map<string, string>,
+    researchReportIds: new Map() as Map<string, string>,
+    researchActivityIds: new Map() as Map<string, string[]>,
+    ongoingResearchId: null as string | null,
+    openResearchId: null as string | null,
+  };
+}
+
+// Add methods to the store for compatibility
+(useStore as any).getState = () => {
+  const state = useUnifiedStore.getState();
+  const currentThreadId = state.currentThreadId;
+  const thread = currentThreadId ? state.threads.get(currentThreadId) : null;
+  
+  return {
+    responding: state.responding,
+    messageIds: thread?.messages.map(m => m.id) || [],
+    messages: new Map(thread?.messages.map(m => [m.id, m]) || []),
+    researchIds: thread?.metadata.researchIds || [],
+    researchPlanIds: thread?.metadata.planMessageIds || new Map(),
+    researchReportIds: thread?.metadata.reportMessageIds || new Map(),
+    researchActivityIds: thread?.metadata.activityMessageIds || new Map(),
+    ongoingResearchId: thread?.metadata.ongoingResearchId || null,
+    openResearchId: thread?.metadata.openResearchId || null,
+  };
+};
+
+(useStore as any).setState = (updater: any) => {
+  const state = useUnifiedStore.getState();
+  const currentThreadId = state.currentThreadId;
+  
+  if (!currentThreadId) return;
+  
+  // Handle partial updates to messages
+  if (typeof updater === 'object' && updater.messages) {
+    const thread = state.threads.get(currentThreadId);
+    if (thread && updater.messages instanceof Map) {
+      // Update messages in the unified store
+      updater.messages.forEach((message: Message, messageId: string) => {
+        const existingIndex = thread.messages.findIndex(m => m.id === messageId);
+        if (existingIndex !== -1) {
+          state.updateMessage(currentThreadId, messageId, message);
+        }
+      });
+    }
+  }
 };
 
 export const useMessages = () => {
@@ -111,7 +172,7 @@ export const useToolCalls = () => {
 };
 
 export const sendMessage = async (
-  message: string,
+  message?: string,
   options?: {
     interruptFeedback?: string;
     resources?: any[];
@@ -120,6 +181,16 @@ export const sendMessage = async (
     abortSignal?: AbortSignal;
   }
 ) => {
+  // 如果没有传入消息，尝试从DOM获取
+  if (!message) {
+    const inputElement = document.querySelector('textarea[name="message"]') as HTMLTextAreaElement;
+    if (inputElement && inputElement.value.trim()) {
+      message = inputElement.value.trim();
+      inputElement.value = ''; // 清空输入框
+    } else {
+      throw new Error('No message provided');
+    }
+  }
   const state = useUnifiedStore.getState();
   const currentThreadId = state.currentThreadId || nanoid();
   
@@ -143,24 +214,16 @@ export const sendMessage = async (
   state.setResponding(true);
   
   try {
-    // 获取设置
-    const settings = getChatStreamSettings();
+    // 使用统一的配置构建函数
+    const chatParams = buildChatStreamParams(currentThreadId, {
+      resources: options?.resources,
+      interrupt_feedback: options?.interruptFeedback,
+    });
     
     // 调用 chatStream API
     const stream = chatStream(
       message,
-      {
-        thread_id: currentThreadId,
-        resources: options?.resources || [],
-        auto_accepted_plan: false,
-        max_plan_iterations: 3,
-        max_step_num: 10,
-        max_search_results: 10,
-        enable_background_investigation: settings.enableBackgroundInvestigation ?? true,
-        report_style: settings.reportStyle || "academic",
-        enable_deep_thinking: settings.enableDeepThinking ?? false,
-        interrupt_feedback: options?.interruptFeedback,
-      },
+      chatParams,
       {
         abortSignal: streamOptions?.abortSignal,
       }
@@ -226,4 +289,23 @@ export const sendMessage = async (
   } finally {
     state.setResponding(false);
   }
+};
+
+// Podcast functionality
+export const listenToPodcast = (messageId: string) => {
+  // TODO: Implement podcast functionality
+  console.log("Listen to podcast for message:", messageId);
+};
+
+export const openResearch = (researchId: string | null) => {
+  const state = useUnifiedStore.getState();
+  const currentThreadId = state.currentThreadId;
+  
+  if (currentThreadId) {
+    state.openResearch(currentThreadId, researchId);
+  }
+};
+
+export const closeResearch = () => {
+  openResearch(null);
 };

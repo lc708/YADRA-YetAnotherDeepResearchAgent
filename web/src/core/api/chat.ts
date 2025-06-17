@@ -29,6 +29,44 @@ export interface ChatRequest {
   interrupt_feedback?: string;
 }
 
+// 统一的配置构建函数
+export function buildChatStreamParams(
+  threadId: string,
+  options: {
+    resources?: Array<Resource>;
+    auto_accepted_plan?: boolean;
+    interrupt_feedback?: string;
+    enableBackgroundInvestigation?: boolean;
+    reportStyle?: ReportStyle;
+    enableDeepThinking?: boolean;
+    mcp_settings?: {
+      servers: Record<
+        string,
+        MCPServerMetadata & {
+          enabled_tools: string[];
+          add_to_agents: string[];
+        }
+      >;
+    };
+  } = {}
+) {
+  const settings = getChatStreamSettings();
+  
+  return {
+    thread_id: threadId,
+    resources: options.resources || [],
+    auto_accepted_plan: options.auto_accepted_plan ?? false,
+    max_plan_iterations: settings.maxPlanIterations || 1,
+    max_step_num: settings.maxStepNum || 3,
+    max_search_results: settings.maxSearchResults || 10,
+    enable_background_investigation: options.enableBackgroundInvestigation ?? settings.enableBackgroundInvestigation ?? true,
+    report_style: (options.reportStyle || settings.reportStyle || "academic") as ReportStyle,
+    enable_deep_thinking: options.enableDeepThinking ?? settings.enableDeepThinking ?? false,
+    interrupt_feedback: options.interrupt_feedback,
+    mcp_settings: options.mcp_settings,
+  };
+}
+
 export async function* chatStream(
   userMessage: string,
   params: {
@@ -211,6 +249,9 @@ export function fastForwardReplay(value: boolean) {
   fastForwardReplaying = value;
 }
 
+// 添加请求缓存 Map
+const pendingRequests = new Map<string, Promise<{ threadId: string }>>();
+
 export async function sendMessageAndGetThreadId(
   content: string,
   options: {
@@ -220,20 +261,28 @@ export async function sendMessageAndGetThreadId(
     enableDeepThinking?: boolean;
   } = {}
 ): Promise<{ threadId: string }> {
-  const settings = getChatStreamSettings();
+  // 生成请求指纹，防重复请求
+  const requestFingerprint = `${content}:${JSON.stringify(options)}`;
+  
+  // 检查是否有相同的请求正在进行
+  if (pendingRequests.has(requestFingerprint)) {
+    console.log('🔄 检测到重复请求，返回缓存的 Promise');
+    return pendingRequests.get(requestFingerprint)!;
+  }
+
+  // 使用统一的配置构建函数
+  const chatParams = buildChatStreamParams("", {
+    resources: options.resources,
+    enableBackgroundInvestigation: options.enableBackgroundInvestigation,
+    reportStyle: options.reportStyle as ReportStyle,
+    enableDeepThinking: options.enableDeepThinking,
+  });
   
   // 准备请求数据
   const requestData: ChatRequest = {
     messages: [{ role: "user", content }],
-    thread_id: undefined, // 让后端生成
-    resources: options.resources || [],
-    auto_accepted_plan: false,
-    max_plan_iterations: 3,
-    max_step_num: 10,
-    max_search_results: 10,
-    enable_background_investigation: options.enableBackgroundInvestigation ?? settings.enableBackgroundInvestigation ?? true,
-    report_style: (options.reportStyle || settings.reportStyle || "academic") as ReportStyle,
-    enable_deep_thinking: options.enableDeepThinking ?? settings.enableDeepThinking ?? false,
+    ...chatParams,
+    thread_id: undefined, // 让后端生成，覆盖chatParams中的thread_id
     mcp_settings: {},
   };
 
@@ -243,42 +292,57 @@ export async function sendMessageAndGetThreadId(
   // 设置超时
   const timeoutId = setTimeout(() => {
     abortController.abort();
-  }, 10000); // 10秒超时
+  }, 15000); // 增加到15秒
 
-  try {
-    const stream = fetchStream(resolveServiceURL("chat/stream"), {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(requestData),
-      signal: abortController.signal,
-    });
-    
-    // 遍历 AsyncIterable
-    for await (const event of stream) {
-      if (event.event === 'thread_created' && event.data) {
-        try {
-          const data = JSON.parse(event.data);
-          if (data.thread_id) {
-            clearTimeout(timeoutId);
-            // 立即返回 thread_id
-            return { threadId: data.thread_id };
+  // 创建请求 Promise
+  const requestPromise = (async () => {
+    try {
+      const stream = fetchStream(resolveServiceURL("chat/stream"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestData),
+        signal: abortController.signal,
+      });
+      
+      // 遍历 AsyncIterable
+      for await (const event of stream) {
+        if (event.event === 'thread_created' && event.data) {
+          try {
+            const data = JSON.parse(event.data);
+            if (data.thread_id) {
+              clearTimeout(timeoutId);
+              // 立即返回 thread_id
+              return { threadId: data.thread_id };
+            }
+          } catch (e) {
+            console.error('Failed to parse thread_created event:', e);
           }
-        } catch (e) {
-          console.error('Failed to parse thread_created event:', e);
         }
       }
+      
+      clearTimeout(timeoutId);
+      // 如果没有收到 thread_id，则拒绝
+      throw new Error('No thread_id received from server');
+    } catch (error: any) {
+      clearTimeout(timeoutId);
+      if (error.name === 'AbortError') {
+        throw new Error('Request timeout - 请求超时，请稍后重试');
+      }
+      throw error;
+    } finally {
+      // 清理缓存（5秒后）
+      setTimeout(() => {
+        pendingRequests.delete(requestFingerprint);
+      }, 5000);
     }
-    
-    clearTimeout(timeoutId);
-    // 如果没有收到 thread_id，则拒绝
-    throw new Error('No thread_id received from server');
-  } catch (error: any) {
-    clearTimeout(timeoutId);
-    if (error.name === 'AbortError') {
-      throw new Error('Request timeout');
-    }
-    throw error;
-  }
+  })();
+
+  // 缓存请求
+  pendingRequests.set(requestFingerprint, requestPromise);
+  
+  return requestPromise;
 }
+
+

@@ -14,7 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
 import { Separator } from "~/components/ui/separator";
 import { Markdown } from "~/components/yadra/markdown";
-import { useStore, useMessageIds } from "~/core/store";
+import { useMessages, useMessageIds } from "~/core/store";
 import type { Message, MessageRole, MessageSource } from "~/core/messages";
 import { cn } from "~/lib/utils";
 
@@ -28,7 +28,7 @@ type SourceFilter = "all" | "input" | "button" | "system";
 
 export function MessageHistory({ traceId, className }: MessageHistoryProps) {
   const messageIds = useMessageIds();
-  const messages = useStore((state) => state.messages);
+  const messages = useMessages();
   
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<FilterType>("all");
@@ -253,4 +253,4 @@ export function MessageHistory({ traceId, className }: MessageHistoryProps) {
       </ScrollArea>
     </div>
   );
-} 
+}

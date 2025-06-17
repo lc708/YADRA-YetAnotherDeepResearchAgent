@@ -25,7 +25,7 @@ import {
 } from "~/core/store";
 import { sendMessageAndGetThreadId } from "~/core/api/chat";
 import { parseJSON } from "~/core/utils";
-import { useToast } from "~/hooks/use-toast";
+import { toast } from "sonner";
 
 // 导入组件
 import { ConversationPanel } from "./components/conversation-panel";
@@ -129,6 +129,7 @@ export default function WorkspacePage() {
     }
 
     const q = searchParams.get("q");
+    const from = searchParams.get("from");
     const investigation = searchParams.get("investigation");
     const style = searchParams.get("style");
     const resourcesParam = searchParams.get("resources");
@@ -152,35 +153,46 @@ export default function WorkspacePage() {
         }
       }
 
-      // 发送初始消息
-      const sendInitialMessage = async () => {
-        console.log("[WorkspacePage] Sending initial message:", q);
-        
-        // 创建AbortController
-        const abortController = new AbortController();
-        abortControllerRef.current = abortController;
-        
-        try {
-          await sendMessage(q, { resources }, { abortSignal: abortController.signal });
-          console.log("[WorkspacePage] Initial message sent successfully");
-          setInitialized(true);
-        } catch (error) {
-          if (error instanceof Error && error.name !== 'AbortError') {
-            console.error("Failed to send initial message:", error);
-          } else if (error instanceof DOMException && error.message === 'Component unmounted') {
-            // 组件卸载导致的中止是正常行为，不需要记录错误
-            console.log("[WorkspacePage] Request aborted due to component unmount");
+      // 🔧 修复重复请求问题：只有从首页跳转来的才发送初始消息
+      if (from === "home") {
+        const sendInitialMessage = async () => {
+          console.log("[WorkspacePage] Sending initial message from home:", q);
+          
+          // 创建AbortController
+          const abortController = new AbortController();
+          abortControllerRef.current = abortController;
+          
+          try {
+            await sendMessage(q, { resources }, { abortSignal: abortController.signal });
+            console.log("[WorkspacePage] Initial message sent successfully");
+            
+            // 🔧 发送成功后，移除from参数避免刷新时重复发送
+            const newParams = new URLSearchParams(searchParams);
+            newParams.delete("from");
+            const newUrl = `${window.location.pathname}?${newParams.toString()}`;
+            window.history.replaceState({}, "", newUrl);
+            
+            setInitialized(true);
+          } catch (error) {
+            if (error instanceof Error && error.name !== 'AbortError') {
+              console.error("Failed to send initial message:", error);
+            } else if (error instanceof DOMException && error.message === 'Component unmounted') {
+              console.log("[WorkspacePage] Request aborted due to component unmount");
+            }
+            setInitialized(true);
           }
-          // 即使出错也设置为已初始化，避免无限重试
-          setInitialized(true);
-        }
-      };
+        };
 
-      void sendInitialMessage();
+        void sendInitialMessage();
+      } else {
+        // 不是从首页来的（直接访问、刷新等），直接标记为已初始化
+        console.log("[WorkspacePage] Not from home, skipping initial message");
+        setInitialized(true);
+      }
     } else {
       setInitialized(true);
     }
-  }, [searchParams, traceId]);
+  }, [searchParams, initialized]); // 移除traceId和messageIds.length依赖，避免无限循环
 
   // 清理函数
   useEffect(() => {
@@ -279,7 +291,7 @@ export default function WorkspacePage() {
               {/* 对话面板 */}
               {conversationVisible && (
                 <div className={cn("flex flex-col border-r border-gray-200 dark:border-gray-700 min-h-0", panelWidth)}>
-                  <ConversationPanel traceId={traceId} />
+                  <ConversationPanel traceId={traceId} onSendMessage={handleSendMessage} />
                 </div>
               )}
 

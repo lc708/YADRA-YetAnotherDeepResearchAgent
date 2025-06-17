@@ -52,11 +52,14 @@ export function ConversationPanel({
   onSendMessage,
 }: ConversationPanelProps) {
   const scrollContainerRef = useRef<ScrollContainerRef>(null);
-  const messageIds = useMessageIds();
+  const messageIds = useMessageIds() || []; // 添加默认值防止undefined
   const threadData = useCurrentThread();
-  const interruptMessage = threadData?.ui.lastInterruptMessageId 
-    ? useMessage(threadData.ui.lastInterruptMessageId) 
-    : null;
+  
+  // 修复条件Hook调用 - 始终调用useMessage，然后根据条件使用结果
+  const lastInterruptMessageId = threadData?.ui.lastInterruptMessageId;
+  const interruptMessageResult = useMessage(lastInterruptMessageId || "");
+  const interruptMessage = lastInterruptMessageId ? interruptMessageResult : null;
+  
   const waitingForFeedbackMessageId = threadData?.ui.waitingForFeedbackMessageId || null;
   const responding = useUnifiedStore((state) => state.responding);
   const openResearchId = threadData?.metadata.openResearchId;
@@ -125,34 +128,35 @@ export function ConversationPanel({
     };
   }, []);
 
-  // 如果面板被隐藏，显示最小化状态
-  if (!conversationVisible) {
-    return (
-      <div className={cn("flex h-full w-full items-center justify-center", className)}>
-        <Card className="w-full max-w-sm">
-          <CardContent className="flex flex-col items-center gap-4 p-6">
-            <MessageSquare className="h-12 w-12 text-muted-foreground" />
-            <div className="text-center">
-              <h3 className="font-semibold">对话面板已隐藏</h3>
-              <p className="text-sm text-muted-foreground">
-                点击右上角按钮展开对话历史
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  // 渲染内容 - 移除条件提前返回，改为条件渲染
+  const renderContent = () => {
+    if (!conversationVisible) {
+      return (
+        <div className={cn("flex h-full w-full items-center justify-center", className)}>
+          <Card className="w-full max-w-sm">
+            <CardContent className="flex flex-col items-center gap-4 p-6">
+              <MessageSquare className="h-12 w-12 text-muted-foreground" />
+              <div className="text-center">
+                <h3 className="font-semibold">对话面板已隐藏</h3>
+                <p className="text-sm text-muted-foreground">
+                  点击右上角按钮展开对话历史
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
 
-  return (
-    <div className={cn("flex h-full w-full flex-col", className)}>
+    return (
+      <div className={cn("flex h-full w-full flex-col", className)}>
       {/* 面板标题栏 */}
       <div className="flex items-center justify-between border-b bg-background/50 px-4 py-3 backdrop-blur-sm">
         <div className="flex items-center gap-2">
           <MessageSquare className="h-5 w-5" />
           <h3 className="font-semibold">实时对话</h3>
           <span className="text-xs text-muted-foreground">
-            ({messageIds.length} 条消息)
+            ({(messageIds?.length || 0)} 条消息)
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -181,7 +185,7 @@ export function ConversationPanel({
           ref={scrollContainerRef}
         >
           <ul className="flex flex-col">
-            {messageIds.length === 0 ? (
+            {(!messageIds || messageIds.length === 0) ? (
               <div className="flex h-full items-center justify-center p-8">
                 <div className="text-center">
                   <MessageSquare className="mx-auto h-12 w-12 text-muted-foreground" />
@@ -212,7 +216,10 @@ export function ConversationPanel({
         </ScrollContainer>
       </div>
     </div>
-  );
+    );
+  };
+
+  return renderContent();
 }
 
 // 消息项组件，复用MessageListView的逻辑
@@ -326,4 +333,4 @@ function ConversationMessageItem({
   }
 
   return null;
-} 
+}

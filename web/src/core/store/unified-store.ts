@@ -42,8 +42,8 @@ interface ThreadState {
   };
 }
 
-// Store 状态
-interface UnifiedStoreState {
+// Store 类型 - 使用 zustand 推断类型而不是预定义接口
+type UnifiedStore = {
   // 线程管理
   threads: Map<string, ThreadState>;
   currentThreadId: string | null;
@@ -61,10 +61,7 @@ interface UnifiedStoreState {
     historyVisible: boolean;
     podcastVisible: boolean;
   };
-}
-
-// Store 操作
-interface UnifiedStoreActions {
+  
   // 线程管理
   createThread: (threadId: string) => ThreadState;
   getThread: (threadId: string) => ThreadState | null;
@@ -87,15 +84,15 @@ interface UnifiedStoreActions {
   setWaitingForFeedback: (threadId: string, messageId: string | null) => void;
   
   // 工作区操作
-  setWorkspaceState: (update: Partial<UnifiedStoreState['workspace']>) => void;
+  setWorkspaceState: (update: Partial<UnifiedStore['workspace']>) => void;
   
   // 派生数据
   getArtifacts: (threadId: string) => Artifact[];
   getMessageById: (threadId: string, messageId: string) => Message | undefined;
-}
+};
 
 // 创建 Store
-export const useUnifiedStore = create<UnifiedStoreState & UnifiedStoreActions>()(
+export const useUnifiedStore = create<UnifiedStore>()(
   subscribeWithSelector(
     immer((set, get) => ({
       // 初始状态
@@ -280,7 +277,7 @@ export const useUnifiedStore = create<UnifiedStoreState & UnifiedStoreActions>()
       },
       
       // 工作区操作
-      setWorkspaceState: (update: Partial<UnifiedStoreState['workspace']>) => {
+      setWorkspaceState: (update: Partial<UnifiedStore['workspace']>) => {
         set((state) => {
           Object.assign(state.workspace, update);
         });
@@ -340,6 +337,7 @@ export const useThreadMessages = (threadId?: string) => {
 
 export const useThreadArtifacts = (threadId?: string) => {
   const currentThreadId = useUnifiedStore((state) => state.currentThreadId);
+  const threads = useUnifiedStore((state) => state.threads);
   const getArtifacts = useUnifiedStore((state) => state.getArtifacts);
   
   const actualThreadId = threadId || currentThreadId;
@@ -347,7 +345,7 @@ export const useThreadArtifacts = (threadId?: string) => {
   return React.useMemo(() => {
     if (!actualThreadId) return [];
     return getArtifacts(actualThreadId);
-  }, [actualThreadId, getArtifacts]);
+  }, [actualThreadId, threads, getArtifacts]);
 };
 
 export const useWorkspaceState = () => {
@@ -473,4 +471,4 @@ export const useWorkspaceActions = () => {
       setWorkspaceState({ feedback: null });
     },
   }), [setWorkspaceState]);
-};                          
+};
