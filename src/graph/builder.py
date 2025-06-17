@@ -72,27 +72,29 @@ _global_checkpointer = None
 def _get_postgres_checkpointer():
     """Get or create PostgreSQL checkpointer."""
     global _global_checkpointer, _global_connection
-    
+
     if _global_checkpointer is None:
-        database_url = os.getenv('DATABASE_URL')
+        database_url = os.getenv("DATABASE_URL")
         if not database_url:
             raise ValueError("DATABASE_URL environment variable is required")
-        
+
         logger.info("🔄 Initializing PostgresSaver...")
-        
-        # Create a persistent connection with proper settings
-        _global_connection = psycopg.connect(
-            database_url,
-            autocommit=True,
-            row_factory=dict_row
-        )
-        
-        # Create checkpointer with the connection
-        _global_checkpointer = PostgresSaver(_global_connection)
-        _global_checkpointer.setup()
-        
-        logger.info("✅ PostgresSaver initialized successfully")
-    
+
+        try:
+            # Create a persistent connection with proper settings
+            _global_connection = psycopg.connect(
+                database_url, autocommit=True, row_factory=dict_row
+            )
+
+            # Create checkpointer with the connection
+            _global_checkpointer = PostgresSaver(_global_connection)
+            _global_checkpointer.setup()
+
+            logger.info("✅ PostgresSaver initialized successfully")
+        except Exception as e:
+            logger.error(f"❌ Failed to initialize PostgresSaver: {e}")
+            raise
+
     return _global_checkpointer
 
 
@@ -112,7 +114,7 @@ def build_graph():
 def cleanup_postgres_resources():
     """Cleanup PostgreSQL resources."""
     global _global_connection, _global_checkpointer
-    
+
     if _global_connection:
         _global_connection.close()
         _global_connection = None
@@ -120,13 +122,5 @@ def cleanup_postgres_resources():
         logger.info("✅ PostgreSQL resources cleaned up")
 
 
-# Initialize on module load
-try:
-    _get_postgres_checkpointer()
-    logger.info("✅ PostgreSQL checkpointer initialized on module load")
-except Exception as e:
-    logger.error(f"❌ Failed to initialize PostgreSQL checkpointer: {e}")
-    raise
-
-# Create default graph instance
+# Create default graph instance (without memory to avoid database dependency during import)
 graph = build_graph()
