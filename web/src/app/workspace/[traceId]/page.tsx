@@ -21,9 +21,18 @@ import {
   useArtifactsPanelVisible,
   useHistoryPanelVisible,
   usePodcastPanelVisible,
-  useWorkspaceFeedback
+  useWorkspaceFeedback,
 } from "~/core/store";
-import { sendMessageAndGetThreadId } from "~/core/api/chat";
+import {
+  // 新架构导入
+  setCurrentUrlParam,
+  setUrlParamMapping,
+  setSessionState,
+  useCurrentUrlParam,
+  useSessionState,
+  sendMessageWithNewAPI,
+} from "~/core/store/unified-store";
+import { getWorkspaceState } from "~/core/api/research-stream";
 import { parseJSON } from "~/core/utils";
 import { toast } from "sonner";
 
@@ -37,31 +46,18 @@ import { PodcastPanel } from "./components/podcast-panel";
 
 export default function WorkspacePage() {
   const params = useParams();
-  const searchParams = useSearchParams();
-  const traceId = params.traceId as string;
+  const urlParam = params.traceId as string; // 注意：这里是url_param，不是thread_id
   const [initialized, setInitialized] = useState(false);
-  const [query, setQuery] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // 获取消息状态
+  // 获取当前状态
+  const currentUrlParam = useCurrentUrlParam();
+  const sessionState = useSessionState();
   const messageIds = useMessageIds();
   const hasMessages = messageIds.length > 0;
   
-  // 在组件挂载时设置 threadId
-  useEffect(() => {
-    if (traceId) {
-      // 设置当前 threadId（不清理其他线程的数据）
-      setCurrentThreadId(traceId);
-    }
-  }, [traceId]);
-
-  // 组件卸载时不清理，保留历史记录
-  useEffect(() => {
-    return () => {
-      // 组件卸载时不清理，以便用户可以回到之前的对话
-    };
-  }, []);
-
   // Workspace状态管理
   const { 
     toggleConversationPanel, 
@@ -76,10 +72,71 @@ export default function WorkspacePage() {
   const historyVisible = useHistoryPanelVisible();
   const podcastVisible = usePodcastPanelVisible();
   const feedback = useWorkspaceFeedback();
-  
 
+  // 初始化工作区状态
+  useEffect(() => {
+    if (!urlParam || initialized) return;
 
-  // 实现消息发送处理函数（简化版本，移除重复检测）
+    const initializeWorkspace = async () => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        console.log(`[WorkspacePage] Initializing workspace with url_param: ${urlParam}`);
+        
+        // 设置当前URL参数
+        setCurrentUrlParam(urlParam);
+        
+        // 获取工作区状态
+        const workspaceData = await getWorkspaceState(urlParam);
+        console.log('[WorkspacePage] Workspace data loaded:', workspaceData);
+        
+        // 设置会话状态
+        setSessionState({
+          sessionMetadata: workspaceData.sessionMetadata,
+          executionHistory: workspaceData.executionHistory || [],
+          currentConfig: workspaceData.config?.currentConfig || null,
+          permissions: workspaceData.permissions || null,
+        });
+        
+        // 设置URL参数到thread_id的映射
+        setUrlParamMapping(urlParam, workspaceData.threadId);
+        
+        // 设置当前thread_id
+        setCurrentThreadId(workspaceData.threadId);
+        
+        // 恢复消息历史
+        if (workspaceData.messages && workspaceData.messages.length > 0) {
+          console.log(`[WorkspacePage] Restoring ${workspaceData.messages.length} messages`);
+          // TODO: 将messages转换为Message格式并添加到store
+        }
+        
+        // 恢复配置
+        if (workspaceData.config?.currentConfig) {
+          const config = workspaceData.config.currentConfig;
+          if (config.enableBackgroundInvestigation !== undefined) {
+            setEnableBackgroundInvestigation(config.enableBackgroundInvestigation);
+          }
+          if (config.reportStyle) {
+            setReportStyle(config.reportStyle);
+          }
+        }
+        
+        setInitialized(true);
+        console.log('[WorkspacePage] Workspace initialized successfully');
+        
+      } catch (error) {
+        console.error('[WorkspacePage] Failed to initialize workspace:', error);
+        setError(error instanceof Error ? error.message : 'Failed to load workspace');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initializeWorkspace();
+  }, [urlParam, initialized]);
+
+  // 实现消息发送处理函数（使用新架构）
   const handleSendMessage = useCallback(
     async (
       message: string,
@@ -88,16 +145,16 @@ export default function WorkspacePage() {
         resources?: Array<Resource>;
       },
     ) => {
-      console.log("[WorkspacePage] Sending message:", message);
+      console.log("[WorkspacePage] Sending message with new API:", message);
       
       const abortController = new AbortController();
       abortControllerRef.current = abortController;
+      
       try {
-        await sendMessage(
+        await sendMessageWithNewAPI(
           message,
           {
-            interruptFeedback:
-              options?.interruptFeedback ?? feedback?.option.value,
+            interruptFeedback: options?.interruptFeedback ?? feedback?.option.value,
             resources: options?.resources,
           },
           {
@@ -108,7 +165,7 @@ export default function WorkspacePage() {
         console.log("[WorkspacePage] Message sent successfully");
       } catch (error) {
         console.error("Failed to send message:", error);
-        throw error; // 重新抛出错误，让调用方处理
+        throw error;
       }
     },
     [feedback],
@@ -122,75 +179,6 @@ export default function WorkspacePage() {
     [setFeedback],
   );
 
-  useEffect(() => {
-    // 避免React Strict Mode的重复执行
-    if (initialized || !searchParams) {
-      return;
-    }
-
-    const q = searchParams.get("q");
-    const investigation = searchParams.get("investigation");
-    const style = searchParams.get("style");
-    const resourcesParam = searchParams.get("resources");
-
-    if (q) {
-      setQuery(q);
-      
-      if (investigation === "true") {
-        setEnableBackgroundInvestigation(true);
-      }
-      if (style) {
-        setReportStyle(style as "academic" | "popular_science" | "news" | "social_media");
-      }
-
-      let resources: Resource[] = [];
-      if (resourcesParam) {
-        try {
-          resources = JSON.parse(resourcesParam);
-        } catch (error) {
-          console.error("Failed to parse resources:", error);
-        }
-      }
-
-      // 🔧 修复重复请求问题：检查是否已有消息，避免重复发送
-      const existingMessages = messageIds.length > 0;
-      
-      if (!existingMessages) {
-        // 只有在没有现有消息时才发送初始消息
-        const sendInitialMessage = async () => {
-          console.log("[WorkspacePage] Sending initial message:", q);
-          
-          // 创建AbortController
-          const abortController = new AbortController();
-          abortControllerRef.current = abortController;
-          
-          try {
-            await sendMessage(q, { resources }, { abortSignal: abortController.signal });
-            console.log("[WorkspacePage] Initial message sent successfully");
-            setInitialized(true);
-          } catch (error) {
-            if (error instanceof Error && error.name !== 'AbortError') {
-              console.error("Failed to send initial message:", error);
-            } else if (error instanceof DOMException && error.message === 'Component unmounted') {
-              // 组件卸载导致的中止是正常行为，不需要记录错误
-              console.log("[WorkspacePage] Request aborted due to component unmount");
-            }
-            // 即使出错也设置为已初始化，避免无限重试
-            setInitialized(true);
-          }
-        };
-
-        void sendInitialMessage();
-      } else {
-        // 如果已有消息（从首页跳转来的情况），直接标记为已初始化
-        console.log("[WorkspacePage] Messages already exist, skipping initial message send");
-        setInitialized(true);
-      }
-    } else {
-      setInitialized(true);
-    }
-  }, [searchParams, traceId, messageIds.length]);
-
   // 清理函数
   useEffect(() => {
     return () => {
@@ -200,10 +188,37 @@ export default function WorkspacePage() {
     };
   }, []);
 
-  // 设置当前traceId
-  useEffect(() => {
-    setCurrentTraceId(traceId);
-  }, [traceId]);
+  // 如果正在加载，显示加载状态
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading workspace...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // 如果有错误，显示错误状态
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="text-red-500 mb-4">
+            <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.694-.833-2.464 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+          </div>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Failed to Load Workspace</h2>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <Button onClick={() => window.location.reload()}>
+            Retry
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen flex-col bg-gradient-to-br from-slate-900 via-slate-800 to-black">
@@ -222,8 +237,8 @@ export default function WorkspacePage() {
           
           <div className="min-w-0 flex-1 max-w-md">
             <h1 className="text-lg font-semibold text-white">研究工作区</h1>
-            <p className="text-xs text-gray-400 truncate" title={query || `会话: ${traceId}`}>
-              {query ? `查询: ${query.length > 30 ? query.substring(0, 30) + '...' : query}` : `会话: ${traceId.slice(0, 8)}...`}
+            <p className="text-xs text-gray-400 truncate" title={urlParam || `会话: ${urlParam}`}>
+              {urlParam ? `查询: ${urlParam.length > 30 ? urlParam.substring(0, 30) + '...' : urlParam}` : `会话: ${urlParam.slice(0, 8)}...`}
             </p>
           </div>
         </div>
@@ -288,7 +303,7 @@ export default function WorkspacePage() {
               {/* 对话面板 */}
               {conversationVisible && (
                 <div className={cn("flex flex-col border-r border-gray-200 dark:border-gray-700 min-h-0", panelWidth)}>
-                  <ConversationPanel traceId={traceId} onSendMessage={handleSendMessage} />
+                  <ConversationPanel traceId={urlParam} onSendMessage={handleSendMessage} />
                 </div>
               )}
 
@@ -313,7 +328,7 @@ export default function WorkspacePage() {
                     </div>
                   </div>
                   <div className="flex-1 overflow-hidden min-h-0">
-                    <ArtifactFeed traceId={traceId} />
+                    <ArtifactFeed traceId={urlParam} />
                   </div>
                 </div>
               )}
@@ -339,7 +354,7 @@ export default function WorkspacePage() {
                     </div>
                   </div>
                   <div className="flex-1 overflow-hidden min-h-0">
-                    <MessageHistory traceId={traceId} />
+                    <MessageHistory traceId={urlParam} />
                   </div>
                 </div>
               )}
@@ -347,7 +362,7 @@ export default function WorkspacePage() {
               {/* 播客面板 */}
               {podcastVisible && (
                 <div className={cn("flex flex-col min-h-0", panelWidth)}>
-                  <PodcastPanel traceId={traceId} />
+                  <PodcastPanel traceId={urlParam} />
                 </div>
               )}
             </>
@@ -401,7 +416,7 @@ export default function WorkspacePage() {
           {/* 输入框区域 - 主要交互区域 */}
           <div className="px-4 pb-4">
             <HeroInput 
-              traceId={traceId}
+              traceId={urlParam}
               placeholder={hasMessages ? "继续研究对话..." : "开始您的研究之旅..."}
               onSendMessage={handleSendMessage}
               context="workspace"

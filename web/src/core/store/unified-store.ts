@@ -44,9 +44,19 @@ interface ThreadState {
 
 // Store 类型 - 使用 zustand 推断类型而不是预定义接口
 type UnifiedStore = {
-  // 线程管理
+  // 线程管理 - 新架构
   threads: Map<string, ThreadState>;
   currentThreadId: string | null;
+  currentUrlParam: string | null;  // 新增：当前URL参数
+  urlParamToThreadId: Map<string, string>; // 新增：URL参数到thread_id的映射
+  
+  // 会话状态 - 新架构
+  sessionState: {
+    sessionMetadata: any | null;
+    executionHistory: any[];
+    currentConfig: any | null;
+    permissions: any | null;
+  } | null;
   
   // 全局 UI 状态
   responding: boolean;
@@ -62,11 +72,19 @@ type UnifiedStore = {
     podcastVisible: boolean;
   };
   
-  // 线程管理
+  // 线程管理 - 新架构方法
   createThread: (threadId: string) => ThreadState;
   getThread: (threadId: string) => ThreadState | null;
   setCurrentThread: (threadId: string | null) => void;
   clearThread: (threadId: string) => void;
+  
+  // URL参数映射 - 新增方法
+  setUrlParamMapping: (urlParam: string, threadId: string) => void;
+  getThreadIdByUrlParam: (urlParam: string) => string | null;
+  setCurrentUrlParam: (urlParam: string | null) => void;
+  
+  // 会话状态管理 - 新增方法
+  setSessionState: (state: UnifiedStore['sessionState']) => void;
   
   // 消息操作
   addMessage: (threadId: string, message: Message) => void;
@@ -98,6 +116,9 @@ export const useUnifiedStore = create<UnifiedStore>()(
       // 初始状态
       threads: new Map(),
       currentThreadId: null,
+      currentUrlParam: null,
+      urlParamToThreadId: new Map(),
+      sessionState: null,
       responding: false,
       workspace: {
         currentTraceId: null,
@@ -171,6 +192,30 @@ export const useUnifiedStore = create<UnifiedStore>()(
           if (state.currentThreadId === threadId) {
             state.currentThreadId = null;
           }
+        });
+      },
+      
+      // URL参数映射 - 新增方法
+      setUrlParamMapping: (urlParam: string, threadId: string) => {
+        set((state) => {
+          state.urlParamToThreadId.set(urlParam, threadId);
+        });
+      },
+      
+      getThreadIdByUrlParam: (urlParam: string) => {
+        return get().urlParamToThreadId.get(urlParam) || null;
+      },
+      
+      setCurrentUrlParam: (urlParam: string | null) => {
+        set((state) => {
+          state.currentUrlParam = urlParam;
+        });
+      },
+      
+      // 会话状态管理 - 新增方法
+      setSessionState: (sessionState: UnifiedStore['sessionState']) => {
+        set((state) => {
+          state.sessionState = sessionState;
         });
       },
       
@@ -382,6 +427,31 @@ export const setCurrentThreadId = (threadId: string) => {
   useUnifiedStore.getState().setCurrentThread(threadId);
 };
 
+// 新架构：URL参数相关导出函数
+export const setCurrentUrlParam = (urlParam: string | null) => {
+  useUnifiedStore.getState().setCurrentUrlParam(urlParam);
+};
+
+export const setUrlParamMapping = (urlParam: string, threadId: string) => {
+  useUnifiedStore.getState().setUrlParamMapping(urlParam, threadId);
+};
+
+export const getThreadIdByUrlParam = (urlParam: string) => {
+  return useUnifiedStore.getState().getThreadIdByUrlParam(urlParam);
+};
+
+export const useCurrentUrlParam = () => {
+  return useUnifiedStore((state) => state.currentUrlParam);
+};
+
+export const useSessionState = () => {
+  return useUnifiedStore((state) => state.sessionState);
+};
+
+export const setSessionState = (sessionState: any) => {
+  useUnifiedStore.getState().setSessionState(sessionState);
+};
+
 export const addMessage = (message: Message) => {
   const state = useUnifiedStore.getState();
   const currentThreadId = state.currentThreadId || nanoid();
@@ -471,4 +541,156 @@ export const useWorkspaceActions = () => {
       setWorkspaceState({ feedback: null });
     },
   }), [setWorkspaceState]);
+};
+
+// 新架构：使用研究流式API发送消息
+export const sendMessageWithNewAPI = async (
+  message: string,
+  options?: {
+    interruptFeedback?: string;
+    resources?: Resource[];
+  },
+  config?: {
+    abortSignal?: AbortSignal;
+  }
+) => {
+  const state = useUnifiedStore.getState();
+  const currentUrlParam = state.currentUrlParam;
+  const currentThreadId = state.currentThreadId;
+  
+  if (!currentUrlParam || !currentThreadId) {
+    throw new Error("No current URL parameter or thread ID available");
+  }
+  
+  // 动态导入API函数
+  const { createResearchStream } = await import("~/core/api/research-stream");
+  const { generateInteractionIDs, getVisitorId } = await import("~/core/utils");
+  const { buildResearchConfig } = await import("~/core/api/research-stream");
+  const { useSettingsStore } = await import("~/core/store/settings-store");
+  
+  try {
+    // 生成交互ID
+    const sessionUuid = currentThreadId; // 使用thread_id作为session_uuid
+    const contextUuid = generateInteractionIDs(sessionUuid).frontend_context_uuid;
+    
+    // 构建配置
+    const settings = useSettingsStore.getState().general;
+    const researchConfig = buildResearchConfig({
+      enableBackgroundInvestigation: settings.enableBackgroundInvestigation,
+      reportStyle: settings.reportStyle,
+      enableDeepThinking: settings.enableDeepThinking,
+      maxPlanIterations: settings.maxPlanIterations,
+      maxStepNum: settings.maxStepNum,
+      maxSearchResults: settings.maxSearchResults,
+    });
+    
+    // 准备请求参数
+    const request = {
+      action: 'continue' as const,
+      message,
+      urlParam: currentUrlParam,
+      frontendUuid: sessionUuid,
+      frontendContextUuid: contextUuid,
+      visitorId: getVisitorId(),
+      userId: undefined, // TODO: 从认证状态获取
+      config: researchConfig,
+      context: {
+        previousArtifacts: [],
+        relatedContext: options?.interruptFeedback || '',
+        userFeedbackHistory: [],
+      },
+      resources: options?.resources || [],
+    };
+    
+    // 设置响应状态
+    state.setResponding(true);
+    
+    // 创建用户消息
+    const userMessage: Message = {
+      id: nanoid(),
+      content: message,
+      contentChunks: [message],
+      role: "user",
+      threadId: currentThreadId,
+      isStreaming: false,
+      resources: options?.resources || [],
+    };
+    
+    // 添加用户消息到store
+    state.addMessage(currentThreadId, userMessage);
+    
+    // 创建助手消息
+    const assistantMessage: Message = {
+      id: nanoid(),
+      content: "",
+      contentChunks: [],
+      role: "assistant", 
+      threadId: currentThreadId,
+      isStreaming: true,
+      agent: "researcher",
+    };
+    
+    // 添加助手消息到store
+    state.addMessage(currentThreadId, assistantMessage);
+    
+    // 创建流式连接
+    const stream = createResearchStream(request);
+    
+    // 处理流式响应
+    for await (const event of stream) {
+      // 检查是否被中止
+      if (config?.abortSignal?.aborted) {
+        break;
+      }
+      
+      switch (event.type) {
+        case 'metadata':
+          console.log('Execution metadata:', event.data);
+          break;
+          
+        case 'progress':
+          console.log('Progress update:', event.data);
+          break;
+          
+        case 'message_chunk':
+          // 更新助手消息内容
+          if ('content' in event.data) {
+            const currentContent = state.getMessageById(currentThreadId, assistantMessage.id)?.content || '';
+            state.updateMessage(currentThreadId, assistantMessage.id, {
+              content: currentContent + event.data.content,
+            });
+          }
+          break;
+          
+        case 'artifact':
+          console.log('Artifact generated:', event.data);
+          // TODO: 处理artifact
+          break;
+          
+        case 'complete':
+          // 标记消息完成
+          state.updateMessage(currentThreadId, assistantMessage.id, {
+            isStreaming: false,
+          });
+          console.log('Execution completed:', event.data);
+          break;
+          
+        case 'error':
+          console.error('Stream error:', event.data);
+          if ('errorMessage' in event.data) {
+            state.updateMessage(currentThreadId, assistantMessage.id, {
+              content: `Error: ${event.data.errorMessage}`,
+              isStreaming: false,
+            });
+          }
+          break;
+      }
+    }
+    
+  } catch (error) {
+    console.error('Failed to send message with new API:', error);
+    throw error;
+  } finally {
+    state.setResponding(false);
+  }
 };

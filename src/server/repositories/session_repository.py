@@ -497,6 +497,48 @@ class SessionRepository:
             rows = await cursor.fetchall()
             return [dict(row) for row in rows]
     
+    async def get_messages_by_session_id(self, session_id: int) -> List[Dict[str, Any]]:
+        """
+        获取会话的消息历史
+        
+        Args:
+            session_id: 会话ID
+            
+        Returns:
+            消息列表
+        """
+        async with await self.get_connection() as conn:
+            cursor = conn.cursor()
+            await cursor.execute("""
+                SELECT * FROM message_history 
+                WHERE session_id = %s 
+                ORDER BY timestamp ASC
+            """, (session_id,))
+            
+            rows = await cursor.fetchall()
+            return [dict(row) for row in rows]
+    
+    async def get_execution_records_by_session_id(self, session_id: int) -> List[Dict[str, Any]]:
+        """
+        获取会话的执行记录
+        
+        Args:
+            session_id: 会话ID
+            
+        Returns:
+            执行记录列表
+        """
+        async with await self.get_connection() as conn:
+            cursor = conn.cursor()
+            await cursor.execute("""
+                SELECT * FROM execution_record 
+                WHERE session_id = %s 
+                ORDER BY created_at ASC
+            """, (session_id,))
+            
+            rows = await cursor.fetchall()
+            return [dict(row) for row in rows]
+    
     async def cleanup_expired_sessions(self) -> int:
         """
         清理过期会话
