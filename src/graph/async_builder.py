@@ -1,6 +1,7 @@
 """
 Async graph builder with PostgreSQL checkpoint support.
 """
+
 import os
 from typing import Optional, Tuple
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
@@ -44,7 +45,7 @@ def continue_to_running_research_team(state: State):
 def _build_base_graph() -> StateGraph:
     """Build the base graph structure without checkpointer."""
     from langgraph.graph import START, END
-    
+
     builder = StateGraph(State)
     builder.add_edge(START, "coordinator")
     builder.add_node("coordinator", coordinator_node)
@@ -76,24 +77,28 @@ _checkpointer_context = None
 async def get_or_create_checkpointer() -> AsyncPostgresSaver:
     """Get or create the global checkpointer instance."""
     global _checkpointer, _checkpointer_context
-    
+
     async with _checkpointer_lock:
         if _checkpointer is None:
-            db_uri = os.getenv('DATABASE_URL')
+            db_uri = os.getenv("DATABASE_URL")
             if not db_uri:
                 raise ValueError("DATABASE_URL environment variable is required")
-            
+
             logger.info("🔄 Creating global AsyncPostgresSaver instance...")
-            
-            # Create the context manager and enter it
-            _checkpointer_context = AsyncPostgresSaver.from_conn_string(db_uri)
-            _checkpointer = await _checkpointer_context.__aenter__()
-            
-            # Ensure tables are set up
-            await _checkpointer.setup()
-            
-            logger.info("✅ Global AsyncPostgresSaver instance created")
-        
+
+            try:
+                # Create the context manager and enter it
+                _checkpointer_context = AsyncPostgresSaver.from_conn_string(db_uri)
+                _checkpointer = await _checkpointer_context.__aenter__()
+
+                # Ensure tables are set up
+                await _checkpointer.setup()
+
+                logger.info("✅ Global AsyncPostgresSaver instance created")
+            except Exception as e:
+                logger.error(f"❌ Failed to create AsyncPostgresSaver: {e}")
+                raise
+
         return _checkpointer
 
 
@@ -101,18 +106,18 @@ async def create_graph():
     """Create a graph instance with the global checkpointer."""
     # Get or create the global checkpointer
     checkpointer = await get_or_create_checkpointer()
-    
+
     # Build and compile graph
     builder = _build_base_graph()
     graph = builder.compile(checkpointer=checkpointer)
-    
+
     return graph
 
 
 async def cleanup_async_resources():
     """Cleanup the global checkpointer when shutting down."""
     global _checkpointer, _checkpointer_context
-    
+
     async with _checkpointer_lock:
         if _checkpointer_context is not None:
             try:
@@ -122,4 +127,4 @@ async def cleanup_async_resources():
                 logger.error(f"Error cleaning up checkpointer: {e}")
             finally:
                 _checkpointer = None
-                _checkpointer_context = None 
+                _checkpointer_context = None

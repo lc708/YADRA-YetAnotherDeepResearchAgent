@@ -22,7 +22,9 @@ SUPABASE_ANON_KEY = os.getenv("NEXT_PUBLIC_SUPABASE_ANON_KEY")
 SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")  # 可选，用于服务端操作
 
 if not SUPABASE_URL or not SUPABASE_ANON_KEY:
-    logger.error("Supabase configuration missing. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY")
+    logger.error(
+        "Supabase configuration missing. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY"
+    )
     raise ValueError("Supabase configuration is incomplete")
 
 # 创建 Supabase 客户端实例
@@ -34,10 +36,12 @@ if SUPABASE_SERVICE_KEY:
     supabase_admin = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
     logger.info("Supabase admin client initialized")
 
+
 def get_supabase_client() -> Client:
     """获取 Supabase 客户端实例"""
     return supabase
 
+
 def get_supabase_admin() -> Optional[Client]:
     """获取 Supabase 管理员客户端（如果可用）"""
-    return supabase_admin 
+    return supabase_admin

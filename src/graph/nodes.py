@@ -201,10 +201,12 @@ def human_feedback_node(
             {"text": "开始研究", "value": "accepted"},
             {"text": "立即生成报告", "value": "skip_research"},
             {"text": "编辑计划", "value": "edit_plan"},
-            {"text": "重新提问", "value": "reask"}
+            {"text": "重新提问", "value": "reask"},
         ]
-        
-        feedback = interrupt(value={"message": "Please Review the Plan.", "options": options})
+
+        feedback = interrupt(
+            value={"message": "Please Review the Plan.", "options": options}
+        )
 
         # if the feedback is not accepted, return the planner node
         if feedback and str(feedback).upper().startswith("[EDIT_PLAN]"):
