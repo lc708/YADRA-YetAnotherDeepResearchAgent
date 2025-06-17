@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
 import { nanoid } from "nanoid";
-import { Send, Paperclip, Lightbulb, ChevronDown, GraduationCap, BookOpen, Newspaper, MessageCircle, Brain, User } from "lucide-react";
+import { Send, Paperclip, Lightbulb, ChevronDown, GraduationCap, BookOpen, Newspaper, MessageCircle, Brain, User, StopCircle, Settings } from "lucide-react";
 import { MagicWandIcon } from "@radix-ui/react-icons";
 import { AnimatePresence, motion } from "framer-motion";
 import { cn } from "~/lib/utils";
@@ -18,6 +18,16 @@ import { getConfig } from "~/core/api/config";
 import { useSettingsStore, setEnableBackgroundInvestigation, setEnableDeepThinking, setReportStyle } from "~/core/store";
 import type { Resource } from "~/core/messages";
 import { sendMessageAndGetThreadId } from "~/core/api/chat";
+
+import { FeedbackSystem } from "~/app/workspace/[traceId]/components/feedback-system";
+import { Detective } from "~/components/yadra/icons/detective";
+import { 
+  useWorkspaceActions, 
+  useWorkspaceFeedback,
+  useMessageIds,
+  sendMessage
+} from "~/core/store";
+import { useUnifiedStore } from "~/core/store/unified-store";
 
 const PLACEHOLDER_TEXTS = [
   "YADRA能帮助你今天做什么？",
@@ -62,9 +72,22 @@ const REPORT_STYLES = [
 
 interface HeroInputProps {
   className?: string;
+  traceId?: string;
+  placeholder?: string;
+  onSendMessage?: (message: string, options?: { 
+    resources?: Resource[];
+    interruptFeedback?: string;
+  }) => void;
+  context?: 'homepage' | 'workspace';
 }
 
-export function HeroInput({ className }: HeroInputProps) {
+export function HeroInput({ 
+  className, 
+  traceId, 
+  placeholder: customPlaceholder, 
+  onSendMessage, 
+  context = 'homepage' 
+}: HeroInputProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [currentPlaceholder, setCurrentPlaceholder] = useState(0);
@@ -74,11 +97,19 @@ export function HeroInput({ className }: HeroInputProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showStyleDropdown, setShowStyleDropdown] = useState(false);
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
+  const [resources, setResources] = useState<Resource[]>([]);
+  const [showReportStyleDialog, setShowReportStyleDialog] = useState(false);
   
   const inputRef = useRef<MessageInputRef>(null);
   const styleButtonRef = useRef<HTMLButtonElement>(null);
   const reportStyle = useSettingsStore((state) => state.general.reportStyle);
   const enableDeepThinking = useSettingsStore((state) => state.general.enableDeepThinking);
+  const backgroundInvestigation = useSettingsStore((state) => state.general.enableBackgroundInvestigation);
+  
+  const responding = context === 'workspace' ? useUnifiedStore((state) => state.responding) : false;
+  const messageIds = context === 'workspace' ? useMessageIds() : [];
+  const feedback = context === 'workspace' ? useWorkspaceFeedback() : null;
+  const { removeFeedback } = context === 'workspace' ? useWorkspaceActions() : { removeFeedback: () => {} };
 
   // 检测basic和reasoning model配置
   const [basicModel, setBasicModel] = useState<string | null>(null);
@@ -176,40 +207,57 @@ export function HeroInput({ className }: HeroInputProps) {
   const handleSubmit = useCallback(
     async (e?: React.FormEvent) => {
       if (e) e.preventDefault();
-      if (!currentPrompt.trim() || !canOperate || isSubmitting) return;
+      if (!currentPrompt.trim() || !canOperate || isSubmitting || responding) return;
 
-      setIsSubmitting(true);
-      
-      try {
-        // 发送消息（不指定 thread_id，让后端生成）
-        const response = await sendMessageAndGetThreadId(currentPrompt, {
-          resources: [],
-          enableBackgroundInvestigation: true,
-          reportStyle: reportStyle || undefined,
-          enableDeepThinking: enableDeepThinking,
-        });
+      if (context === 'workspace' && onSendMessage) {
+        try {
+          await onSendMessage(currentPrompt, {
+            resources,
+            interruptFeedback: feedback?.option.value,
+          });
+          setCurrentPrompt("");
+          setResources([]);
+          
+          if (feedback) {
+            removeFeedback();
+          }
+        } catch (error) {
+          console.error("Failed to send message:", error);
+        }
+      } else {
+        setIsSubmitting(true);
         
-        if (response.threadId) {
-          // 构建查询参数
-      const params = new URLSearchParams({
-            q: currentPrompt,
-        investigation: "true",
-        ...(enableDeepThinking && { enable_deep_thinking: "true" }),
-        ...(reportStyle && { style: reportStyle }),
+        try {
+          // 发送消息（不指定 thread_id，让后端生成）
+          const response = await sendMessageAndGetThreadId(currentPrompt, {
+            resources: [],
+            enableBackgroundInvestigation: true,
+            reportStyle: reportStyle || undefined,
+            enableDeepThinking: enableDeepThinking,
           });
           
-          // 使用后端返回的 thread_id 跳转
-          router.push(`/workspace/${response.threadId}?${params.toString()}`);
-        } else {
-          alert('Failed to get thread ID from server');
+          if (response.threadId) {
+            // 构建查询参数
+            const params = new URLSearchParams({
+              q: currentPrompt,
+              investigation: "true",
+              ...(enableDeepThinking && { enable_deep_thinking: "true" }),
+              ...(reportStyle && { style: reportStyle }),
+            });
+            
+            // 使用后端返回的 thread_id 跳转
+            router.push(`/workspace/${response.threadId}?${params.toString()}`);
+          } else {
+            alert('Failed to get thread ID from server');
+            setIsSubmitting(false);
+          }
+        } catch (error: any) {
+          alert(`Error: ${error.message || 'Unknown error'}`);
           setIsSubmitting(false);
         }
-      } catch (error: any) {
-        alert(`Error: ${error.message || 'Unknown error'}`);
-        setIsSubmitting(false);
       }
     },
-    [currentPrompt, canOperate, reportStyle, enableDeepThinking, router, isSubmitting]
+    [currentPrompt, canOperate, reportStyle, enableDeepThinking, router, isSubmitting, responding, context, onSendMessage, resources, feedback, removeFeedback]
   );
 
   // 监听示例问题选择事件
@@ -336,6 +384,144 @@ export function HeroInput({ className }: HeroInputProps) {
 
   return (
     <div className={cn("mx-auto w-full max-w-4xl", className)}>
+      {/* Feedback system for workspace context */}
+      {context === 'workspace' && feedback && (
+        <div className="mb-4">
+          <FeedbackSystem
+            feedback={feedback}
+            onRemoveFeedback={removeFeedback}
+            variant="compact"
+          />
+        </div>
+      )}
+      
+      {/* Settings toggles for workspace context */}
+      {context === 'workspace' && (
+        <div className="mb-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            {reasoningModel && (
+              <Tooltip
+                delayDuration={300}
+                className="max-w-xs border border-white/20 bg-black/90 backdrop-blur-sm text-white shadow-xl"
+                title={
+                  <div className="p-2">
+                    <p className="mb-2 font-medium text-blue-300">
+                      {enableDeepThinking ? "推理模式" : "常规模式"}
+                    </p>
+                    <p className="text-xs text-gray-300 leading-relaxed">
+                      {enableDeepThinking 
+                        ? "AI将进行深度思考和推理，生成更加深思熟虑的研究计划"
+                        : "AI将以常规模式处理您的问题，快速生成研究计划"
+                      }
+                    </p>
+                    <div className="mt-2 pt-2 border-t border-white/10">
+                      <p className="text-xs text-gray-400">
+                        使用模型：{enableDeepThinking ? reasoningModel : basicModel}
+                      </p>
+                    </div>
+                  </div>
+                }
+              >
+                <button
+                  type="button"
+                  onClick={() => setEnableDeepThinking(!enableDeepThinking)}
+                  className={cn(
+                    "group relative overflow-hidden rounded-lg border h-9 px-3 text-xs font-medium transition-all duration-300",
+                    "backdrop-blur-sm flex items-center gap-1.5",
+                    enableDeepThinking
+                      ? "border-blue-400/50 bg-blue-500/20 text-blue-300 shadow-[0_0_20px_rgba(59,130,246,0.3)]"
+                      : "border-gray-200/20 bg-gray-50/5 text-gray-600 hover:border-gray-300/30 hover:bg-gray-100/10 hover:text-gray-800"
+                  )}
+                >
+                  {enableDeepThinking && (
+                    <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 via-purple-500/10 to-blue-500/10 opacity-50"></div>
+                  )}
+                  <div className="relative z-10 flex items-center gap-1.5">
+                    <Lightbulb 
+                      className={cn(
+                        "h-5 w-5 transition-all duration-300",
+                        enableDeepThinking 
+                          ? "text-blue-300 drop-shadow-[0_0_6px_rgba(59,130,246,0.8)]" 
+                          : "text-gray-500 group-hover:text-gray-700"
+                      )} 
+                    />
+                    <span>推理模式</span>
+                  </div>
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100"></div>
+                </button>
+              </Tooltip>
+            )}
+
+            <Tooltip
+              delayDuration={300}
+              className="max-w-xs border border-white/20 bg-black/90 backdrop-blur-sm text-white shadow-xl"
+              title={
+                <div className="p-2">
+                  <p className="mb-2 font-medium text-green-300">调研模式</p>
+                  <p className="text-xs text-gray-300 leading-relaxed">
+                    {backgroundInvestigation ? "已启用" : "已关闭"} - 
+                    在制定计划前进行快速搜索，适用于时事热点和最新动态研究
+                  </p>
+                </div>
+              }
+            >
+              <button
+                type="button"
+                onClick={() => setEnableBackgroundInvestigation(!backgroundInvestigation)}
+                className={cn(
+                  "group relative overflow-hidden rounded-lg border h-9 px-3 text-xs font-medium transition-all duration-300",
+                  "backdrop-blur-sm flex items-center gap-1.5",
+                  backgroundInvestigation
+                    ? "border-green-400/50 bg-green-500/20 text-green-300 shadow-[0_0_20px_rgba(34,197,94,0.3)]"
+                    : "border-gray-200/20 bg-gray-50/5 text-gray-600 hover:border-gray-300/30 hover:bg-gray-100/10 hover:text-gray-800"
+                )}
+              >
+                {backgroundInvestigation && (
+                  <div className="absolute inset-0 bg-gradient-to-r from-green-500/10 via-emerald-500/10 to-green-500/10 opacity-50"></div>
+                )}
+                <div className="relative z-10 flex items-center gap-1.5">
+                  <Detective 
+                    className={cn(
+                      "h-5 w-5 transition-all duration-300",
+                      backgroundInvestigation 
+                        ? "text-green-300 drop-shadow-[0_0_6px_rgba(34,197,94,0.8)]" 
+                        : "text-gray-500 group-hover:text-gray-700"
+                    )} 
+                  />
+                  <span>调研模式</span>
+                </div>
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100"></div>
+              </button>
+            </Tooltip>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <ReportStyleDialog />
+          </div>
+        </div>
+      )}
+      
+      {/* Resources display for workspace context */}
+      {context === 'workspace' && resources.length > 0 && (
+        <div className="mb-4 flex flex-wrap gap-2">
+          {resources.map((resource, index) => (
+            <div
+              key={index}
+              className="flex items-center gap-2 rounded-md bg-muted px-3 py-1 text-sm"
+            >
+              <Paperclip className="h-3 w-3" />
+              <span className="truncate max-w-32">{resource.title}</span>
+              <button
+                onClick={() => setResources(prev => prev.filter((_, i) => i !== index))}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      
       <div className="relative">
         <div className="relative overflow-hidden rounded-xl border border-white/20 bg-white/5 backdrop-blur-sm transition-all duration-200 focus-within:border-white/30 focus-within:bg-white/10">
           <AnimatePresence>
@@ -387,7 +573,7 @@ export function HeroInput({ className }: HeroInputProps) {
           <MessageInput
             ref={inputRef}
             className="min-h-[80px] px-4 py-4 sm:px-6 sm:py-6"
-            placeholder={PLACEHOLDER_TEXTS[currentPlaceholder]}
+            placeholder={context === 'homepage' ? PLACEHOLDER_TEXTS[currentPlaceholder] : (customPlaceholder || "继续对话...")}
             onChange={setCurrentPrompt}
             onEnter={() => handleSubmit()}
           />
@@ -489,49 +675,65 @@ export function HeroInput({ className }: HeroInputProps) {
             </div>
             
             <div className="flex items-center gap-2">
-              {/* 提示词优化按钮 - 主题色底色，白色图标 */}
-              <Tooltip 
-                delayDuration={300}
-                side="bottom"
-                sideOffset={8}
-                className="border border-white/20 bg-black/90 backdrop-blur-sm text-white shadow-xl"
-                title="AI增强提示 - 让AI优化您的问题描述"
-              >
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className={cn(
-                    "h-9 w-9 p-0 border transition-all duration-300",
-                    canOperate
-                      ? "border-blue-500/50 bg-blue-600/80 hover:bg-blue-600 hover:shadow-[0_0_20px_rgba(59,130,246,0.4)]"
-                      : "border-gray-400/20 bg-gray-500/20 cursor-not-allowed",
-                    isEnhancing && "animate-pulse border-blue-400/50 bg-blue-500/20"
-                  )}
-                  onClick={handleEnhancePrompt}
-                  disabled={!canOperate || isEnhancing}
-                >
-                  {isEnhancing ? (
-                    <div className="h-3 w-3 animate-bounce rounded-full bg-white shadow-[0_0_10px_rgba(255,255,255,0.8)]" />
-                  ) : (
-                    <MagicWandIcon className={cn(
-                      "h-4 w-4 transition-colors",
-                      canOperate ? "text-white" : "text-gray-500"
-                    )} />
-                  )}
-                </Button>
-              </Tooltip>
+              {/* File attachment button for workspace context */}
+              {context === 'workspace' && (
+                <Tooltip title="附加文件">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-9 w-9 p-0 text-gray-600 hover:text-brand dark:text-gray-400 dark:hover:text-brand"
+                    disabled={responding}
+                  >
+                    <Paperclip className="h-4 w-4" />
+                  </Button>
+                </Tooltip>
+              )}
               
-              {/* 发送按钮 - 主题色底色，白色箭头图标 */}
+              {/* 提示词优化按钮 - 主题色底色，白色图标 */}
+              {context === 'homepage' && (
+                <Tooltip 
+                  delayDuration={300}
+                  side="bottom"
+                  sideOffset={8}
+                  className="border border-white/20 bg-black/90 backdrop-blur-sm text-white shadow-xl"
+                  title="AI增强提示 - 让AI优化您的问题描述"
+                >
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className={cn(
+                      "h-9 w-9 p-0 border transition-all duration-300",
+                      canOperate
+                        ? "border-blue-500/50 bg-blue-600/80 hover:bg-blue-600 hover:shadow-[0_0_20px_rgba(59,130,246,0.4)]"
+                        : "border-gray-400/20 bg-gray-500/20 cursor-not-allowed",
+                      isEnhancing && "animate-pulse border-blue-400/50 bg-blue-500/20"
+                    )}
+                    onClick={handleEnhancePrompt}
+                    disabled={!canOperate || isEnhancing}
+                  >
+                    {isEnhancing ? (
+                      <div className="h-3 w-3 animate-bounce rounded-full bg-white shadow-[0_0_10px_rgba(255,255,255,0.8)]" />
+                    ) : (
+                      <MagicWandIcon className={cn(
+                        "h-4 w-4 transition-colors",
+                        canOperate ? "text-white" : "text-gray-500"
+                      )} />
+                    )}
+                  </Button>
+                </Tooltip>
+              )}
+              
+              {/* 发送/停止按钮 */}
               <Tooltip
                 delayDuration={300}
                 side="bottom"
                 sideOffset={8}
                 className="border border-white/20 bg-black/90 backdrop-blur-sm text-white shadow-xl"
-                title={canOperate ? (isSubmitting ? "正在处理..." : "发送消息") : "请输入消息"}
+                title={responding ? "停止生成" : (canOperate ? (isSubmitting ? "正在处理..." : "发送消息") : "请输入消息")}
               >
                 <Button
-                  onClick={() => handleSubmit()}
-                  disabled={!canOperate || isSubmitting}
+                  onClick={responding ? () => {} : () => handleSubmit()}
+                  disabled={!canOperate || (isSubmitting && !responding)}
                   className={cn(
                     "h-9 w-9 p-0 rounded-lg border transition-all duration-300",
                     canOperate && !isSubmitting
@@ -539,13 +741,15 @@ export function HeroInput({ className }: HeroInputProps) {
                       : "border-gray-400/20 bg-gray-500/20 cursor-not-allowed"
                   )}
                 >
-                  {isSubmitting ? (
+                  {responding ? (
+                    <StopCircle className="h-4 w-4" />
+                  ) : isSubmitting ? (
                     <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
                   ) : (
-                  <Send className={cn(
-                    "h-4 w-4 transition-colors",
-                    canOperate ? "text-white" : "text-gray-500"
-                  )} />
+                    <Send className={cn(
+                      "h-4 w-4 transition-colors",
+                      canOperate ? "text-white" : "text-gray-500"
+                    )} />
                   )}
                 </Button>
               </Tooltip>

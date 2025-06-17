@@ -25,6 +25,7 @@ if not SUPABASE_SERVICE_KEY:
 # 使用 service key 创建管理员客户端
 supabase_admin: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
+
 async def create_test_user():
     """创建测试用户"""
     test_users = [
@@ -32,57 +33,60 @@ async def create_test_user():
             "email": "dev@yadra.test",
             "password": "Dev123456!",
             "display_name": "Dev User",
-            "enable_deep_thinking": True
+            "enable_deep_thinking": True,
         },
         {
-            "email": "test@yadra.test", 
+            "email": "test@yadra.test",
             "password": "Test123456!",
             "display_name": "Test User",
-            "enable_deep_thinking": False
-        }
+            "enable_deep_thinking": False,
+        },
     ]
-    
+
     print("🚀 创建测试用户...")
-    
+
     for user_data in test_users:
         print(f"\n📧 创建用户: {user_data['email']}")
-        
+
         try:
             # 使用管理员 API 创建用户（自动验证邮箱）
-            response = supabase_admin.auth.admin.create_user({
-                "email": user_data["email"],
-                "password": user_data["password"],
-                "email_confirm": True,  # 自动确认邮箱
-                "user_metadata": {
-                    "display_name": user_data["display_name"],
-                    "enable_deep_thinking": user_data["enable_deep_thinking"]
+            response = supabase_admin.auth.admin.create_user(
+                {
+                    "email": user_data["email"],
+                    "password": user_data["password"],
+                    "email_confirm": True,  # 自动确认邮箱
+                    "user_metadata": {
+                        "display_name": user_data["display_name"],
+                        "enable_deep_thinking": user_data["enable_deep_thinking"],
+                    },
                 }
-            })
-            
+            )
+
             if response.user:
                 print(f"✅ 用户创建成功！")
                 print(f"   ID: {response.user.id}")
                 print(f"   邮箱: {response.user.email}")
                 print(f"   邮箱已验证: {response.user.email_confirmed_at is not None}")
-                
+
                 # 测试登录
                 print(f"\n🔐 测试登录...")
-                anon_client = create_client(SUPABASE_URL, os.getenv("NEXT_PUBLIC_SUPABASE_ANON_KEY"))
-                login_response = anon_client.auth.sign_in_with_password({
-                    "email": user_data["email"],
-                    "password": user_data["password"]
-                })
-                
+                anon_client = create_client(
+                    SUPABASE_URL, os.getenv("NEXT_PUBLIC_SUPABASE_ANON_KEY")
+                )
+                login_response = anon_client.auth.sign_in_with_password(
+                    {"email": user_data["email"], "password": user_data["password"]}
+                )
+
                 if login_response.session:
                     print(f"✅ 登录成功！")
                     print(f"   Token: {login_response.session.access_token[:30]}...")
                 else:
                     print(f"❌ 登录失败")
-                    
+
         except Exception as e:
             if "already been registered" in str(e):
                 print(f"⚠️  用户已存在")
-                
+
                 # 尝试更新现有用户的密码
                 try:
                     # 先获取用户
@@ -92,15 +96,12 @@ async def create_test_user():
                         if u.email == user_data["email"]:
                             existing_user = u
                             break
-                    
+
                     if existing_user:
                         # 更新密码
                         supabase_admin.auth.admin.update_user_by_id(
                             existing_user.id,
-                            {
-                                "password": user_data["password"],
-                                "email_confirm": True
-                            }
+                            {"password": user_data["password"], "email_confirm": True},
                         )
                         print(f"✅ 已更新现有用户的密码")
                 except Exception as update_error:
@@ -108,11 +109,12 @@ async def create_test_user():
             else:
                 print(f"❌ 错误: {e}")
 
-    print("\n" + "="*50)
+    print("\n" + "=" * 50)
     print("📝 测试账号信息：")
     for user in test_users:
         print(f"\n邮箱: {user['email']}")
         print(f"密码: {user['password']}")
 
+
 if __name__ == "__main__":
-    asyncio.run(create_test_user()) 
+    asyncio.run(create_test_user())

@@ -29,7 +29,7 @@ import { useToast } from "~/hooks/use-toast";
 
 // 导入组件
 import { ConversationPanel } from "./components/conversation-panel";
-import { EnhancedInput } from "./components/enhanced-input";
+import { HeroInput } from "~/components/yadra/hero-input";
 import { DebugPanel } from "./components/debug-panel";
 import { UserGuide } from "./components/user-guide";
 import { MessageHistory } from "./components/message-history";
@@ -391,10 +391,12 @@ export default function WorkspacePage() {
           
           {/* 输入框区域 - 主要交互区域 */}
           <div className="px-4 pb-4">
-            <EnhancedInput 
+            <HeroInput 
               traceId={traceId}
               placeholder={hasMessages ? "继续研究对话..." : "开始您的研究之旅..."}
               onSendMessage={handleSendMessage}
+              context="workspace"
+              className="w-full"
             />
           </div>
         </div>
