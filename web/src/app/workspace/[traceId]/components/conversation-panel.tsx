@@ -7,22 +7,18 @@ import { motion } from "framer-motion";
 import { MessageSquare } from "lucide-react";
 import { useCallback, useMemo, useRef, useEffect } from "react";
 
-import { 
-  MessageBubble, 
-  ResearchCard, 
-  PlanCard, 
-  PodcastCard 
-} from "~/app/chat/components/message-list-view";
+// 使用新的组件系统，fallback到旧组件
+import { MessageContainer, type Message as NewMessage } from "~/components/conversation/message-container";
+import { ScrollContainer, type ScrollContainerRef } from "~/components/conversation/scroll-container";
+import { LoadingAnimation } from "~/components/conversation/loading-animation";
+import { MarkdownRenderer } from "~/components/conversation/markdown-renderer";
+
+// 使用yadra组件作为fallback
+import { Markdown } from "~/components/yadra/markdown";
 import {
   Card,
   CardContent,
 } from "~/components/ui/card";
-import { LoadingAnimation } from "~/components/yadra/loading-animation";
-import { Markdown } from "~/components/yadra/markdown";
-import {
-  ScrollContainer,
-  type ScrollContainerRef,
-} from "~/components/yadra/scroll-container";
 import type { Message, Option, Resource } from "~/core/messages";
 import {
   useMessageIds,
@@ -107,7 +103,11 @@ export function ConversationPanel({
   // 初始化workspace集成
   useEffect(() => {
     const store = useUnifiedStore.getState();
-    store.setCurrentThread(traceId);
+    // traceId实际上是URL参数，需要映射到真正的thread_id
+    const realThreadId = store.getThreadIdByUrlParam(traceId);
+    if (realThreadId) {
+      store.setCurrentThread(realThreadId);
+    }
     store.setWorkspaceState({ currentTraceId: traceId });
 
     return () => {
@@ -222,7 +222,7 @@ export function ConversationPanel({
   return renderContent();
 }
 
-// 消息项组件，复用MessageListView的逻辑
+// 消息项组件，使用新的组件系统
 function ConversationMessageItem({
   className,
   messageId,
@@ -252,6 +252,20 @@ function ConversationMessageItem({
 
   if (!message) return null;
 
+  // 适配Message类型到新组件的格式
+  const adaptedMessage: NewMessage = {
+    id: message.id,
+    role: message.role as "user" | "assistant" | "system",
+    content: message.content || "",
+    timestamp: new Date(), // Message类型暂无timestamp字段
+    isStreaming: message.isStreaming || false,
+    metadata: {
+      model: message.agent,
+      reasoning: message.reasoningContent || undefined,
+      artifacts: [] // Message类型暂无artifacts字段
+    }
+  };
+
   if (
     message.role === "user" ||
     message.agent === "coordinator" ||
@@ -261,56 +275,64 @@ function ConversationMessageItem({
   ) {
     let content: React.ReactNode;
     
-    if (message.agent === "planner") {
-      content = (
-        <div className="w-full px-4">
-          <PlanCard
-            message={message}
-            waitForFeedback={waitForFeedback}
-            interruptMessage={interruptMessage}
-            onFeedback={onFeedback}
-            onSendMessage={onSendMessage}
-          />
-        </div>
-      );
-    } else if (message.agent === "podcast") {
-      content = (
-        <div className="w-full px-4">
-          <PodcastCard message={message} />
-        </div>
-      );
-    } else if (startOfResearch) {
-      content = (
-        <div className="w-full px-4">
-          <ResearchCard
-            researchId={message.id}
-            onToggleResearch={onToggleResearch}
-          />
-        </div>
-      );
-    } else {
-      content = message.content ? (
-        <div
-          className={cn(
-            "flex w-full px-4",
-            message.role === "user" && "justify-end",
-            className,
-          )}
-        >
-          <MessageBubble message={message}>
-            <div className="flex w-full flex-col text-wrap break-words">
-              <Markdown
-                className={cn(
-                  message.role === "user" &&
-                    "prose-invert not-dark:text-secondary dark:text-inherit",
-                )}
-              >
-                {message?.content}
-              </Markdown>
-            </div>
-          </MessageBubble>
-        </div>
-      ) : null;
+    // 简化版本：先只处理基本消息，特殊类型后续实现
+    if (message.content) {
+      if (message.agent === "planner") {
+        // TODO: 实现计划显示
+        content = (
+          <div className="w-full px-4">
+            <MessageContainer
+              message={adaptedMessage}
+              showAvatar={true}
+              showTimestamp={true}
+              showActions={false}
+              className="border-l-4 border-l-blue-500 bg-blue-50/50 dark:bg-blue-950/20"
+            />
+          </div>
+        );
+      } else if (message.agent === "podcast") {
+        // TODO: 实现播客显示
+        content = (
+          <div className="w-full px-4">
+            <MessageContainer
+              message={adaptedMessage}
+              showAvatar={true}
+              showTimestamp={true}
+              showActions={false}
+              className="border-l-4 border-l-purple-500 bg-purple-50/50 dark:bg-purple-950/20"
+            />
+          </div>
+        );
+      } else if (startOfResearch) {
+        // TODO: 实现研究进度显示
+        content = (
+          <div className="w-full px-4">
+            <MessageContainer
+              message={adaptedMessage}
+              showAvatar={true}
+              showTimestamp={true}
+              showActions={false}
+              className="border-l-4 border-l-green-500 bg-green-50/50 dark:bg-green-950/20"
+            />
+          </div>
+        );
+      } else {
+        // 基本消息显示
+        content = (
+          <div className="w-full px-4">
+            <MessageContainer
+              message={adaptedMessage}
+              showAvatar={true}
+              showTimestamp={true}
+              showActions={true}
+              onCopy={(content) => {
+                navigator.clipboard.writeText(content);
+              }}
+              className={className}
+            />
+          </div>
+        );
+      }
     }
 
     if (content) {

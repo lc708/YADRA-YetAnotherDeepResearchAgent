@@ -54,13 +54,13 @@ export interface ResearchStreamRequest {
   message: string;
   
   // 会话标识（create时为空，其他操作时必填）
-  urlParam?: string;
+  url_param?: string;
   
   // 前端ID体系
-  frontendUuid: string;         // 会话级UUID（create时生成，后续保持不变）
-  frontendContextUuid: string;  // 交互级UUID（每次操作都生成新的）
-  visitorId: string;            // 访客ID
-  userId?: string;              // 用户ID
+  frontend_uuid: string;         // 会话级UUID（create时生成，后续保持不变）
+  frontend_context_uuid: string;  // 交互级UUID（每次操作都生成新的）
+  visitor_id: string;            // 访客ID
+  user_id?: string;              // 用户ID
   
   // 完整配置信息
   config: ResearchConfig;
@@ -77,93 +77,169 @@ export interface ResearchStreamRequest {
 export type SSEEventType = 
   | 'navigation'
   | 'metadata' 
-  | 'progress'
+  | 'node_start'
+  | 'node_complete'
+  | 'plan_generated'
+  | 'search_results'
+  | 'agent_output'
   | 'message_chunk'
   | 'artifact'
+  | 'progress'
   | 'complete'
   | 'error';
 
 // 导航信息（仅create操作返回）
 export interface NavigationEvent {
-  urlParam: string;
-  threadId: string;
-  workspaceUrl: string;
+  url_param: string;
+  thread_id: string;
+  workspace_url: string;
+  frontend_uuid: string;
+  frontend_context_uuid: string;
+  timestamp: string;
 }
 
 // 执行元数据
 export interface MetadataEvent {
-  executionId: string;
-  configUsed: ResearchConfig;
-  modelInfo: {
-    modelName: string;
-    provider: string;
-    version: string;
+  execution_id: string;
+  thread_id: string;
+  frontend_uuid: string;
+  frontend_context_uuid: string;
+  visitor_id: string;
+  user_id?: string;
+  config_used: object;
+  model_info: {
+    [key: string]: string;
   };
-  estimatedDuration: number;
-  startTime: string;
+  estimated_duration: number;
+  start_time: string;
+  timestamp: string;
+}
+
+// 节点事件（开始/完成）
+export interface NodeEvent {
+  node_name: string;
+  node_type: 'start' | 'complete';
+  thread_id: string;
+  execution_id: string;
+  input_data?: object;
+  output_data?: object;
+  duration_ms?: number;
+  timestamp: string;
+}
+
+// 计划生成事件
+export interface PlanEvent {
+  plan_data: object;
+  plan_iterations: number;
+  thread_id: string;
+  execution_id: string;
+  timestamp: string;
+}
+
+// 搜索结果事件
+export interface SearchResultsEvent {
+  query: string;
+  results: Array<{
+    url?: string;
+    title?: string;
+    content?: string;
+    images?: string[];
+    [key: string]: any;
+  }>;
+  source: string;
+  thread_id: string;
+  execution_id: string;
+  timestamp: string;
+}
+
+// 代理输出事件
+export interface AgentOutputEvent {
+  agent_name: string;
+  agent_type: string;
+  content: string;
+  metadata: object;
+  thread_id: string;
+  execution_id: string;
+  timestamp: string;
 }
 
 // 进度更新
 export interface ProgressEvent {
-  currentStep: string;
-  progressPercentage: number;
-  statusMessage: string;
-  stepsCompleted: string[];
-  stepsRemaining: string[];
+  current_node: string;
+  completed_nodes: string[];
+  remaining_nodes: string[];
+  current_step_description: string;
+  thread_id: string;
+  execution_id: string;
+  timestamp: string;
 }
 
 // 消息内容流
 export interface MessageChunkEvent {
-  chunkId: string;
+  chunk_id: string;
   content: string;
-  chunkType: 'planning' | 'research' | 'analysis' | 'conclusion';
-  metadata: {
-    source: string;
-    confidence?: number;
-  };
+  chunk_type: 'planning' | 'research' | 'analysis' | 'conclusion';
+  agent_name: string;
+  sequence: number;
+  is_final: boolean;
+  metadata: object;
+  thread_id: string;
+  execution_id: string;
+  timestamp: string;
 }
 
 // 生成的artifacts
 export interface ArtifactEvent {
-  artifactId: string;
+  artifact_id: string;
   type: 'research_plan' | 'data_table' | 'chart' | 'summary' | 'code' | 'document';
   title: string;
   content: string;
-  metadata: {
-    createdAt: string;
-    sourceAgent: string;
-  };
+  format: 'markdown' | 'html' | 'json' | 'csv' | 'code';
+  metadata: object;
+  thread_id: string;
+  execution_id: string;
+  timestamp: string;
 }
 
 // 执行完成
 export interface CompleteEvent {
-  executionId: string;
-  totalDuration: number;
-  tokensConsumed: {
-    inputTokens: number;
-    outputTokens: number;
-    totalCost: number;
+  execution_id: string;
+  thread_id: string;
+  total_duration_ms: number;
+  tokens_consumed: {
+    [key: string]: number;
   };
-  artifactsGenerated: string[];
-  finalStatus: 'success' | 'partial' | 'failed';
-  completionTime: string;
+  total_cost: number;
+  artifacts_generated: string[];
+  final_status: string;
+  completion_time: string;
+  summary: object;
+  timestamp: string;
 }
 
 // 错误信息
 export interface ErrorEvent {
-  errorCode: string;
-  errorMessage: string;
-  retryAfter?: number;
-  suggestions?: string[];
+  error_code: string;
+  error_message: string;
+  error_details: object;
+  thread_id: string;
+  execution_id: string;
+  retry_after?: number;
+  suggestions: string[];
+  timestamp: string;
 }
 
 // SSE事件联合类型
 export type SSEEventData = 
   | NavigationEvent
   | MetadataEvent
-  | ProgressEvent
+  | NodeEvent
+  | PlanEvent
+  | SearchResultsEvent
+  | AgentOutputEvent
   | MessageChunkEvent
   | ArtifactEvent
+  | ProgressEvent
   | CompleteEvent
   | ErrorEvent;
 
@@ -176,8 +252,8 @@ export interface SSEEvent {
 
 export interface WorkspaceState {
   // 基础信息
-  threadId: string;
-  urlParam: string;
+  thread_id: string;
+  url_param: string;
   status: 'active' | 'completed' | 'error' | 'paused';
   
   // 会话元数据
@@ -195,7 +271,7 @@ export interface WorkspaceState {
     role: 'user' | 'assistant';
     timestamp: string;
     metadata: {
-      frontendContextUuid: string;
+      frontend_context_uuid: string;
       interactionType: string;
       modelUsed: string;
     };

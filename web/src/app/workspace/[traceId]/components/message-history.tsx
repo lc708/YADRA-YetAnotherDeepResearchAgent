@@ -37,10 +37,8 @@ export function MessageHistory({ traceId, className }: MessageHistoryProps) {
 
   // 获取所有消息
   const allMessages = useMemo(() => {
-    return messageIds
-      .map(id => messages.get(id))
-      .filter((msg): msg is Message => msg !== undefined);
-  }, [messageIds, messages]);
+    return messages || [];
+  }, [messages]);
 
   // 获取唯一的agent类型
   const availableAgents = useMemo(() => {

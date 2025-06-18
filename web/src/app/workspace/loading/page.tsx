@@ -8,10 +8,11 @@ export default function WorkspaceLoadingPage() {
   const router = useRouter();
 
   useEffect(() => {
-    // 如果停留在加载页面超过5秒，返回首页
+    // 缩短等待时间到3秒 - 通常研究任务创建不需要这么久
     const timeout = setTimeout(() => {
+      console.log("[Loading] Timeout reached, redirecting to home");
       router.push("/");
-    }, 5000);
+    }, 3000);
 
     return () => clearTimeout(timeout);
   }, [router]);
@@ -21,7 +22,10 @@ export default function WorkspaceLoadingPage() {
       <div className="text-center">
         <LoadingAnimation />
         <p className="mt-4 text-sm text-muted-foreground">
-          正在创建新的对话...
+          正在准备研究环境...
+        </p>
+        <p className="mt-2 text-xs text-muted-foreground/60">
+          这通常只需要几秒钟
         </p>
       </div>
     </div>

@@ -108,6 +108,10 @@ async def get_graph_instance():
 from src.server.research_stream_api import router as research_stream_router
 app.include_router(research_stream_router)
 
+# Import and include research create router
+from src.server.research_create_api import router as research_create_router
+app.include_router(research_create_router)
+
 
 @app.post("/api/chat/stream")
 async def chat_stream(

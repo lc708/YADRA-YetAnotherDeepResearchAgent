@@ -367,11 +367,26 @@ export const useCurrentThread = () => {
   return thread;
 };
 
-export const useThreadMessages = (threadId?: string) => {
+export const useThreadMessages = (threadIdOrUrlParam?: string) => {
   const currentThreadId = useUnifiedStore((state) => state.currentThreadId);
   const threads = useUnifiedStore((state) => state.threads);
+  const urlParamToThreadId = useUnifiedStore((state) => state.urlParamToThreadId);
   
-  const actualThreadId = threadId || currentThreadId;
+  // 解析实际的thread_id：可能是URL参数，需要映射
+  const actualThreadId = React.useMemo(() => {
+    if (threadIdOrUrlParam) {
+      // 首先尝试作为thread_id直接使用
+      if (threads.has(threadIdOrUrlParam)) {
+        return threadIdOrUrlParam;
+      }
+      // 然后尝试作为URL参数映射
+      const mappedThreadId = urlParamToThreadId.get(threadIdOrUrlParam);
+      if (mappedThreadId && threads.has(mappedThreadId)) {
+        return mappedThreadId;
+      }
+    }
+    return currentThreadId;
+  }, [threadIdOrUrlParam, currentThreadId, threads, urlParamToThreadId]);
   
   return React.useMemo(() => {
     if (!actualThreadId) return [];
@@ -380,12 +395,27 @@ export const useThreadMessages = (threadId?: string) => {
   }, [actualThreadId, threads]);
 };
 
-export const useThreadArtifacts = (threadId?: string) => {
+export const useThreadArtifacts = (threadIdOrUrlParam?: string) => {
   const currentThreadId = useUnifiedStore((state) => state.currentThreadId);
   const threads = useUnifiedStore((state) => state.threads);
   const getArtifacts = useUnifiedStore((state) => state.getArtifacts);
+  const urlParamToThreadId = useUnifiedStore((state) => state.urlParamToThreadId);
   
-  const actualThreadId = threadId || currentThreadId;
+  // 解析实际的thread_id：可能是URL参数，需要映射
+  const actualThreadId = React.useMemo(() => {
+    if (threadIdOrUrlParam) {
+      // 首先尝试作为thread_id直接使用
+      if (threads.has(threadIdOrUrlParam)) {
+        return threadIdOrUrlParam;
+      }
+      // 然后尝试作为URL参数映射
+      const mappedThreadId = urlParamToThreadId.get(threadIdOrUrlParam);
+      if (mappedThreadId && threads.has(mappedThreadId)) {
+        return mappedThreadId;
+      }
+    }
+    return currentThreadId;
+  }, [threadIdOrUrlParam, currentThreadId, threads, urlParamToThreadId]);
   
   return React.useMemo(() => {
     if (!actualThreadId) return [];
@@ -398,10 +428,27 @@ export const useWorkspaceState = () => {
 };
 
 // 兼容旧 API 的 wrapper
-export const useMessageIds = (threadId?: string) => {
+export const useMessageIds = (threadIdOrUrlParam?: string) => {
   // 分两步获取，避免 selector 重建
   const currentThreadId = useUnifiedStore((state) => state.currentThreadId);
-  const actualThreadId = threadId || currentThreadId;
+  const threads = useUnifiedStore((state) => state.threads);
+  const urlParamToThreadId = useUnifiedStore((state) => state.urlParamToThreadId);
+  
+  // 解析实际的thread_id：可能是URL参数，需要映射
+  const actualThreadId = React.useMemo(() => {
+    if (threadIdOrUrlParam) {
+      // 首先尝试作为thread_id直接使用
+      if (threads.has(threadIdOrUrlParam)) {
+        return threadIdOrUrlParam;
+      }
+      // 然后尝试作为URL参数映射
+      const mappedThreadId = urlParamToThreadId.get(threadIdOrUrlParam);
+      if (mappedThreadId && threads.has(mappedThreadId)) {
+        return mappedThreadId;
+      }
+    }
+    return currentThreadId;
+  }, [threadIdOrUrlParam, currentThreadId, threads, urlParamToThreadId]);
   
   // 使用 useShallow 避免不必要的重渲染
   return useUnifiedStore(
@@ -589,10 +636,10 @@ export const sendMessageWithNewAPI = async (
       action: 'continue' as const,
       message,
       urlParam: currentUrlParam,
-      frontendUuid: sessionUuid,
-      frontendContextUuid: contextUuid,
-      visitorId: getVisitorId(),
-      userId: undefined, // TODO: 从认证状态获取
+      frontend_uuid: sessionUuid,
+      frontend_context_uuid: contextUuid,
+      visitor_id: getVisitorId(),
+      user_id: undefined, // TODO: 从认证状态获取
       config: researchConfig,
       context: {
         previousArtifacts: [],
@@ -644,12 +691,88 @@ export const sendMessageWithNewAPI = async (
       }
       
       switch (event.type) {
+        case 'navigation':
+          console.log('Navigation event:', event.data);
+          // 处理页面导航
+          if ('workspace_url' in event.data && event.data.workspace_url) {
+            // 如果需要导航到新页面，这里可以处理
+            // 但通常navigation事件是在初始请求时发送的
+          }
+          break;
+          
         case 'metadata':
           console.log('Execution metadata:', event.data);
+          // 更新会话元数据
+          if (state.sessionState) {
+            state.setSessionState({
+              ...state.sessionState,
+              sessionMetadata: {
+                ...state.sessionState.sessionMetadata,
+                ...event.data,
+              },
+            });
+          }
           break;
+          
+        case 'node_start':
+          console.log('Node started:', event.data);
+          // 可以用于显示当前执行的节点状态
+          break;
+          
+        case 'node_complete':
+          console.log('Node completed:', event.data);
+          // 可以用于更新节点执行状态
+          break;
+          
+                 case 'plan_generated':
+           console.log('Plan generated:', event.data);
+           // 创建计划消息
+           if ('plan_content' in event.data && typeof event.data.plan_content === 'string') {
+             const planMessage: Message = {
+               id: nanoid(),
+               content: event.data.plan_content,
+               contentChunks: [event.data.plan_content],
+               role: "assistant",
+               threadId: currentThreadId,
+               isStreaming: false,
+               agent: "planner",
+             };
+             state.addMessage(currentThreadId, planMessage);
+           }
+           break;
+          
+        case 'search_results':
+          console.log('Search results:', event.data);
+          // 可以用于显示搜索结果或创建搜索结果消息
+          break;
+          
+                 case 'agent_output':
+           console.log('Agent output:', event.data);
+           // 处理智能体输出
+           if ('content' in event.data && 'agent_name' in event.data && 
+               typeof event.data.content === 'string' && typeof event.data.agent_name === 'string') {
+             // 确保agent_name是有效的agent类型
+             const validAgents = ["coordinator", "planner", "researcher", "coder", "reporter", "podcast"] as const;
+             const agentName = validAgents.includes(event.data.agent_name as any) 
+               ? event.data.agent_name as typeof validAgents[number]
+               : "researcher";
+             
+             const agentMessage: Message = {
+               id: nanoid(),
+               content: event.data.content,
+               contentChunks: [event.data.content],
+               role: "assistant",
+               threadId: currentThreadId,
+               isStreaming: false,
+               agent: agentName,
+             };
+             state.addMessage(currentThreadId, agentMessage);
+           }
+           break;
           
         case 'progress':
           console.log('Progress update:', event.data);
+          // 可以用于更新进度条或状态显示
           break;
           
         case 'message_chunk':
@@ -662,10 +785,22 @@ export const sendMessageWithNewAPI = async (
           }
           break;
           
-        case 'artifact':
-          console.log('Artifact generated:', event.data);
-          // TODO: 处理artifact
-          break;
+                 case 'artifact':
+           console.log('Artifact generated:', event.data);
+           // 处理artifact - 创建artifact消息
+           if ('artifact_content' in event.data && typeof event.data.artifact_content === 'string') {
+             const artifactMessage: Message = {
+               id: nanoid(),
+               content: event.data.artifact_content,
+               contentChunks: [event.data.artifact_content],
+               role: "assistant",
+               threadId: currentThreadId,
+               isStreaming: false,
+               agent: "reporter",
+             };
+             state.addMessage(currentThreadId, artifactMessage);
+           }
+           break;
           
         case 'complete':
           // 标记消息完成
@@ -677,9 +812,9 @@ export const sendMessageWithNewAPI = async (
           
         case 'error':
           console.error('Stream error:', event.data);
-          if ('errorMessage' in event.data) {
+          if ('error_message' in event.data) {
             state.updateMessage(currentThreadId, assistantMessage.id, {
-              content: `Error: ${event.data.errorMessage}`,
+              content: `Error: ${event.data.error_message}`,
               isStreaming: false,
             });
           }

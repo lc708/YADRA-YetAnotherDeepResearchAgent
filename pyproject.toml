@@ -39,6 +39,7 @@ dependencies = [
     "loguru>=0.7.0",
     "jieba>=0.42.1",
     "pypinyin>=0.51.0",
+    "asyncpg>=0.30.0",
 ]
 
 [project.optional-dependencies]

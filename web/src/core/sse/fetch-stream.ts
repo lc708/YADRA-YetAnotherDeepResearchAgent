@@ -49,6 +49,7 @@ export async function* fetchStream(
 function parseEvent(chunk: string) {
   let resultEvent = "message";
   let resultData: string | null = null;
+  
   for (const line of chunk.split("\n")) {
     const pos = line.indexOf(": ");
     if (pos === -1) {
@@ -62,9 +63,12 @@ function parseEvent(chunk: string) {
       resultData = value;
     }
   }
-  if (resultEvent === "message" && resultData === null) {
+  
+  // 只有当没有数据时才返回undefined
+  if (resultData === null || resultData === "") {
     return undefined;
   }
+  
   return {
     event: resultEvent,
     data: resultData,

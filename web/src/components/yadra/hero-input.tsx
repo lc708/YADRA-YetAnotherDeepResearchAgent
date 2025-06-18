@@ -18,7 +18,23 @@ import { getConfig } from "~/core/api/config";
 import { useSettingsStore, setEnableBackgroundInvestigation, setEnableDeepThinking, setReportStyle } from "~/core/store";
 import type { Resource } from "~/core/messages";
 import { sendMessageAndGetThreadId } from "~/core/api/chat";
-import { createResearchStream, isNavigationEvent, buildResearchConfig } from "~/core/api/research-stream";
+import { 
+  createResearchStream, 
+  isNavigationEvent, 
+  isMetadataEvent,
+  isPlanGeneratedEvent,
+  isAgentOutputEvent,
+  isMessageChunkEvent,
+  isArtifactEvent,
+  isCompleteEvent,
+  isErrorEvent,
+  buildResearchConfig 
+} from "~/core/api/research-stream";
+import { 
+  createResearchSession,
+  validateResearchQuestion,
+  buildWorkspaceUrl 
+} from "~/core/api/research-create";
 import { generateInitialQuestionIDs, getVisitorId } from "~/core/utils";
 
 import { FeedbackSystem } from "~/app/workspace/[traceId]/components/feedback-system";
@@ -29,7 +45,13 @@ import {
   useMessageIds,
   sendMessage
 } from "~/core/store";
-import { useUnifiedStore } from "~/core/store/unified-store";
+import { 
+  useUnifiedStore,
+  setCurrentUrlParam,
+  setUrlParamMapping,
+  setCurrentThreadId,
+  setResponding
+} from "~/core/store/unified-store";
 
 const PLACEHOLDER_TEXTS = [
   "YADRA能帮助你今天做什么？",
@@ -227,50 +249,89 @@ export function HeroInput({
           console.error("Failed to send message:", error);
         }
       } else {
+        // 🔥 两步分离架构 - Step 1: 创建研究任务
         setIsSubmitting(true);
         
         try {
-          // 生成前端ID
-          const ids = generateInitialQuestionIDs();
-          const visitorId = getVisitorId();
+          // 验证问题有效性
+          if (!validateResearchQuestion(currentPrompt)) {
+            alert('问题长度必须在1-2000字符之间');
+            setIsSubmitting(false);
+            return;
+          }
           
-          // 构建研究配置
+          // 构建配置
           const settings = useSettingsStore.getState().general;
-          const researchConfig = buildResearchConfig({
-            enableBackgroundInvestigation: settings.enableBackgroundInvestigation,
-            reportStyle: settings.reportStyle,
-            enableDeepThinking: settings.enableDeepThinking,
-            maxPlanIterations: settings.maxPlanIterations,
-            maxStepNum: settings.maxStepNum,
-            maxSearchResults: settings.maxSearchResults,
-          });
-          
-          // 准备请求参数
-          const request = {
-            action: 'create' as const,
-            message: currentPrompt,
-            frontendUuid: ids.frontend_uuid,
-            frontendContextUuid: ids.frontend_context_uuid,
-            visitorId: visitorId,
-            userId: undefined, // TODO: 从认证状态获取
-            config: researchConfig,
+          const config = {
+            research: {
+              report_style: settings.reportStyle,
+              enable_web_search: true,
+              max_research_depth: 3,
+              enable_deep_thinking: settings.enableDeepThinking,
+              enable_background_investigation: settings.enableBackgroundInvestigation,
+            },
+            model: {
+              provider: "anthropic",
+              model_name: "claude-3-5-sonnet",
+              temperature: 0.7,
+              top_p: 0.9,
+              max_tokens: 4000,
+            },
+            output: {
+              language: "zhCN",
+              output_format: "markdown",
+              include_artifacts: true,
+              include_citations: true,
+            },
+            preferences: {
+              maxPlanIterations: settings.maxPlanIterations,
+              maxStepNum: settings.maxStepNum,
+              maxSearchResults: settings.maxSearchResults,
+            }
           };
           
-          // 调用新的研究流式API
-          const stream = createResearchStream(request);
+          console.log('[HandleSubmit] Creating research session with two-step architecture...');
           
-          // 监听第一个navigation事件
-          for await (const event of stream) {
-            if (isNavigationEvent(event)) {
-              const { workspaceUrl } = event.data;
-              router.push(workspaceUrl);
-              break; // 跳转后停止处理流
+          // Step 1: 快速创建会话并获取url_param
+          const createResponse = await createResearchSession(currentPrompt, config);
+          
+          console.log('[HandleSubmit] Research session created:', {
+            url_param: createResponse.url_param,
+            workspace_url: createResponse.workspace_url,
+            estimated_duration: createResponse.estimated_duration
+          });
+          
+          // 清空输入框 (立即反馈)
+          setCurrentPrompt("");
+          if (inputRef.current) {
+            inputRef.current.setContent("");
+          }
+          
+          // Step 2: 立即跳转到workspace页面
+          console.log('[HandleSubmit] Navigating to workspace...');
+          router.push(createResponse.workspace_url);
+          
+          // 设置正在提交状态为false（导航后在workspace页面处理）
+          setIsSubmitting(false);
+          
+        } catch (error: any) {
+          console.error("Failed to create research session:", error);
+          
+          // 更详细的错误处理
+          let errorMessage = '创建研究任务失败';
+          if (error.message) {
+            if (error.message.includes('API request failed: 500')) {
+              errorMessage = '服务器内部错误，请稍后重试';
+            } else if (error.message.includes('API request failed: 400')) {
+              errorMessage = '请求参数错误，请检查问题内容';
+            } else if (error.message.includes('Failed to fetch')) {
+              errorMessage = '网络连接失败，请检查网络连接';
+            } else {
+              errorMessage = error.message;
             }
           }
           
-        } catch (error: any) {
-          console.error("Research stream error:", error);
-          alert(`Error: ${error.message || 'Unknown error'}`);
+          alert(`错误: ${errorMessage}`);
           setIsSubmitting(false);
         }
       }

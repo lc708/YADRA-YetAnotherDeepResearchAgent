@@ -11,7 +11,7 @@ import { Label } from "~/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "~/components/ui/collapsible";
 import { Checkbox } from "~/components/ui/checkbox";
-import { useStore, useMessageIds } from "~/core/store";
+import { useThreadMessages, useCurrentThread } from "~/core/store";
 import type { Message } from "~/core/messages";
 import { cn } from "~/lib/utils";
 
@@ -37,8 +37,8 @@ interface SearchFilters {
 }
 
 export function SearchPanel({ traceId, onSearchResults, className }: SearchPanelProps) {
-  const messageIds = useMessageIds();
-  const messages = useStore((state) => state.messages);
+  const thread = useCurrentThread();
+  const messages = useThreadMessages();
   
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
   const [filters, setFilters] = useState<SearchFilters>({
@@ -58,10 +58,8 @@ export function SearchPanel({ traceId, onSearchResults, className }: SearchPanel
 
   // 获取所有消息
   const allMessages = useMemo(() => {
-    return messageIds
-      .map(id => messages.get(id))
-      .filter((msg): msg is Message => msg !== undefined);
-  }, [messageIds, messages]);
+    return messages || [];
+  }, [messages]);
 
   // 获取可用的选项
   const availableOptions = useMemo(() => {

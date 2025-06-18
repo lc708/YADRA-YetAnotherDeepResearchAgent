@@ -15,6 +15,10 @@ import type {
   SSEEventType,
   NavigationEvent,
   MetadataEvent,
+  NodeEvent,
+  PlanEvent,
+  SearchResultsEvent,
+  AgentOutputEvent,
   ProgressEvent,
   MessageChunkEvent,
   ArtifactEvent,
@@ -44,6 +48,7 @@ export async function* createResearchStream(
     for await (const event of stream) {
       // 解析SSE事件
       const parsedEvent = parseSSEEvent(event);
+      
       if (parsedEvent) {
         yield parsedEvent;
       }
@@ -55,9 +60,13 @@ export async function* createResearchStream(
     yield {
       type: 'error',
       data: {
-        errorCode: 'STREAM_ERROR',
-        errorMessage: error instanceof Error ? error.message : 'Unknown stream error',
+        error_code: 'STREAM_ERROR',
+        error_message: error instanceof Error ? error.message : 'Unknown stream error',
+        error_details: {},
+        thread_id: '',
+        execution_id: '',
         suggestions: ['请检查网络连接', '重试请求'],
+        timestamp: new Date().toISOString(),
       } as ErrorEvent,
     };
   }
@@ -92,6 +101,26 @@ export function isMetadataEvent(event: SSEEvent): event is SSEEvent & { data: Me
   return event.type === 'metadata';
 }
 
+export function isNodeStartEvent(event: SSEEvent): event is SSEEvent & { data: NodeEvent } {
+  return event.type === 'node_start';
+}
+
+export function isNodeCompleteEvent(event: SSEEvent): event is SSEEvent & { data: NodeEvent } {
+  return event.type === 'node_complete';
+}
+
+export function isPlanGeneratedEvent(event: SSEEvent): event is SSEEvent & { data: PlanEvent } {
+  return event.type === 'plan_generated';
+}
+
+export function isSearchResultsEvent(event: SSEEvent): event is SSEEvent & { data: SearchResultsEvent } {
+  return event.type === 'search_results';
+}
+
+export function isAgentOutputEvent(event: SSEEvent): event is SSEEvent & { data: AgentOutputEvent } {
+  return event.type === 'agent_output';
+}
+
 export function isProgressEvent(event: SSEEvent): event is SSEEvent & { data: ProgressEvent } {
   return event.type === 'progress';
 }
@@ -117,7 +146,7 @@ export function isErrorEvent(event: SSEEvent): event is SSEEvent & { data: Error
  * @param urlParam URL参数
  */
 export async function getWorkspaceState(urlParam: string) {
-  const url = resolveServiceURL(`/api/workspace/${urlParam}`);
+  const url = resolveServiceURL(`/api/research/workspace/${urlParam}`);
   
   try {
     const response = await fetch(url, {
