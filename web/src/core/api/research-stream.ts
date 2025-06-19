@@ -172,6 +172,7 @@ export async function getWorkspaceState(urlParam: string) {
  * 基于项目现有的设置系统
  */
 export function buildResearchConfig(settings: {
+  autoAcceptedPlan?: boolean;
   enableBackgroundInvestigation?: boolean;
   reportStyle?: 'academic' | 'popular_science' | 'news' | 'social_media';
   enableDeepThinking?: boolean;
@@ -181,6 +182,7 @@ export function buildResearchConfig(settings: {
   [key: string]: any;
 }) {
   return {
+    auto_accepted_plan: settings.autoAcceptedPlan ?? false, // 🔥 用户可配置，默认false
     enableBackgroundInvestigation: settings.enableBackgroundInvestigation ?? true,
     reportStyle: settings.reportStyle ?? 'academic',
     enableDeepThinking: settings.enableDeepThinking ?? false,

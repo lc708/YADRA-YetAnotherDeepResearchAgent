@@ -316,12 +316,17 @@ class ResearchStreamService:
     ) -> AsyncGenerator[Dict[str, str], None]:
         """处理LangGraph流式执行"""
         
+        # 获取session信息用于数据库保存
+        session = await self.session_repo.get_session_by_thread_id(thread_id)
+        if not session:
+            raise ValueError(f"Session not found for thread_id: {thread_id}")
+        
         start_time = datetime.utcnow()
+        current_node = ""
         completed_nodes = []
-        current_node = "coordinator"
         
         try:
-            # 发送metadata事件
+            # 发送开始事件
             metadata_event = MetadataEvent(
                 execution_id=execution_id,
                 thread_id=thread_id,
@@ -408,6 +413,20 @@ class ResearchStreamService:
                                     content = getattr(last_message, 'content', str(last_message))
                                     
                                     if content:
+                                        # 🔥 保存消息到数据库
+                                        try:
+                                            await self.session_repo.save_message(
+                                                session_id=session.id,
+                                                execution_id=execution_id,
+                                                role="assistant",
+                                                content=content,
+                                                content_type="text",
+                                                frontend_context_uuid=request.frontend_context_uuid,
+                                                source_agent=node_name
+                                            )
+                                        except Exception as e:
+                                            logger.error(f"保存消息失败: {e}")
+                                        
                                         # 计算token和成本
                                         token_info = self._calculate_tokens_and_cost(content, is_input=False)
                                         
@@ -441,6 +460,38 @@ class ResearchStreamService:
                             # 处理计划生成
                             if "current_plan" in node_output:
                                 plan_data = node_output["current_plan"]
+                                
+                                # 🔥 保存plan作为artifact到数据库
+                                try:
+                                    # 处理Plan对象的序列化
+                                    if isinstance(plan_data, str):
+                                        plan_content = plan_data
+                                    elif hasattr(plan_data, 'dict'):
+                                        # Pydantic模型，使用.dict()方法
+                                        plan_content = json.dumps(plan_data.dict(), ensure_ascii=False, indent=2)
+                                    elif hasattr(plan_data, '__dict__'):
+                                        # 普通对象，使用__dict__
+                                        plan_content = json.dumps(plan_data.__dict__, ensure_ascii=False, indent=2)
+                                    else:
+                                        # 其他情况，使用safe_json_dumps
+                                        plan_content = safe_json_dumps(plan_data)
+                                    
+                                    await self.session_repo.save_artifact(
+                                        session_id=session.id,
+                                        execution_id=execution_id,
+                                        artifact_type="research_plan",
+                                        title="研究计划",
+                                        content=plan_content,
+                                        description="由AI生成的研究计划",
+                                        content_format="json",
+                                        source_agent=node_name,
+                                        generation_context={"node": current_node, "timestamp": current_timestamp}
+                                    )
+                                except Exception as e:
+                                    logger.error(f"保存plan artifact失败: {e}")
+                                    logger.error(f"Plan data type: {type(plan_data)}")
+                                    logger.error(f"Plan data content: {str(plan_data)[:200]}...")
+                                
                                 plan_event = PlanEvent(
                                     plan_data=plan_data if isinstance(plan_data, dict) else {"plan": str(plan_data)},
                                     plan_iterations=node_output.get("plan_iterations", 0),
@@ -457,6 +508,21 @@ class ResearchStreamService:
                             # 处理背景调查结果
                             if "background_investigation_results" in node_output:
                                 search_content = node_output["background_investigation_results"]
+                                
+                                # 🔥 保存搜索结果到数据库
+                                try:
+                                    await self.session_repo.save_message(
+                                        session_id=session.id,
+                                        execution_id=execution_id,
+                                        role="assistant",
+                                        content=search_content,
+                                        content_type="search_results",
+                                        frontend_context_uuid=request.frontend_context_uuid,
+                                        source_agent=node_name
+                                    )
+                                except Exception as e:
+                                    logger.error(f"保存搜索结果失败: {e}")
+                                
                                 extracted = self._extract_urls_and_images(search_content)
                                 
                                 # 解析搜索结果
@@ -479,6 +545,22 @@ class ResearchStreamService:
                             # 处理最终报告
                             if "final_report" in node_output:
                                 report_content = node_output["final_report"]
+                                
+                                # 🔥 保存最终报告到数据库
+                                try:
+                                    await self.session_repo.save_artifact(
+                                        session_id=session.id,
+                                        execution_id=execution_id,
+                                        artifact_type="summary",
+                                        title="研究报告",
+                                        content=report_content,
+                                        description="最终研究报告",
+                                        content_format="markdown",
+                                        source_agent=node_name,
+                                        generation_context={"node": current_node, "research_topic": node_output.get("research_topic", "")}
+                                    )
+                                except Exception as e:
+                                    logger.error(f"保存最终报告失败: {e}")
                                 
                                 # 创建报告artifact
                                 artifact_event = ArtifactEvent(
@@ -528,15 +610,11 @@ class ResearchStreamService:
                 thread_id=thread_id,
                 total_duration_ms=duration_ms,
                 tokens_consumed=final_token_info,
-                total_cost=final_token_info["total_cost"],
-                artifacts_generated=[],  # TODO: 实际的artifacts
-                final_status="success",
-                completion_time=end_time.isoformat() + "Z",
-                summary={
-                    "nodes_executed": completed_nodes + [current_node],
-                    "total_messages": len(event.get("messages", [])),
-                    "research_topic": initial_state.get("research_topic", "")
-                },
+                total_cost=0.0,
+                artifacts_generated=[],
+                final_status="completed",
+                completion_time=self._get_current_timestamp(),
+                summary={"nodes_completed": completed_nodes},
                 timestamp=self._get_current_timestamp()
             )
             
@@ -569,10 +647,27 @@ class ResearchStreamService:
             # 生成thread_id
             thread_id = str(uuid.uuid4())
             
-            # 解析配置
-            research_config = request.config.get("research_config", {})
+            # 解析配置 - 支持新旧格式
+            # 如果有research_config字段，使用它；否则从扁平化的config中提取
+            if "research_config" in request.config:
+                research_config = request.config["research_config"]
+            else:
+                # 从扁平化的config中提取research相关配置
+                research_config = {
+                    "auto_accepted_plan": request.config.get("auto_accepted_plan", False),
+                    "enable_background_investigation": request.config.get("enableBackgroundInvestigation", True),
+                    "report_style": request.config.get("reportStyle", "academic"),
+                    "enable_deep_thinking": request.config.get("enableDeepThinking", False),
+                    "max_plan_iterations": request.config.get("maxPlanIterations", 3),
+                    "max_step_num": request.config.get("maxStepNum", 5),
+                    "max_search_results": request.config.get("maxSearchResults", 5),
+                }
+            
             model_config = request.config.get("model_config", {})
-            output_config = request.config.get("output_config", {})
+            output_config = request.config.get("output_config", {
+                "language": "zh-CN",
+                "output_format": request.config.get("outputFormat", "markdown")
+            })
             
             # 创建会话记录
             session_data, url_param = await self.session_repo.create_session(
@@ -615,7 +710,7 @@ class ResearchStreamService:
                 "messages": [{"role": "user", "content": request.message}],
                 "research_topic": request.message,
                 "locale": output_config.get("language", "zh-CN"),
-                "auto_accepted_plan": True,  # 自动接受计划
+                "auto_accepted_plan": research_config.get("auto_accepted_plan", False),  # 用户可配置，默认需要确认
                 "enable_background_investigation": research_config.get("enable_background_investigation", True),
                 "plan_iterations": 0
             }
@@ -657,6 +752,70 @@ class ResearchStreamService:
             
             thread_id = session.thread_id
             
+            # 🔥 关键修复：如果消息为空，这是状态查询请求，不需要执行LangGraph
+            if not request.message.strip():
+                logger.info(f"Received status query request for thread_id: {thread_id}")
+                
+                # 发送metadata事件表示连接建立
+                metadata_event = MetadataEvent(
+                    execution_id=f"status_query_{uuid.uuid4().hex[:8]}",
+                    thread_id=thread_id,
+                    frontend_uuid=request.frontend_uuid,
+                    frontend_context_uuid=request.frontend_context_uuid,
+                    visitor_id=request.visitor_id,
+                    user_id=request.user_id,
+                    config_used=request.config,
+                    model_info={
+                        "model_name": "status_query",
+                        "provider": "system",
+                        "version": "1.0"
+                    },
+                    estimated_duration=0,
+                    start_time=self._get_current_timestamp(),
+                    timestamp=self._get_current_timestamp()
+                )
+                
+                yield {
+                    "event": SSEEventType.METADATA.value,
+                    "data": safe_json_dumps(asdict(metadata_event))
+                }
+                
+                # 检查是否有正在运行的任务
+                execution_records = await self.session_repo.get_execution_records_by_session_id(session.id)
+                latest_execution = execution_records[0] if execution_records else None
+                
+                if latest_execution and latest_execution.get("status") == "running":
+                    logger.info(f"Found running task for thread_id: {thread_id}, starting live monitoring")
+                    # 如果有正在运行的任务，启动实际的LangGraph监听
+                    # 这里可以实现对现有LangGraph执行的监听逻辑
+                    # 暂时发送complete事件表示查询完成
+                    pass
+                else:
+                    logger.info(f"No running task found for thread_id: {thread_id}, sending complete")
+                
+                # 发送complete事件表示状态查询完成
+                complete_event = CompleteEvent(
+                    execution_id=metadata_event.execution_id,
+                    thread_id=thread_id,
+                    total_duration_ms=0,
+                    tokens_consumed={"input": 0, "output": 0},
+                    total_cost=0.0,
+                    artifacts_generated=[],
+                    final_status="status_query_complete",
+                    completion_time=self._get_current_timestamp(),
+                    summary={"type": "status_query", "running_tasks": 0},
+                    timestamp=self._get_current_timestamp()
+                )
+                
+                yield {
+                    "event": SSEEventType.COMPLETE.value,
+                    "data": safe_json_dumps(asdict(complete_event))
+                }
+                return
+            
+            # 🔥 原有的continue逻辑（当有实际消息时）
+            logger.info(f"Continuing research with message: {request.message[:50]}...")
+            
             # 创建执行记录
             execution_record = await self.session_repo.create_execution_record(
                 session_id=session.id,
@@ -677,7 +836,10 @@ class ResearchStreamService:
                 ] + [{"role": "user", "content": request.message}],
                 "research_topic": session.initial_question,
                 "locale": "zh-CN",
-                "auto_accepted_plan": True,
+                "auto_accepted_plan": (
+                    request.config.get("research_config", {}).get("auto_accepted_plan") or 
+                    request.config.get("auto_accepted_plan", False)
+                ),
                 "enable_background_investigation": True,
                 "plan_iterations": 0
             }
@@ -769,6 +931,36 @@ async def get_workspace_data(
         # 获取执行记录
         executions_data = await session_repo.get_execution_records_by_session_id(session.id)
         
+        # 🔥 获取artifacts
+        artifacts_data = []
+        try:
+            async with await session_repo.get_connection() as conn:
+                cursor = conn.cursor()
+                await cursor.execute("""
+                    SELECT artifact_id, type, title, description, content, 
+                           content_format, source_agent, created_at
+                    FROM artifact_storage 
+                    WHERE session_id = %s 
+                    ORDER BY created_at DESC
+                """, (session.id,))
+                artifacts_rows = await cursor.fetchall()
+                
+                artifacts_data = [
+                    {
+                        "id": row["artifact_id"],
+                        "type": row["type"],
+                        "title": row["title"],
+                        "description": row["description"],
+                        "content": row["content"],
+                        "format": row["content_format"],
+                        "source_agent": row["source_agent"],
+                        "created_at": row["created_at"].isoformat() if row["created_at"] else None
+                    }
+                    for row in artifacts_rows
+                ]
+        except Exception as e:
+            logger.error(f"获取artifacts失败: {e}")
+        
         # 获取配置
         config = await session_repo.get_session_config(session.id)
         
@@ -803,7 +995,7 @@ async def get_workspace_data(
                 }
                 for msg in messages_data
             ],
-            "artifacts": [],  # TODO: 实现artifacts获取
+            "artifacts": artifacts_data,
             "config": {
                 "current_config": {
                     "research_config": config.research_config or {},

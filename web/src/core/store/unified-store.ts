@@ -623,6 +623,7 @@ export const sendMessageWithNewAPI = async (
     // 构建配置
     const settings = useSettingsStore.getState().general;
     const researchConfig = buildResearchConfig({
+      autoAcceptedPlan: settings.autoAcceptedPlan, // 🔥 传递用户的autoAcceptedPlan设置
       enableBackgroundInvestigation: settings.enableBackgroundInvestigation,
       reportStyle: settings.reportStyle,
       enableDeepThinking: settings.enableDeepThinking,

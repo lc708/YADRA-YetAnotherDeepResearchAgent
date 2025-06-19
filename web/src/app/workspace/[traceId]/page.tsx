@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, MessageSquare, FileText, Settings, Maximize2, Minimize2, History, Headphones } from "lucide-react";
+import { ArrowLeft, MessageSquare, FileText, Settings, Maximize2, Minimize2, History, Headphones, Activity } from "lucide-react";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useState, useCallback, useRef } from "react";
@@ -43,7 +43,7 @@ import { ConversationPanel } from "./components/conversation-panel";
 import { HeroInput } from "~/components/yadra/hero-input";
 //import { DebugPanel } from "./components/debug-panel";
 //import { UserGuide } from "./components/user-guide";
-import { MessageHistory } from "./components/message-history";
+import { OutputStream } from "./components/output-stream";
 import { PodcastPanel } from "./components/podcast-panel";
 
 export default function WorkspacePage() {
@@ -53,7 +53,426 @@ export default function WorkspacePage() {
   const [loading, setLoading] = useState(true);
   const [dataLoading, setDataLoading] = useState(false); // 数据加载状态（不阻塞界面）
   const [error, setError] = useState<string | null>(null);
+  const [sseConnected, setSseConnected] = useState(false); // SSE连接状态
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  // 🔥 SSE连接函数 - 支持两种场景
+  const startSSEConnection = useCallback(async (threadId: string, action: 'create' | 'continue', message: string = '') => {
+    if (sseConnected) {
+      console.log('[WorkspacePage] SSE already connected, skipping');
+      return;
+    }
+
+    try {
+      setSseConnected(true);
+      console.log(`[WorkspacePage] Starting SSE connection - Action: ${action}, ThreadId: ${threadId}`);
+      
+      // 动态导入SSE相关模块
+      const { 
+        createResearchStream, 
+        isNavigationEvent,
+        isMetadataEvent,
+        isPlanGeneratedEvent,
+        isAgentOutputEvent,
+        isMessageChunkEvent,
+        isArtifactEvent,
+        isCompleteEvent,
+        isErrorEvent,
+        isNodeStartEvent,
+        isNodeCompleteEvent,
+        isSearchResultsEvent,
+        isProgressEvent
+      } = await import("~/core/api/research-stream");
+      const { generateInitialQuestionIDs, getVisitorId } = await import("~/core/utils");
+      const { nanoid } = await import("nanoid");
+      
+      // 生成前端ID
+      const ids = generateInitialQuestionIDs();
+      const visitorId = getVisitorId();
+      
+      // 构建请求 - 根据场景决定参数
+      const request = {
+        action: action as 'create' | 'continue',
+        url_param: urlParam,
+        message: message, // 场景1有消息内容，场景2为空
+        frontend_uuid: ids.frontend_uuid,
+        frontend_context_uuid: ids.frontend_context_uuid,
+        visitor_id: visitorId,
+        config: {
+          enableBackgroundInvestigation: false,
+          reportStyle: 'academic' as 'academic' | 'popular_science' | 'news' | 'social_media',
+          enableDeepThinking: false,
+          maxPlanIterations: 1,
+          maxStepNum: 1,
+          maxSearchResults: 1,
+          outputFormat: 'markdown' as 'markdown',
+          includeCitations: false,
+          includeArtifacts: false,
+          auto_accepted_plan: false, // 默认需要用户确认计划
+        },
+      };
+      
+      console.log(`[WorkspacePage] Connecting to SSE - Action: ${action}`);
+      
+      // 连接SSE流
+      const stream = createResearchStream(request);
+      const store = useUnifiedStore.getState();
+      
+      // 处理SSE事件
+      for await (const event of stream) {
+        console.log('[WorkspacePage] SSE event received:', event.type, event.data);
+        
+        switch (event.type) {
+          case 'navigation':
+            if (isNavigationEvent(event)) {
+              console.log('[WorkspacePage] Navigation received:', event.data);
+              // 🔥 处理导航事件 - 设置URL到thread_id的映射
+              setUrlParamMapping(event.data.url_param, event.data.thread_id);
+              setCurrentThreadId(event.data.thread_id);
+              
+              // 更新当前线程ID
+              const currentThreadId = event.data.thread_id;
+              threadId = currentThreadId; // 更新局部变量
+              
+              // 确保线程存在
+              const store = useUnifiedStore.getState();
+              store.setCurrentThread(currentThreadId);
+            }
+            break;
+            
+          case 'metadata':
+            if (isMetadataEvent(event)) {
+              console.log('[WorkspacePage] Metadata received:', event.data);
+              // 更新会话元数据
+              setSessionState({
+                sessionMetadata: {
+                  execution_id: event.data.execution_id,
+                  thread_id: event.data.thread_id,
+                  frontend_uuid: event.data.frontend_uuid,
+                  estimated_duration: event.data.estimated_duration,
+                  start_time: event.data.start_time,
+                  model_info: event.data.model_info,
+                },
+                executionHistory: [],
+                currentConfig: event.data.config_used,
+                permissions: { canModify: true, canShare: true },
+              });
+            }
+            break;
+            
+          case 'node_start':
+            if (isNodeStartEvent(event)) {
+              console.log('[WorkspacePage] Node started:', event.data.node_name);
+              // 🔥 新增：处理节点开始事件
+              if (threadId) {
+                const store = useUnifiedStore.getState();
+                                 const progressMessage = {
+                   id: `node-start-${event.data.node_name}-${Date.now()}`,
+                   content: `🚀 开始执行: ${event.data.node_name}`,
+                   contentChunks: [`🚀 开始执行: ${event.data.node_name}`],
+                   role: "assistant" as const,
+                   threadId: threadId,
+                   isStreaming: false,
+                   agent: undefined, // system事件不属于特定agent
+                   resources: [],
+                  metadata: {
+                    nodeEvent: true,
+                    nodeType: 'start',
+                    nodeName: event.data.node_name,
+                    timestamp: event.data.timestamp,
+                  },
+                };
+                store.addMessage(threadId, progressMessage);
+              }
+            }
+            break;
+            
+          case 'node_complete':
+            if (isNodeCompleteEvent(event)) {
+              console.log('[WorkspacePage] Node completed:', event.data.node_name);
+              // 🔥 新增：处理节点完成事件
+              if (threadId) {
+                const store = useUnifiedStore.getState();
+                                 const progressMessage = {
+                   id: `node-complete-${event.data.node_name}-${Date.now()}`,
+                   content: `✅ 完成执行: ${event.data.node_name}${event.data.duration_ms ? ` (${event.data.duration_ms}ms)` : ''}`,
+                   contentChunks: [`✅ 完成执行: ${event.data.node_name}${event.data.duration_ms ? ` (${event.data.duration_ms}ms)` : ''}`],
+                   role: "assistant" as const,
+                   threadId: threadId,
+                   isStreaming: false,
+                   agent: undefined, // system事件不属于特定agent
+                   resources: [],
+                  metadata: {
+                    nodeEvent: true,
+                    nodeType: 'complete',
+                    nodeName: event.data.node_name,
+                    duration: event.data.duration_ms,
+                    timestamp: event.data.timestamp,
+                  },
+                };
+                store.addMessage(threadId, progressMessage);
+              }
+            }
+            break;
+            
+          case 'plan_generated':
+            if (isPlanGeneratedEvent(event)) {
+              console.log('[WorkspacePage] Plan generated:', event.data);
+              // 🔥 新增：处理计划生成事件
+              if (threadId) {
+                const store = useUnifiedStore.getState();
+                const planMessage = {
+                  id: `plan-${event.data.execution_id}-${Date.now()}`,
+                  content: `📋 研究计划已生成 (第${event.data.plan_iterations}次迭代)`,
+                  contentChunks: [`📋 研究计划已生成 (第${event.data.plan_iterations}次迭代)`],
+                  role: "assistant" as const,
+                  threadId: threadId,
+                  isStreaming: false,
+                  agent: "planner" as const,
+                  resources: [],
+                  metadata: {
+                    planEvent: true,
+                    planData: event.data.plan_data,
+                    planIterations: event.data.plan_iterations,
+                    timestamp: event.data.timestamp,
+                  },
+                };
+                store.addMessage(threadId, planMessage);
+              }
+            }
+            break;
+            
+          case 'search_results':
+            if (isSearchResultsEvent(event)) {
+              console.log('[WorkspacePage] Search results:', event.data);
+              // 🔥 新增：处理搜索结果事件
+              if (threadId) {
+                const store = useUnifiedStore.getState();
+                const searchMessage = {
+                  id: `search-${event.data.execution_id}-${Date.now()}`,
+                  content: `🔍 搜索完成: "${event.data.query}" (${event.data.results.length} 个结果)`,
+                  contentChunks: [`🔍 搜索完成: "${event.data.query}" (${event.data.results.length} 个结果)`],
+                  role: "assistant" as const,
+                  threadId: threadId,
+                  isStreaming: false,
+                  agent: "researcher" as const,
+                                     resources: event.data.results.map(result => ({
+                     uri: result.url || '',
+                     title: result.title || '',
+                   })),
+                  metadata: {
+                    searchEvent: true,
+                    query: event.data.query,
+                    source: event.data.source,
+                    resultsCount: event.data.results.length,
+                    timestamp: event.data.timestamp,
+                  },
+                };
+                store.addMessage(threadId, searchMessage);
+              }
+            }
+            break;
+            
+          case 'agent_output':
+            if (isAgentOutputEvent(event)) {
+              console.log('[WorkspacePage] Agent output:', event.data);
+              // 🔥 新增：处理代理输出事件
+              if (threadId) {
+                const store = useUnifiedStore.getState();
+                const agentMessage = {
+                  id: `agent-${event.data.agent_name}-${Date.now()}`,
+                  content: event.data.content,
+                  contentChunks: [event.data.content],
+                  role: "assistant" as const,
+                  threadId: threadId,
+                  isStreaming: false,
+                  agent: event.data.agent_name as any,
+                  resources: [],
+                  metadata: {
+                    agentEvent: true,
+                    agentType: event.data.agent_type,
+                    agentMetadata: event.data.metadata,
+                    timestamp: event.data.timestamp,
+                  },
+                };
+                store.addMessage(threadId, agentMessage);
+              }
+            }
+            break;
+            
+          case 'progress':
+            if (isProgressEvent(event)) {
+              console.log('[WorkspacePage] Progress update:', event.data);
+              // 🔥 新增：处理进度更新事件
+              if (threadId) {
+                const store = useUnifiedStore.getState();
+                                 const progressMessage = {
+                   id: `progress-${event.data.execution_id}-${Date.now()}`,
+                   content: `⏳ ${event.data.current_step_description}`,
+                   contentChunks: [`⏳ ${event.data.current_step_description}`],
+                   role: "assistant" as const,
+                   threadId: threadId,
+                   isStreaming: false,
+                   agent: undefined, // system事件不属于特定agent
+                  resources: [],
+                  metadata: {
+                    progressEvent: true,
+                    currentNode: event.data.current_node,
+                    completedNodes: event.data.completed_nodes,
+                    remainingNodes: event.data.remaining_nodes,
+                    timestamp: event.data.timestamp,
+                  },
+                };
+                store.addMessage(threadId, progressMessage);
+              }
+            }
+            break;
+            
+          case 'message_chunk':
+            if (threadId && isMessageChunkEvent(event)) {
+              console.log('[WorkspacePage] Message chunk received:', event.data);
+              
+              const validAgents = ["coordinator", "planner", "researcher", "coder", "reporter", "podcast"] as const;
+              const agentName = validAgents.includes(event.data.agent_name as any) 
+                ? event.data.agent_name as typeof validAgents[number]
+                : "researcher";
+              
+              const message = {
+                id: event.data.chunk_id,
+                content: event.data.content,
+                contentChunks: [event.data.content],
+                role: "assistant" as const,
+                threadId: threadId,
+                isStreaming: !event.data.is_final,
+                agent: agentName,
+                resources: [],
+                metadata: {
+                  chunkType: event.data.chunk_type,
+                  sequence: event.data.sequence,
+                  chunkMetadata: event.data.metadata,
+                  timestamp: event.data.timestamp,
+                },
+              };
+              store.addMessage(threadId, message);
+            }
+            break;
+            
+          case 'artifact':
+            if (threadId && isArtifactEvent(event)) {
+              console.log('[WorkspacePage] Artifact generated:', event.data);
+              
+              const artifactMessage = {
+                id: event.data.artifact_id,
+                content: event.data.content,
+                contentChunks: [event.data.content],
+                role: "assistant" as const,
+                threadId: threadId,
+                isStreaming: false,
+                agent: "reporter" as const,
+                resources: [],
+                metadata: {
+                  artifactEvent: true,
+                  artifactType: event.data.type,
+                  artifactTitle: event.data.title,
+                  artifactFormat: event.data.format,
+                  artifactMetadata: event.data.metadata,
+                  timestamp: event.data.timestamp,
+                },
+              };
+              store.addMessage(threadId, artifactMessage);
+            }
+            break;
+            
+          case 'complete':
+            if (isCompleteEvent(event)) {
+              console.log('[WorkspacePage] Research completed:', event.data);
+              
+              // 🔥 增强：处理完成事件的详细信息
+              if (threadId) {
+                const store = useUnifiedStore.getState();
+                                 const completeMessage = {
+                   id: `complete-${event.data.execution_id}`,
+                   content: `🎉 研究完成！总耗时: ${event.data.total_duration_ms}ms，生成了 ${event.data.artifacts_generated.length} 个工件`,
+                   contentChunks: [`🎉 研究完成！总耗时: ${event.data.total_duration_ms}ms，生成了 ${event.data.artifacts_generated.length} 个工件`],
+                   role: "assistant" as const,
+                   threadId: threadId,
+                   isStreaming: false,
+                   agent: undefined, // system事件不属于特定agent
+                  resources: [],
+                  metadata: {
+                    completeEvent: true,
+                    totalDuration: event.data.total_duration_ms,
+                    tokensConsumed: event.data.tokens_consumed,
+                    totalCost: event.data.total_cost,
+                    artifactsGenerated: event.data.artifacts_generated,
+                    finalStatus: event.data.final_status,
+                    summary: event.data.summary,
+                    timestamp: event.data.timestamp,
+                  },
+                };
+                store.addMessage(threadId, completeMessage);
+              }
+              
+              setDataLoading(false);
+              setInitialized(true);
+              setSseConnected(false);
+              return; // 结束SSE处理循环
+            }
+            break;
+            
+          case 'error':
+            if (isErrorEvent(event)) {
+              console.error('[WorkspacePage] SSE error:', event.data);
+              
+              // 🔥 增强：处理错误事件的详细信息
+              if (threadId) {
+                const store = useUnifiedStore.getState();
+                                 const errorMessage = {
+                   id: `error-${event.data.execution_id}-${Date.now()}`,
+                   content: `❌ 错误: ${event.data.error_message}`,
+                   contentChunks: [`❌ 错误: ${event.data.error_message}`],
+                   role: "assistant" as const,
+                   threadId: threadId,
+                   isStreaming: false,
+                   agent: undefined, // system事件不属于特定agent
+                  resources: [],
+                  metadata: {
+                    errorEvent: true,
+                    errorCode: event.data.error_code,
+                    errorDetails: event.data.error_details,
+                    suggestions: event.data.suggestions,
+                    timestamp: event.data.timestamp,
+                  },
+                };
+                store.addMessage(threadId, errorMessage);
+              }
+              
+              setError(`研究过程出错: ${event.data.error_message}`);
+              setDataLoading(false);
+              setInitialized(true);
+              setSseConnected(false);
+              return; // 结束SSE处理循环
+            }
+            break;
+            
+          default:
+            console.log('[WorkspacePage] Unhandled SSE event:', event.type);
+            break;
+        }
+      }
+      
+      console.log('[WorkspacePage] SSE stream completed');
+      setSseConnected(false);
+      setDataLoading(false);
+      setInitialized(true);
+      
+    } catch (error) {
+      console.error('[WorkspacePage] SSE connection failed:', error);
+      setSseConnected(false);
+      setDataLoading(false);
+      setInitialized(true);
+    }
+  }, [sseConnected, urlParam, setSessionState, setDataLoading, setInitialized, setError]);
 
   // 获取当前状态
   const currentUrlParam = useCurrentUrlParam();
@@ -76,87 +495,91 @@ export default function WorkspacePage() {
   const podcastVisible = usePodcastPanelVisible();
   const feedback = useWorkspaceFeedback();
 
-  // 两步分离架构 - Step 2: 初始化工作区并连接SSE
+  // 🚀 重构后的工作区初始化逻辑
   useEffect(() => {
     if (!urlParam || initialized) return;
 
-    const initializeWorkspaceWithSSE = async () => {
+    const initializeWorkspace = async () => {
       setLoading(true);
       setError(null);
 
       try {
-        console.log(`[WorkspacePage] Initializing workspace with two-step architecture: ${urlParam}`);
+        console.log(`[WorkspacePage] Initializing workspace: ${urlParam}`);
         
         // 设置当前URL参数
         setCurrentUrlParam(urlParam);
         
         // 🚀 快速显示界面 - 先设置loading为false，让用户看到基础界面
         setLoading(false);
-        
-        // 开始后台数据加载
         setDataLoading(true);
         
-        // 首先尝试获取现有工作区状态（检查是否为新任务或历史任务）
+        // 尝试获取现有工作区状态
         try {
-          const workspaceData = await getWorkspaceState(urlParam);
+        const workspaceData = await getWorkspaceState(urlParam);
           console.log('[WorkspacePage] Existing workspace data found:', workspaceData);
           
-          // 设置会话状态
-          setSessionState({
-            sessionMetadata: workspaceData.sessionMetadata,
-            executionHistory: workspaceData.executionHistory || [],
-            currentConfig: workspaceData.config?.currentConfig || null,
-            permissions: workspaceData.permissions || null,
-          });
-          
-          // 设置URL参数到thread_id的映射
-          setUrlParamMapping(urlParam, workspaceData.thread_id);
-          setCurrentThreadId(workspaceData.thread_id);
-          
-          // 恢复消息历史
-          if (workspaceData.messages && workspaceData.messages.length > 0) {
-            console.log(`[WorkspacePage] Restoring ${workspaceData.messages.length} messages`);
+          // 🔥 关键修复：确保在添加消息前正确设置线程映射
+          if (workspaceData.thread_id) {
+            console.log(`[WorkspacePage] Setting up thread mapping: ${urlParam} -> ${workspaceData.thread_id}`);
+            setUrlParamMapping(urlParam, workspaceData.thread_id);
+            setCurrentThreadId(workspaceData.thread_id);
             
-            const { nanoid } = await import("nanoid");
+            // 确保线程存在（如果不存在会自动创建）
             const store = useUnifiedStore.getState();
+            store.setCurrentThread(workspaceData.thread_id);
+          }
+        
+        // 设置会话状态
+        setSessionState({
+          sessionMetadata: workspaceData.sessionMetadata,
+          executionHistory: workspaceData.sessionMetadata?.execution_history || [],
+          currentConfig: workspaceData.config?.currentConfig || null,
+          permissions: workspaceData.permissions || null,
+        });
+        
+          // 🔥 关键修复：恢复消息历史（确保线程映射已设置）
+          if (workspaceData.messages && workspaceData.messages.length > 0 && workspaceData.thread_id) {
+            console.log(`[WorkspacePage] Restoring ${workspaceData.messages.length} messages to thread ${workspaceData.thread_id}`);
+          
+          const { nanoid } = await import("nanoid");
+          const store = useUnifiedStore.getState();
+          
+          // 转换并添加消息到store
+          for (const msg of workspaceData.messages) {
+            const message = {
+              id: msg.id || nanoid(),
+              content: msg.content || '',
+              contentChunks: [msg.content || ''],
+              role: (msg.role === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
+              threadId: workspaceData.thread_id,
+              isStreaming: false,
+              agent: msg.agent || undefined,
+              resources: msg.resources || [],
+            };
             
-            // 转换并添加消息到store
-            for (const msg of workspaceData.messages) {
-              const message = {
-                id: msg.id || nanoid(),
-                content: msg.content || '',
-                contentChunks: [msg.content || ''],
-                role: (msg.role === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
-                threadId: workspaceData.thread_id,
-                isStreaming: false,
-                agent: msg.agent || undefined,
-                resources: msg.resources || [],
-              };
-              
-              store.addMessage(workspaceData.thread_id, message);
-            }
-            
+              // 使用正确的threadId添加消息
+            store.addMessage(workspaceData.thread_id, message);
+          }
+          
             console.log(`[WorkspacePage] Successfully restored ${workspaceData.messages.length} messages`);
+        }
+        
+        // 恢复配置
+        if (workspaceData.config?.currentConfig) {
+          const config = workspaceData.config.currentConfig;
+          if (config.enableBackgroundInvestigation !== undefined) {
+            setEnableBackgroundInvestigation(config.enableBackgroundInvestigation);
           }
-          
-          // 恢复配置
-          if (workspaceData.config?.currentConfig) {
-            const config = workspaceData.config.currentConfig;
-            if (config.enableBackgroundInvestigation !== undefined) {
-              setEnableBackgroundInvestigation(config.enableBackgroundInvestigation);
-            }
-            if (config.reportStyle) {
-              setReportStyle(config.reportStyle);
-            }
+          if (config.reportStyle) {
+            setReportStyle(config.reportStyle);
           }
-          
-          console.log('[WorkspacePage] Workspace initialized from existing data');
-          
-          // 🔥 关键修复：根据执行状态判断是否需要启动SSE连接
-          const hasMessages = workspaceData.messages && workspaceData.messages.length > 0;
+        }
+        
+          // 🔥 关键逻辑：检查任务状态，决定是否需要 SSE 连接
           const executionHistory = workspaceData.sessionMetadata?.execution_history || [];
           const latestExecution = executionHistory[0]; // 最新的执行记录
           const isStillRunning = latestExecution?.status === 'running';
+          const hasMessages = workspaceData.messages && workspaceData.messages.length > 0;
           
           console.log('[WorkspacePage] Execution status check:', {
             hasMessages,
@@ -165,244 +588,51 @@ export default function WorkspacePage() {
             executionCount: executionHistory.length
           });
           
-          if (hasMessages && !isStillRunning) {
-            // 有消息数据且任务已完成，初始化完成
-            setInitialized(true);
-            setDataLoading(false);
-            console.log('[WorkspacePage] Workspace initialization completed with existing data');
-            return;
+          // 🚨 添加详细调试
+          console.log('[WorkspacePage] DEBUG - Full execution history:', executionHistory);
+          console.log('[WorkspacePage] DEBUG - Latest execution object:', latestExecution);
+          console.log('[WorkspacePage] DEBUG - Status comparison:', {
+            actualStatus: latestExecution?.status,
+            expectedStatus: 'running',
+            isEqual: latestExecution?.status === 'running',
+            statusType: typeof latestExecution?.status
+          });
+          
+          if (isStillRunning) {
+            // 场景2：任务还在运行，需要建立 SSE 连接获取实时更新
+            console.log('[WorkspacePage] ✅ Task is still running, starting SSE connection for live updates...');
+            await startSSEConnection(workspaceData.thread_id, 'continue');
           } else {
-            // 需要启动SSE连接的情况：
-            // 1. 任务仍在运行 (isStillRunning = true)
-            // 2. 没有消息且没有运行中的任务
-            if (isStillRunning) {
-              console.log('[WorkspacePage] Task is still running, starting SSE connection to get live data...');
-            } else {
-              console.log('[WorkspacePage] No messages and no running task, starting SSE connection...');
-            }
-            
-            // 🔥 关键修复：实际启动SSE连接
-            await startSSEConnection();
+            // 任务已完成，只显示历史数据
+            console.log('[WorkspacePage] ❌ Task completed, showing historical data only');
+            console.log('[WorkspacePage] DEBUG - Why not running?', {
+              hasLatestExecution: !!latestExecution,
+              status: latestExecution?.status,
+              isRunning: latestExecution?.status === 'running'
+            });
+            setDataLoading(false);
+            setInitialized(true);
           }
           
         } catch (workspaceError) {
-          console.log('[WorkspacePage] No existing workspace data, this might be a new task');
-          
-          // 如果没有现有数据，这可能是刚创建的任务，需要连接SSE获取实时数据
-          console.log('[WorkspacePage] Starting SSE connection for new task...');
-          
-          // 对于新任务，也使用相同的SSE连接逻辑
-          await startSSEConnection();
-        }
-        
-        // 🔥 提取SSE连接逻辑为独立函数
-        async function startSSEConnection() {
-          
-          // 动态导入SSE相关模块
-          const { 
-            createResearchStream, 
-            isNavigationEvent,
-            isMetadataEvent,
-            isPlanGeneratedEvent,
-            isAgentOutputEvent,
-            isMessageChunkEvent,
-            isArtifactEvent,
-            isCompleteEvent,
-            isErrorEvent
-          } = await import("~/core/api/research-stream");
-          const { generateInitialQuestionIDs, getVisitorId } = await import("~/core/utils");
-          const { nanoid } = await import("nanoid");
-          
-          // 生成前端ID（用于SSE连接）
-          const ids = generateInitialQuestionIDs();
-          const visitorId = getVisitorId();
-          
-                     // 构建SSE请求 - 注意：如果后台任务已完成，我们需要检查实际状态
-           const { useSettingsStore } = await import("~/core/store");
-           const settings = useSettingsStore.getState().general;
-           
-           // 首先检查现有任务的状态
-           console.log('[WorkspacePage] Checking if background task is still running...');
-           
-           const request = {
-             action: 'continue' as const,
-             url_param: urlParam,
-             message: '获取当前进度', // 请求获取当前进度和状态
-             frontend_uuid: ids.frontend_uuid,
-             frontend_context_uuid: ids.frontend_context_uuid,
-             visitor_id: visitorId,
-             config: {
-               enableBackgroundInvestigation: settings.enableBackgroundInvestigation,
-               reportStyle: settings.reportStyle,
-               enableDeepThinking: settings.enableDeepThinking,
-               maxPlanIterations: settings.maxPlanIterations,
-               maxStepNum: settings.maxStepNum,
-               maxSearchResults: settings.maxSearchResults,
-               outputFormat: 'markdown' as const,
-               includeCitations: true,
-               includeArtifacts: true,
-             },
-           };
-          
-          console.log('[WorkspacePage] Connecting to SSE stream...');
-          
-          // 连接SSE流
-          const stream = createResearchStream(request);
-          const store = useUnifiedStore.getState();
-          let currentThreadId: string | null = null;
-          
-          // 处理SSE事件
-          for await (const event of stream) {
-            console.log('[WorkspacePage] SSE event received:', event.type, event.data);
-            
-            switch (event.type) {
-              case 'navigation':
-                if (isNavigationEvent(event)) {
-                  const { thread_id } = event.data;
-                  console.log('[WorkspacePage] Navigation event - thread_id:', thread_id);
-                  
-                  // 设置映射关系
-                  setUrlParamMapping(urlParam, thread_id);
-                  setCurrentThreadId(thread_id);
-                  currentThreadId = thread_id;
-                }
-                break;
-                
-              case 'metadata':
-                if (isMetadataEvent(event)) {
-                  console.log('[WorkspacePage] Metadata received:', event.data);
-                  
-                  // 设置会话元数据
-                  setSessionState({
-                    sessionMetadata: {
-                      execution_id: event.data.execution_id,
-                      thread_id: event.data.thread_id,
-                      frontend_uuid: event.data.frontend_uuid,
-                      estimated_duration: event.data.estimated_duration,
-                      start_time: event.data.start_time,
-                    },
-                    executionHistory: [],
-                    currentConfig: event.data.config_used,
-                    permissions: { canModify: true, canShare: true },
-                  });
-                }
-                break;
-                
-              case 'plan_generated':
-                if (currentThreadId && isPlanGeneratedEvent(event)) {
-                  console.log('[WorkspacePage] Plan generated:', event.data);
-                  
-                  const planContent = JSON.stringify(event.data.plan_data, null, 2);
-                  const planMessage = {
-                    id: nanoid(),
-                    content: planContent,
-                    contentChunks: [planContent],
-                    role: "assistant" as const,
-                    threadId: currentThreadId,
-                    isStreaming: false,
-                    agent: "planner" as const,
-                    resources: [],
-                  };
-                  store.addMessage(currentThreadId, planMessage);
-                }
-                break;
-                
-              case 'agent_output':
-                if (currentThreadId && isAgentOutputEvent(event)) {
-                  console.log('[WorkspacePage] Agent output:', event.data);
-                  
-                  const validAgents = ["coordinator", "planner", "researcher", "coder", "reporter", "podcast"] as const;
-                  const agentName = validAgents.includes(event.data.agent_name as any) 
-                    ? event.data.agent_name as typeof validAgents[number]
-                    : "researcher";
-                  
-                  const agentMessage = {
-                    id: nanoid(),
-                    content: event.data.content,
-                    contentChunks: [event.data.content],
-                    role: "assistant" as const,
-                    threadId: currentThreadId,
-                    isStreaming: false,
-                    agent: agentName,
-                    resources: [],
-                  };
-                  store.addMessage(currentThreadId, agentMessage);
-                }
-                break;
-                
-              case 'artifact':
-                if (currentThreadId && isArtifactEvent(event)) {
-                  console.log('[WorkspacePage] Artifact generated:', event.data);
-                  
-                  const artifactMessage = {
-                    id: nanoid(),
-                    content: event.data.content,
-                    contentChunks: [event.data.content],
-                    role: "assistant" as const,
-                    threadId: currentThreadId,
-                    isStreaming: false,
-                    agent: "reporter" as const,
-                    resources: [],
-                  };
-                  store.addMessage(currentThreadId, artifactMessage);
-                }
-                break;
-                
-              case 'complete':
-                if (isCompleteEvent(event)) {
-                  console.log('[WorkspacePage] Research completed:', event.data);
-                  
-                  // 🎯 任务完成，停止数据加载指示器
-                  setDataLoading(false);
-                  setInitialized(true);
-                  
-                  // 可以在这里处理完成后的逻辑，比如显示完成通知
-                  console.log('[WorkspacePage] Task completed successfully, SSE stream will end');
-                  return; // 结束SSE处理循环
-                }
-                break;
-                
-              case 'error':
-                if (isErrorEvent(event)) {
-                  console.error('[WorkspacePage] SSE error:', event.data);
-                  setError(`研究过程出错: ${event.data.error_message}`);
-                  setDataLoading(false);
-                  setInitialized(true);
-                  return; // 结束SSE处理循环
-                } else {
-                  console.error('[WorkspacePage] Unknown SSE error:', event);
-                  setError('研究过程出现未知错误');
-                  setDataLoading(false);
-                  setInitialized(true);
-                  return; // 结束SSE处理循环
-                }
-                break;
-                
-              default:
-                console.log('[WorkspacePage] Unhandled SSE event:', event.type);
-                break;
-            }
-          }
-          
-          console.log('[WorkspacePage] SSE stream completed');
-        } // 🔥 结束startSSEConnection函数
-        
+          console.log('[WorkspacePage] No existing workspace data found:', workspaceError);
+          setError('无法加载工作区数据，请检查URL是否正确');
+          setDataLoading(false);
         setInitialized(true);
-        setDataLoading(false); // 数据加载完成
-        console.log('[WorkspacePage] Workspace initialization completed');
+        }
         
       } catch (error) {
         console.error('[WorkspacePage] Failed to initialize workspace:', error);
         setError(error instanceof Error ? error.message : 'Failed to load workspace');
-        setLoading(false); // 确保错误时也不显示loading
-        setDataLoading(false); // 停止数据加载指示器
+        setLoading(false);
+        setDataLoading(false);
       }
     };
 
-    initializeWorkspaceWithSSE();
-  }, [urlParam, initialized]);
+    initializeWorkspace();
+  }, [urlParam, initialized, startSSEConnection]); // 🔥 添加 startSSEConnection 依赖
 
-  // 实现消息发送处理函数（使用新架构）
+  // 实现消息发送处理函数 - 支持workspace页面的两种场景
   const handleSendMessage = useCallback(
     async (
       message: string,
@@ -411,30 +641,29 @@ export default function WorkspacePage() {
         resources?: Array<Resource>;
       },
     ) => {
-      console.log("[WorkspacePage] Sending message with new API:", message);
-      
-      const abortController = new AbortController();
-      abortControllerRef.current = abortController;
+      console.log("[WorkspacePage] Sending message:", message);
       
       try {
-        await sendMessageWithNewAPI(
-          message,
-          {
-            interruptFeedback: options?.interruptFeedback ?? feedback?.option.value,
-            resources: options?.resources,
-          },
-          {
-            abortSignal: abortController.signal,
-          },
-        );
+        // 场景1：在workspace页面直接提交新问题
+        // 使用SSE连接进行流式处理
+        const sessionState = useSessionState();
+        const threadId = sessionState?.sessionMetadata?.thread_id || urlParam;
+        
+        console.log("[WorkspacePage] Starting new research in workspace with SSE");
+        setDataLoading(true);
+        
+        // 启动SSE连接处理新消息
+        await startSSEConnection(threadId, 'create', message);
         
         console.log("[WorkspacePage] Message sent successfully");
       } catch (error) {
         console.error("Failed to send message:", error);
+        setError(error instanceof Error ? error.message : 'Failed to send message');
+        setDataLoading(false);
         throw error;
       }
     },
-    [feedback],
+    [urlParam, startSSEConnection],
   );
 
   // 实现反馈处理函数
@@ -448,8 +677,8 @@ export default function WorkspacePage() {
   // 清理函数
   useEffect(() => {
     return () => {
-      if (abortControllerRef.current && !abortControllerRef.current.signal.aborted) {
-        abortControllerRef.current.abort(new DOMException('Component unmounted', 'AbortError'));
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
       }
     };
   }, []);
@@ -504,7 +733,7 @@ export default function WorkspacePage() {
           
           <div className="min-w-0 flex-1 max-w-md">
             <div className="flex items-center gap-2">
-              <h1 className="text-lg font-semibold text-white">研究工作区</h1>
+            <h1 className="text-lg font-semibold text-white">研究工作区</h1>
               {dataLoading && (
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-400"></div>
               )}
@@ -548,8 +777,8 @@ export default function WorkspacePage() {
             onClick={toggleHistoryPanel}
             className="gap-1"
           >
-            <History className="h-4 w-4" />
-            <span className="hidden lg:inline">历史</span>
+            <Activity className="h-4 w-4" />
+            <span className="hidden lg:inline">输出流</span>
             {historyVisible ? <Minimize2 className="h-3 w-3 hidden sm:inline" /> : <Maximize2 className="h-3 w-3 hidden sm:inline" />}
           </Button>
           
@@ -616,7 +845,7 @@ export default function WorkspacePage() {
                   <div className="flex-shrink-0 border-b border-gray-200 px-4 py-3 dark:border-gray-700">
                     <div className="flex items-center justify-between">
                       <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                        消息历史
+                        实时输出流
                       </h2>
                       <Button
                         variant="ghost"
@@ -629,7 +858,7 @@ export default function WorkspacePage() {
                     </div>
                   </div>
                   <div className="flex-1 overflow-hidden min-h-0">
-                    <MessageHistory traceId={urlParam} />
+                    <OutputStream traceId={urlParam} />
                   </div>
                 </div>
               )}

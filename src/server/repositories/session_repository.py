@@ -499,13 +499,13 @@ class SessionRepository:
     
     async def get_messages_by_session_id(self, session_id: int) -> List[Dict[str, Any]]:
         """
-        获取会话的消息历史
+        获取指定会话的消息历史
         
         Args:
             session_id: 会话ID
             
         Returns:
-            消息列表
+            List[Dict]: 消息列表
         """
         async with await self.get_connection() as conn:
             cursor = conn.cursor()
@@ -515,8 +515,128 @@ class SessionRepository:
                 ORDER BY timestamp ASC
             """, (session_id,))
             
-            rows = await cursor.fetchall()
-            return [dict(row) for row in rows]
+            return await cursor.fetchall()
+
+    async def save_message(
+        self,
+        session_id: int,
+        execution_id: Optional[str],
+        role: str,
+        content: str,
+        content_type: str = "text",
+        frontend_context_uuid: Optional[str] = None,
+        chunk_sequence: Optional[int] = None,
+        source_agent: Optional[str] = None,
+        confidence_score: Optional[float] = None
+    ) -> Dict[str, Any]:
+        """
+        保存消息到message_history表
+        
+        Args:
+            session_id: 会话ID
+            execution_id: 执行ID
+            role: 消息角色 (user, assistant, system)
+            content: 消息内容
+            content_type: 内容类型 (text, plan, artifact)
+            frontend_context_uuid: 前端上下文UUID
+            chunk_sequence: 消息块序号
+            source_agent: 来源代理
+            confidence_score: 置信度分数
+            
+        Returns:
+            Dict: 保存的消息数据
+        """
+        async with await self.get_connection() as conn:
+            cursor = conn.cursor()
+            
+            # 如果有execution_id，查找对应的execution记录
+            execution_record_id = None
+            if execution_id:
+                await cursor.execute("""
+                    SELECT id FROM execution_record 
+                    WHERE execution_id = %s AND session_id = %s
+                """, (execution_id, session_id))
+                exec_result = await cursor.fetchone()
+                if exec_result:
+                    execution_record_id = exec_result['id']
+            
+            await cursor.execute("""
+                INSERT INTO message_history (
+                    session_id, execution_id, role, content, content_type,
+                    frontend_context_uuid, chunk_sequence, source_agent, confidence_score
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING *
+            """, (
+                session_id, execution_record_id, role, content, content_type,
+                frontend_context_uuid, chunk_sequence, source_agent, confidence_score
+            ))
+            
+            return await cursor.fetchone()
+
+    async def save_artifact(
+        self,
+        session_id: int,
+        execution_id: Optional[str],
+        artifact_type: str,
+        title: str,
+        content: str,
+        description: Optional[str] = None,
+        content_format: str = "markdown",
+        source_agent: Optional[str] = None,
+        generation_context: Optional[Dict[str, Any]] = None,
+        dependencies: Optional[List[str]] = None,
+        version: int = 1,
+        parent_artifact_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        保存artifact到artifact_storage表
+        
+        Args:
+            session_id: 会话ID
+            execution_id: 执行ID
+            artifact_type: artifact类型
+            title: 标题
+            content: 内容
+            description: 描述
+            content_format: 内容格式
+            source_agent: 来源代理
+            generation_context: 生成上下文
+            dependencies: 依赖项
+            version: 版本号
+            parent_artifact_id: 父artifact ID
+            
+        Returns:
+            Dict: 保存的artifact数据
+        """
+        async with await self.get_connection() as conn:
+            cursor = conn.cursor()
+            
+            # 如果有execution_id，查找对应的execution记录
+            execution_record_id = None
+            if execution_id:
+                await cursor.execute("""
+                    SELECT id FROM execution_record 
+                    WHERE execution_id = %s AND session_id = %s
+                """, (execution_id, session_id))
+                exec_result = await cursor.fetchone()
+                if exec_result:
+                    execution_record_id = exec_result['id']
+            
+            await cursor.execute("""
+                INSERT INTO artifact_storage (
+                    session_id, execution_id, type, title, description, content,
+                    content_format, file_size, source_agent, generation_context,
+                    dependencies, version, parent_artifact_id
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING *
+            """, (
+                session_id, execution_record_id, artifact_type, title, description, content,
+                content_format, len(content.encode('utf-8')), source_agent, 
+                json.dumps(generation_context) if generation_context else None,
+                dependencies, version, parent_artifact_id
+            ))
+            
+            return await cursor.fetchone()
     
     async def get_execution_records_by_session_id(self, session_id: int) -> List[Dict[str, Any]]:
         """

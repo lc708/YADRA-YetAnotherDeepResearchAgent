@@ -19,6 +19,7 @@ export interface CreateResearchRequest {
       max_research_depth?: number;
       enable_deep_thinking?: boolean;
       enable_background_investigation?: boolean;
+      auto_accepted_plan?: boolean; // 🔥 支持用户配置的auto_accepted_plan
     };
     model?: {
       provider?: string;

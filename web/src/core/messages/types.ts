@@ -33,6 +33,7 @@ export interface Message {
     resources: any[];
     timestamp: string;
   };
+  metadata?: Record<string, any>;
 }
 
 export interface Option {

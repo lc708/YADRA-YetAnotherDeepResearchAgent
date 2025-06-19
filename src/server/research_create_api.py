@@ -5,13 +5,17 @@ Research Create API for YADRA
 """
 
 import asyncio
+import os
 import uuid
 from datetime import datetime
 from typing import Dict, Any, Optional
 import logging
+from dataclasses import dataclass
+import json
 
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
+from dotenv import load_dotenv
 
 from src.server.repositories.session_repository import (
     SessionRepository, 
@@ -19,6 +23,7 @@ from src.server.repositories.session_repository import (
     ActionType,
     ExecutionStatus
 )
+from src.utils.url_param_generator import generate_url_param
 
 logger = logging.getLogger(__name__)
 
@@ -176,38 +181,60 @@ class ResearchCreateService:
             
             logger.info(f"Created execution record: {execution_record.execution_id}")
             
-            # 导入Langgraph相关模块（延迟导入避免启动时的依赖问题）
-            from src.graph.async_builder import create_graph
-            from src.graph.types import State
+            # 🔥 使用ResearchStreamService来处理后台任务，确保数据保存
+            from src.server.research_stream_api import ResearchStreamService, ResearchStreamRequest, ActionType as StreamActionType
             
-            # 创建Langgraph实例
-            graph = await create_graph()
+            # 创建ResearchStreamService实例
+            stream_service = ResearchStreamService(self.session_repo)
             
-            # 构建初始状态 - 用户问题必须在messages中！
-            from langchain_core.messages import HumanMessage
-            
-            initial_state = State(
-                messages=[HumanMessage(content=question)],  # 🔥 关键修复：用户问题放入messages
-                question=question,  # 保留question字段用于其他用途
-                context={
-                    "thread_id": thread_id,
-                    "execution_id": execution_record.execution_id,
-                    "session_id": session_id,
-                    "frontend_uuid": frontend_uuid,
+            # 构建请求对象
+            stream_request = ResearchStreamRequest(
+                action=StreamActionType.CREATE,
+                message=question,
+                url_param=None,  # 后台任务不需要url_param
+                frontend_uuid=frontend_uuid,
+                frontend_context_uuid=frontend_uuid,
+                visitor_id=str(uuid.uuid4()),  # 🔥 使用正确的UUID格式
+                user_id=None,
+                config={
                     "research_config": research_config,
                     "model_config": model_config,
                     "output_config": output_config
                 }
             )
             
-            # 开始执行Langgraph流程（异步执行，不阻塞响应）
-            async for chunk in graph.astream(
-                initial_state, 
-                {"configurable": {"thread_id": thread_id}},
-                stream_mode="values"
-            ):
-                # 这里可以记录进度，但不需要等待完成
-                logger.debug(f"Background task progress for {thread_id}: {chunk}")
+            # 执行流式处理，但不发送SSE事件，只保存数据
+            async for event in stream_service.create_research_stream(stream_request):
+                # 在后台任务中，我们只关心数据保存，不需要发送SSE事件
+                logger.debug(f"Background task event: {event.get('event', 'unknown') if isinstance(event, dict) else str(event)}")
+                
+                # 如果是完成或错误事件，更新执行记录状态
+                if isinstance(event, dict):
+                    event_type = event.get('event')
+                    if event_type == 'complete':
+                        await self.session_repo.update_execution_record(
+                            execution_id=execution_record.execution_id,
+                            status=ExecutionStatus.COMPLETED,
+                            end_time=datetime.now()
+                        )
+                        logger.info(f"Background task completed for thread_id: {thread_id}")
+                        break
+                    elif event_type == 'error':
+                        error_data = event.get('data', {})
+                        if isinstance(error_data, str):
+                            try:
+                                error_data = json.loads(error_data)
+                            except:
+                                error_data = {"error_message": error_data}
+                        
+                        await self.session_repo.update_execution_record(
+                            execution_id=execution_record.execution_id,
+                            status=ExecutionStatus.ERROR,
+                            error_message=error_data.get('error_message', 'Unknown error'),
+                            end_time=datetime.now()
+                        )
+                        logger.error(f"Background task failed for thread_id: {thread_id}")
+                        break
                 
         except Exception as e:
             logger.error(f"Background research task failed for {thread_id}: {e}")
@@ -216,7 +243,8 @@ class ResearchCreateService:
                 await self.session_repo.update_execution_record(
                     execution_id=execution_record.execution_id if 'execution_record' in locals() else thread_id,
                     status=ExecutionStatus.ERROR,
-                    error_message=str(e)
+                    error_message=str(e),
+                    end_time=datetime.now()
                 )
             except:
                 pass  # 避免嵌套异常
@@ -252,9 +280,6 @@ class ResearchCreateService:
 # 依赖注入
 async def get_session_repository_dependency() -> SessionRepository:
     """获取SessionRepository依赖"""
-    import os
-    from dotenv import load_dotenv
-    
     load_dotenv()
     db_url = os.getenv("DATABASE_URL")
     if not db_url:

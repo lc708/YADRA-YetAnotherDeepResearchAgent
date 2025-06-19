@@ -260,7 +260,7 @@ export function HeroInput({
             return;
           }
           
-          // 构建配置
+          // 构建配置 - 保持原有嵌套格式，但添加auto_accepted_plan
           const settings = useSettingsStore.getState().general;
           const config = {
             research: {
@@ -269,6 +269,7 @@ export function HeroInput({
               max_research_depth: 3,
               enable_deep_thinking: settings.enableDeepThinking,
               enable_background_investigation: settings.enableBackgroundInvestigation,
+              auto_accepted_plan: settings.autoAcceptedPlan, // 🔥 关键：包含用户的autoAcceptedPlan设置
             },
             model: {
               provider: "anthropic",
@@ -284,9 +285,9 @@ export function HeroInput({
               include_citations: true,
             },
             preferences: {
-              maxPlanIterations: settings.maxPlanIterations,
-              maxStepNum: settings.maxStepNum,
-              maxSearchResults: settings.maxSearchResults,
+            maxPlanIterations: settings.maxPlanIterations,
+            maxStepNum: settings.maxStepNum,
+            maxSearchResults: settings.maxSearchResults,
             }
           };
           
