@@ -25,7 +25,8 @@ def setup_session_mapping_schema():
 
         # 1. 会话映射表 - 核心映射表
         print("📊 创建 session_mapping 表...")
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS session_mapping (
                 id SERIAL PRIMARY KEY,
                 thread_id TEXT NOT NULL UNIQUE,
@@ -46,11 +47,13 @@ def setup_session_mapping_schema():
                 last_activity_at TIMESTAMPTZ DEFAULT NOW(),
                 expires_at TIMESTAMPTZ DEFAULT (NOW() + INTERVAL '30 days')
             );
-        """)
+        """
+        )
 
         # 2. 会话配置表 - 配置版本管理
         print("⚙️ 创建 session_config 表...")
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS session_config (
                 id SERIAL PRIMARY KEY,
                 session_id INTEGER NOT NULL REFERENCES session_mapping(id) ON DELETE CASCADE,
@@ -85,11 +88,13 @@ def setup_session_mapping_schema():
                 created_at TIMESTAMPTZ DEFAULT NOW(),
                 is_active BOOLEAN DEFAULT TRUE
             );
-        """)
+        """
+        )
 
         # 3. 执行记录表 - 追踪所有执行
         print("📈 创建 execution_record 表...")
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS execution_record (
                 id SERIAL PRIMARY KEY,
                 session_id INTEGER NOT NULL REFERENCES session_mapping(id) ON DELETE CASCADE,
@@ -123,11 +128,13 @@ def setup_session_mapping_schema():
                 
                 created_at TIMESTAMPTZ DEFAULT NOW()
             );
-        """)
+        """
+        )
 
         # 4. 消息历史表 - 完整对话流
         print("💬 创建 message_history 表...")
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS message_history (
                 id SERIAL PRIMARY KEY,
                 session_id INTEGER NOT NULL REFERENCES session_mapping(id) ON DELETE CASCADE,
@@ -149,11 +156,13 @@ def setup_session_mapping_schema():
                 timestamp TIMESTAMPTZ DEFAULT NOW(),
                 created_at TIMESTAMPTZ DEFAULT NOW()
             );
-        """)
+        """
+        )
 
         # 5. Artifact存储表 - 增强版artifacts
         print("🎨 创建 artifact_storage 表...")
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS artifact_storage (
                 id SERIAL PRIMARY KEY,
                 session_id INTEGER NOT NULL REFERENCES session_mapping(id) ON DELETE CASCADE,
@@ -183,13 +192,15 @@ def setup_session_mapping_schema():
                 created_at TIMESTAMPTZ DEFAULT NOW(),
                 updated_at TIMESTAMPTZ DEFAULT NOW()
             );
-        """)
+        """
+        )
 
         # 创建索引
         print("📇 创建索引...")
-        
+
         # session_mapping 索引
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE UNIQUE INDEX IF NOT EXISTS idx_session_mapping_url_param ON session_mapping(url_param);
             CREATE UNIQUE INDEX IF NOT EXISTS idx_session_mapping_thread_id ON session_mapping(thread_id);
             CREATE INDEX IF NOT EXISTS idx_session_mapping_frontend_uuid ON session_mapping(frontend_uuid);
@@ -198,43 +209,53 @@ def setup_session_mapping_schema():
             CREATE INDEX IF NOT EXISTS idx_session_mapping_status ON session_mapping(status);
             CREATE INDEX IF NOT EXISTS idx_session_mapping_created_at ON session_mapping(created_at);
             CREATE INDEX IF NOT EXISTS idx_session_mapping_last_activity ON session_mapping(last_activity_at);
-        """)
+        """
+        )
 
         # session_config 索引
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE INDEX IF NOT EXISTS idx_session_config_session_id ON session_config(session_id);
             CREATE INDEX IF NOT EXISTS idx_session_config_active ON session_config(session_id, is_active) WHERE is_active = TRUE;
-        """)
+        """
+        )
 
         # execution_record 索引
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE INDEX IF NOT EXISTS idx_execution_record_session_id ON execution_record(session_id);
             CREATE INDEX IF NOT EXISTS idx_execution_record_frontend_context_uuid ON execution_record(frontend_context_uuid);
             CREATE INDEX IF NOT EXISTS idx_execution_record_status ON execution_record(status);
             CREATE INDEX IF NOT EXISTS idx_execution_record_created_at ON execution_record(created_at);
             CREATE INDEX IF NOT EXISTS idx_execution_record_action_type ON execution_record(action_type);
-        """)
+        """
+        )
 
         # message_history 索引
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE INDEX IF NOT EXISTS idx_message_history_session_id ON message_history(session_id);
             CREATE INDEX IF NOT EXISTS idx_message_history_execution_id ON message_history(execution_id);
             CREATE INDEX IF NOT EXISTS idx_message_history_timestamp ON message_history(timestamp);
             CREATE INDEX IF NOT EXISTS idx_message_history_role ON message_history(role);
-        """)
+        """
+        )
 
         # artifact_storage 索引
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE INDEX IF NOT EXISTS idx_artifact_storage_session_id ON artifact_storage(session_id);
             CREATE INDEX IF NOT EXISTS idx_artifact_storage_execution_id ON artifact_storage(execution_id);
             CREATE INDEX IF NOT EXISTS idx_artifact_storage_type ON artifact_storage(type);
             CREATE INDEX IF NOT EXISTS idx_artifact_storage_created_at ON artifact_storage(created_at);
             CREATE INDEX IF NOT EXISTS idx_artifact_storage_artifact_id ON artifact_storage(artifact_id);
-        """)
+        """
+        )
 
         # 创建触发器 - 自动更新时间戳
         print("⚡ 创建触发器...")
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE OR REPLACE FUNCTION update_updated_at_column()
             RETURNS TRIGGER AS $$
             BEGIN
@@ -242,25 +263,31 @@ def setup_session_mapping_schema():
                 RETURN NEW;
             END;
             $$ LANGUAGE plpgsql;
-        """)
+        """
+        )
 
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TRIGGER update_session_mapping_updated_at
                 BEFORE UPDATE ON session_mapping
                 FOR EACH ROW
                 EXECUTE FUNCTION update_updated_at_column();
-        """)
+        """
+        )
 
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TRIGGER update_artifact_storage_updated_at
                 BEFORE UPDATE ON artifact_storage
                 FOR EACH ROW
                 EXECUTE FUNCTION update_updated_at_column();
-        """)
+        """
+        )
 
         # 创建视图 - 便于查询
         print("👁️ 创建视图...")
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE OR REPLACE VIEW session_overview AS
             SELECT 
                 sm.id,
@@ -282,26 +309,37 @@ def setup_session_mapping_schema():
             LEFT JOIN message_history mh ON sm.id = mh.session_id
             LEFT JOIN artifact_storage ars ON sm.id = ars.session_id
             GROUP BY sm.id, sm.thread_id, sm.url_param, sm.frontend_uuid, sm.session_title, sm.status, sm.created_at, sm.last_activity_at, up.display_name;
-        """)
+        """
+        )
 
         conn.commit()
         print("✅ 会话映射系统创建成功!")
 
         # 验证表创建
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT table_name FROM information_schema.tables 
             WHERE table_schema = 'public' 
             AND table_name IN ('session_mapping', 'session_config', 'execution_record', 'message_history', 'artifact_storage')
             ORDER BY table_name;
-        """)
+        """
+        )
 
         tables = cursor.fetchall()
         print(f"📊 创建的表: {[t[0] for t in tables]}")
 
         # 显示表统计
         print("\n📈 表结构统计:")
-        for table_name in ['session_mapping', 'session_config', 'execution_record', 'message_history', 'artifact_storage']:
-            cursor.execute(f"SELECT COUNT(*) FROM information_schema.columns WHERE table_name = '{table_name}' AND table_schema = 'public';")
+        for table_name in [
+            "session_mapping",
+            "session_config",
+            "execution_record",
+            "message_history",
+            "artifact_storage",
+        ]:
+            cursor.execute(
+                f"SELECT COUNT(*) FROM information_schema.columns WHERE table_name = '{table_name}' AND table_schema = 'public';"
+            )
             column_count = cursor.fetchone()[0]
             print(f"   {table_name}: {column_count} 列")
 
@@ -316,4 +354,4 @@ def setup_session_mapping_schema():
 
 if __name__ == "__main__":
     success = setup_session_mapping_schema()
-    exit(0 if success else 1) 
+    exit(0 if success else 1)

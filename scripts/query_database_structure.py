@@ -25,7 +25,8 @@ def query_database_structure():
 
         # 1. 查询所有表
         print("📊 所有表结构:")
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT 
                 schemaname as schema_name,
                 tablename as table_name,
@@ -33,8 +34,9 @@ def query_database_structure():
             FROM pg_tables 
             WHERE schemaname IN ('public', 'auth', 'storage', 'realtime')
             ORDER BY schemaname, tablename;
-        """)
-        
+        """
+        )
+
         tables = cursor.fetchall()
         current_schema = None
         for schema, table, owner in tables:
@@ -45,14 +47,16 @@ def query_database_structure():
 
         # 2. 查询checkpoint相关表
         print("\n\n🔄 Checkpoint相关表:")
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT table_name 
             FROM information_schema.tables 
             WHERE table_schema = 'public' 
             AND table_name LIKE '%checkpoint%'
             ORDER BY table_name;
-        """)
-        
+        """
+        )
+
         checkpoint_tables = cursor.fetchall()
         if checkpoint_tables:
             for table in checkpoint_tables:
@@ -62,20 +66,23 @@ def query_database_structure():
 
         # 3. 查询public schema中的详细表结构
         print("\n\n📋 Public Schema 表详细结构:")
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT table_name 
             FROM information_schema.tables 
             WHERE table_schema = 'public' 
             ORDER BY table_name;
-        """)
-        
+        """
+        )
+
         public_tables = cursor.fetchall()
         for table in public_tables:
             table_name = table[0]
             print(f"\n🗂️  {table_name}:")
-            
+
             # 查询列信息
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT 
                     column_name,
                     data_type,
@@ -86,18 +93,23 @@ def query_database_structure():
                 WHERE table_schema = 'public' 
                 AND table_name = %s
                 ORDER BY ordinal_position;
-            """, (table_name,))
-            
+            """,
+                (table_name,),
+            )
+
             columns = cursor.fetchall()
             for col_name, data_type, nullable, default, max_length in columns:
                 nullable_str = "NULL" if nullable == "YES" else "NOT NULL"
                 default_str = f" DEFAULT {default}" if default else ""
                 length_str = f"({max_length})" if max_length else ""
-                print(f"   - {col_name}: {data_type}{length_str} {nullable_str}{default_str}")
+                print(
+                    f"   - {col_name}: {data_type}{length_str} {nullable_str}{default_str}"
+                )
 
         # 4. 查询索引
         print("\n\n📇 索引信息:")
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT 
                 schemaname,
                 tablename,
@@ -106,8 +118,9 @@ def query_database_structure():
             FROM pg_indexes 
             WHERE schemaname = 'public'
             ORDER BY tablename, indexname;
-        """)
-        
+        """
+        )
+
         indexes = cursor.fetchall()
         current_table = None
         for schema, table, index_name, index_def in indexes:
@@ -119,7 +132,8 @@ def query_database_structure():
 
         # 5. 查询外键约束
         print("\n\n🔗 外键约束:")
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT
                 tc.table_name,
                 kcu.column_name,
@@ -136,11 +150,20 @@ def query_database_structure():
             WHERE tc.constraint_type = 'FOREIGN KEY'
             AND tc.table_schema = 'public'
             ORDER BY tc.table_name, kcu.column_name;
-        """)
-        
+        """
+        )
+
         foreign_keys = cursor.fetchall()
-        for table, column, foreign_table, foreign_column, constraint_name in foreign_keys:
-            print(f"   {table}.{column} -> {foreign_table}.{foreign_column} ({constraint_name})")
+        for (
+            table,
+            column,
+            foreign_table,
+            foreign_column,
+            constraint_name,
+        ) in foreign_keys:
+            print(
+                f"   {table}.{column} -> {foreign_table}.{foreign_column} ({constraint_name})"
+            )
 
         cursor.close()
         conn.close()
@@ -154,4 +177,4 @@ def query_database_structure():
 
 if __name__ == "__main__":
     success = query_database_structure()
-    exit(0 if success else 1) 
+    exit(0 if success else 1)

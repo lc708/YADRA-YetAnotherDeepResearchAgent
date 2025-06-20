@@ -106,10 +106,12 @@ async def get_graph_instance():
 
 # Import and include research stream router
 from src.server.research_stream_api import router as research_stream_router
+
 app.include_router(research_stream_router)
 
 # Import and include research create router
 from src.server.research_create_api import router as research_ask_router
+
 app.include_router(research_ask_router)
 
 
@@ -613,10 +615,10 @@ async def startup():
     """Server startup event handler."""
     # 初始化日志系统
     setup_logging(log_dir="logs", log_level="INFO")
-    app_logger.info("🚀 YADRA Server starting up", 
-                   version="1.0.0", 
-                   python_version=sys.version)
-    
+    app_logger.info(
+        "🚀 YADRA Server starting up", version="1.0.0", python_version=sys.version
+    )
+
     # 现有的启动逻辑
     await setup_user_tables()
     await get_graph_instance()

@@ -7,6 +7,7 @@ import os
 import psycopg
 from dotenv import load_dotenv
 
+
 def query_foreign_keys():
     load_dotenv()
     database_url = os.getenv("DATABASE_URL")
@@ -15,7 +16,8 @@ def query_foreign_keys():
     cursor = conn.cursor()
 
     print("🔗 外键约束详情:")
-    cursor.execute("""
+    cursor.execute(
+        """
         SELECT
             tc.table_name,
             kcu.column_name,
@@ -32,17 +34,27 @@ def query_foreign_keys():
         WHERE tc.constraint_type = 'FOREIGN KEY'
         AND tc.table_schema = 'public'
         ORDER BY tc.table_name, kcu.column_name;
-    """)
+    """
+    )
 
     foreign_keys = cursor.fetchall()
     if foreign_keys:
-        for table, column, foreign_table, foreign_column, constraint_name in foreign_keys:
-            print(f"   {table}.{column} -> {foreign_table}.{foreign_column} ({constraint_name})")
+        for (
+            table,
+            column,
+            foreign_table,
+            foreign_column,
+            constraint_name,
+        ) in foreign_keys:
+            print(
+                f"   {table}.{column} -> {foreign_table}.{foreign_column} ({constraint_name})"
+            )
     else:
         print("   未找到外键约束")
 
     cursor.close()
     conn.close()
 
+
 if __name__ == "__main__":
-    query_foreign_keys() 
+    query_foreign_keys()

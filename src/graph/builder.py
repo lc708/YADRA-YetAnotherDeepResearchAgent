@@ -30,10 +30,10 @@ def continue_to_running_research_team(state: State):
     current_plan = state.get("current_plan")
     if not current_plan or not current_plan.steps:
         return "planner"
-    
+
     if all(step.execution_res for step in current_plan.steps):
         return "planner"
-    
+
     for step in current_plan.steps:
         if not step.execution_res:
             break
@@ -88,28 +88,30 @@ def _get_postgres_checkpointer():
             # 创建连接池
             _global_connection_pool = ConnectionPool(
                 database_url,
-                min_size=2,      # 最小连接数
-                max_size=10,     # 最大连接数
-                max_idle=300,    # 最大空闲时间（秒）
+                min_size=2,  # 最小连接数
+                max_size=10,  # 最大连接数
+                max_idle=300,  # 最大空闲时间（秒）
                 max_lifetime=3600,  # 连接最大生存时间（秒）
                 kwargs={
                     "autocommit": True,
                     "row_factory": dict_row,
-                    "connect_timeout": 30,    # 连接超时
+                    "connect_timeout": 30,  # 连接超时
                     "server_settings": {
                         "application_name": "yadra_agent",
                         "tcp_keepalives_idle": "600",
                         "tcp_keepalives_interval": "30",
                         "tcp_keepalives_count": "3",
-                    }
-                }
+                    },
+                },
             )
 
             # 使用连接池创建 checkpointer
             _global_checkpointer = PostgresSaver.from_conn_pool(_global_connection_pool)
             _global_checkpointer.setup()
 
-            logger.info("✅ PostgresSaver with connection pool initialized successfully")
+            logger.info(
+                "✅ PostgresSaver with connection pool initialized successfully"
+            )
         except Exception as e:
             logger.error(f"❌ Failed to initialize PostgresSaver: {e}")
             raise
