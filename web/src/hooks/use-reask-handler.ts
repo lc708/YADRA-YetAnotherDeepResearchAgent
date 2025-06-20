@@ -7,12 +7,15 @@ import { useRouter, usePathname } from "next/navigation";
 import { toast } from "sonner";
 import { useUnifiedStore } from "~/core/store/unified-store";
 
-interface OriginalInput {
+export interface OriginalInput {
   thread_id: string;
   original_input: string;
 }
 
-export function useReaskHandler() {
+export function useReaskHandler(options?: {
+  onRestore?: (input: string) => void;
+  onError?: (error: Error) => void;
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const currentThreadId = useUnifiedStore((state) => state.currentThreadId);
@@ -24,6 +27,9 @@ export function useReaskHandler() {
     
     // 保存原始输入
     originalInputRef.current = original_input;
+    
+    // 调用回调函数
+    options?.onRestore?.(original_input);
     
     // 如果在 workspace 页面，导航到新的页面
     if (pathname.startsWith("/workspace/")) {

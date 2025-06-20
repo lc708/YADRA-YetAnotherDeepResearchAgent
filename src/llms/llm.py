@@ -71,7 +71,7 @@ def _create_llm_use_conf(
     # 创建自定义的httpx客户端来解决SSL连接问题
     http_client = httpx.Client(
         verify=False,  # 跳过SSL验证
-        timeout=60.0,  # 增加超时时间
+        timeout=120.0,  # 增加超时时间到120秒
         limits=httpx.Limits(max_connections=10, max_keepalive_connections=5),
     )
 
@@ -79,8 +79,9 @@ def _create_llm_use_conf(
     merged_conf.update(
         {
             "http_client": http_client,
-            "max_retries": 2,  # 减少重试次数
-            "timeout": 60.0,  # 设置超时
+            "max_retries": 3,  # 增加重试次数
+            "timeout": 120.0,  # 设置超时120秒
+            "request_timeout": 120.0,  # 请求超时
         }
     )
 

@@ -6,6 +6,7 @@ import { type Metadata } from "next";
 import Script from "next/script";
 
 import { ThemeProviderWrapper } from "~/components/yadra/theme-provider-wrapper";
+import { GlobalSidebar } from "~/components/layout/global-sidebar";
 import { loadConfig } from "~/core/api/config";
 import { env } from "~/env";
 
@@ -43,7 +44,17 @@ export default async function RootLayout({
         </Script>
       </head>
       <body className="bg-app">
-        <ThemeProviderWrapper>{children}</ThemeProviderWrapper>
+        <ThemeProviderWrapper>
+          <div className="flex h-screen">
+            {/* 全局左侧边栏 */}
+            <GlobalSidebar />
+            
+            {/* 主要内容区域 */}
+            <main className="flex-1 overflow-hidden">
+              {children}
+            </main>
+          </div>
+        </ThemeProviderWrapper>
         <Toaster />
         {
           // NO USER BEHAVIOR TRACKING OR PRIVATE DATA COLLECTION BY DEFAULT

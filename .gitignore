@@ -35,3 +35,7 @@ todos/
 
 # cursor
 .cursor/
+
+# logs
+logs/
+*.log

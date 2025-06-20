@@ -7,6 +7,8 @@ from langgraph.checkpoint.postgres import PostgresSaver
 from src.prompts.planner_model import StepType
 import psycopg
 from psycopg.rows import dict_row
+import psycopg_pool
+from psycopg_pool import ConnectionPool
 
 logger = logging.getLogger(__name__)
 
@@ -28,8 +30,10 @@ def continue_to_running_research_team(state: State):
     current_plan = state.get("current_plan")
     if not current_plan or not current_plan.steps:
         return "planner"
+
     if all(step.execution_res for step in current_plan.steps):
         return "planner"
+
     for step in current_plan.steps:
         if not step.execution_res:
             break
@@ -65,32 +69,49 @@ def _build_base_graph():
 
 
 # Global PostgresSaver connection
-_global_connection = None
+_global_connection_pool = None
 _global_checkpointer = None
 
 
 def _get_postgres_checkpointer():
-    """Get or create PostgreSQL checkpointer."""
-    global _global_checkpointer, _global_connection
+    """Get or create PostgreSQL checkpointer with connection pool."""
+    global _global_checkpointer, _global_connection_pool
 
     if _global_checkpointer is None:
         database_url = os.getenv("DATABASE_URL")
         if not database_url:
             raise ValueError("DATABASE_URL environment variable is required")
 
-        logger.info("🔄 Initializing PostgresSaver...")
+        logger.info("🔄 Initializing PostgresSaver with connection pool...")
 
         try:
-            # Create a persistent connection with proper settings
-            _global_connection = psycopg.connect(
-                database_url, autocommit=True, row_factory=dict_row
+            # 创建连接池
+            _global_connection_pool = ConnectionPool(
+                database_url,
+                min_size=2,  # 最小连接数
+                max_size=10,  # 最大连接数
+                max_idle=300,  # 最大空闲时间（秒）
+                max_lifetime=3600,  # 连接最大生存时间（秒）
+                kwargs={
+                    "autocommit": True,
+                    "row_factory": dict_row,
+                    "connect_timeout": 30,  # 连接超时
+                    "server_settings": {
+                        "application_name": "yadra_agent",
+                        "tcp_keepalives_idle": "600",
+                        "tcp_keepalives_interval": "30",
+                        "tcp_keepalives_count": "3",
+                    },
+                },
             )
 
-            # Create checkpointer with the connection
-            _global_checkpointer = PostgresSaver(_global_connection)
+            # 使用连接池创建 checkpointer
+            _global_checkpointer = PostgresSaver.from_conn_pool(_global_connection_pool)
             _global_checkpointer.setup()
 
-            logger.info("✅ PostgresSaver initialized successfully")
+            logger.info(
+                "✅ PostgresSaver with connection pool initialized successfully"
+            )
         except Exception as e:
             logger.error(f"❌ Failed to initialize PostgresSaver: {e}")
             raise
@@ -113,13 +134,13 @@ def build_graph():
 
 def cleanup_postgres_resources():
     """Cleanup PostgreSQL resources."""
-    global _global_connection, _global_checkpointer
+    global _global_connection_pool, _global_checkpointer
 
-    if _global_connection:
-        _global_connection.close()
-        _global_connection = None
+    if _global_connection_pool:
+        _global_connection_pool.close()
+        _global_connection_pool = None
         _global_checkpointer = None
-        logger.info("✅ PostgreSQL resources cleaned up")
+        logger.info("✅ PostgreSQL connection pool cleaned up")
 
 
 # Create default graph instance (without memory to avoid database dependency during import)

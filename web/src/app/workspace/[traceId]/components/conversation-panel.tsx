@@ -7,22 +7,18 @@ import { motion } from "framer-motion";
 import { MessageSquare } from "lucide-react";
 import { useCallback, useMemo, useRef, useEffect } from "react";
 
-import { 
-  MessageBubble, 
-  ResearchCard, 
-  PlanCard, 
-  PodcastCard 
-} from "~/app/chat/components/message-list-view";
+// 使用新的组件系统，fallback到旧组件
+import { MessageContainer, type Message as NewMessage } from "~/components/conversation/message-container";
+import { ScrollContainer, type ScrollContainerRef } from "~/components/conversation/scroll-container";
+import { LoadingAnimation } from "~/components/conversation/loading-animation";
+import { MarkdownRenderer } from "~/components/conversation/markdown-renderer";
+
+// 使用yadra组件作为fallback
+import { Markdown } from "~/components/yadra/markdown";
 import {
   Card,
   CardContent,
 } from "~/components/ui/card";
-import { LoadingAnimation } from "~/components/yadra/loading-animation";
-import { Markdown } from "~/components/yadra/markdown";
-import {
-  ScrollContainer,
-  type ScrollContainerRef,
-} from "~/components/yadra/scroll-container";
 import type { Message, Option, Resource } from "~/core/messages";
 import {
   useMessageIds,
@@ -52,11 +48,28 @@ export function ConversationPanel({
   onSendMessage,
 }: ConversationPanelProps) {
   const scrollContainerRef = useRef<ScrollContainerRef>(null);
-  const messageIds = useMessageIds();
+  
+  // 🔥 调试：打印参数和获取的消息
+  console.log('[ConversationPanel] traceId:', traceId);
+  
+  const messageIds = useMessageIds(traceId) || []; // 🔥 修复：传入traceId参数
   const threadData = useCurrentThread();
-  const interruptMessage = threadData?.ui.lastInterruptMessageId 
-    ? useMessage(threadData.ui.lastInterruptMessageId) 
-    : null;
+  
+  // 🔥 调试：打印获取的消息数量和thread信息
+  console.log('[ConversationPanel] messageIds:', messageIds);
+  console.log('[ConversationPanel] messageIds.length:', messageIds.length);
+  console.log('[ConversationPanel] currentThread:', threadData);
+  
+  // 🔥 获取URL参数到thread_id的映射，用于调试
+  const urlParamToThreadId = useUnifiedStore((state) => state.urlParamToThreadId);
+  const mappedThreadId = urlParamToThreadId.get(traceId);
+  console.log('[ConversationPanel] URL param mapping:', traceId, '->', mappedThreadId);
+  
+  // 修复条件Hook调用 - 始终调用useMessage，然后根据条件使用结果
+  const lastInterruptMessageId = threadData?.ui.lastInterruptMessageId;
+  const interruptMessageResult = useMessage(lastInterruptMessageId || "");
+  const interruptMessage = lastInterruptMessageId ? interruptMessageResult : null;
+  
   const waitingForFeedbackMessageId = threadData?.ui.waitingForFeedbackMessageId || null;
   const responding = useUnifiedStore((state) => state.responding);
   const openResearchId = threadData?.metadata.openResearchId;
@@ -104,7 +117,11 @@ export function ConversationPanel({
   // 初始化workspace集成
   useEffect(() => {
     const store = useUnifiedStore.getState();
-    store.setCurrentThread(traceId);
+    // traceId实际上是URL参数，需要映射到真正的thread_id
+    const realThreadId = store.getThreadIdByUrlParam(traceId);
+    if (realThreadId) {
+      store.setCurrentThread(realThreadId);
+    }
     store.setWorkspaceState({ currentTraceId: traceId });
 
     return () => {
@@ -125,97 +142,81 @@ export function ConversationPanel({
     };
   }, []);
 
-  // 如果面板被隐藏，显示最小化状态
-  if (!conversationVisible) {
-    return (
-      <div className={cn("flex h-full w-full items-center justify-center", className)}>
-        <Card className="w-full max-w-sm">
-          <CardContent className="flex flex-col items-center gap-4 p-6">
-            <MessageSquare className="h-12 w-12 text-muted-foreground" />
-            <div className="text-center">
-              <h3 className="font-semibold">对话面板已隐藏</h3>
-              <p className="text-sm text-muted-foreground">
-                点击右上角按钮展开对话历史
-              </p>
+  // 渲染内容 - 移除条件提前返回，改为条件渲染
+  const renderContent = () => {
+    if (!conversationVisible) {
+      return (
+        <div className={cn("flex h-full w-full items-center justify-center", className)}>
+          <div className="w-full max-w-sm">
+            <div className="flex flex-col items-center gap-4 p-6">
+              <MessageSquare className="h-12 w-12 text-white/60" />
+              <div className="text-center">
+                <h3 className="font-semibold text-white">对话面板已隐藏</h3>
+                <p className="text-sm text-white/60">
+                  点击右上角按钮展开对话历史
+                </p>
+              </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className={cn("flex h-full w-full flex-col", className)}>
+        {/* 消息列表 - 移除标题栏，直接显示消息 */}
+        <div className="flex-1 overflow-hidden">
+          <ScrollContainer
+            ref={scrollContainerRef}
+            className="h-full p-4"
+            autoScrollToBottom={true}
+          >
+            <div className="space-y-4">
+              {messageIds.length === 0 ? (
+                <div className="flex items-center justify-center h-40">
+                  <div className="text-center">
+                    <MessageSquare className="h-8 w-8 text-white/40 mx-auto mb-2" />
+                    <p className="text-white/60 text-sm">暂无对话消息</p>
+                    {process.env.NODE_ENV === 'development' && (
+                      <p className="text-blue-400 text-xs mt-1">
+                        Debug: traceId={traceId}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                messageIds.map((messageId, index) => (
+                  <ConversationMessageItem
+                    key={messageId}
+                    messageId={messageId}
+                    className={index === messageIds.length - 1 ? "mb-4" : ""}
+                    waitForFeedback={waitingForFeedbackMessageId === messageId}
+                    interruptMessage={interruptMessage}
+                    onFeedback={handleFeedback}
+                    onSendMessage={handleSendMessage}
+                    onToggleResearch={handleToggleResearch}
+                  />
+                ))
+              )}
+              
+              {/* 加载状态 */}
+              {responding && (
+                <div className="flex items-center gap-2 p-4 text-white/60">
+                  <LoadingOutlined className="animate-spin" />
+                  <span className="text-sm">AI正在思考和回复...</span>
+                </div>
+              )}
+            </div>
+          </ScrollContainer>
+        </div>
       </div>
     );
-  }
+  };
 
-  return (
-    <div className={cn("flex h-full w-full flex-col", className)}>
-      {/* 面板标题栏 */}
-      <div className="flex items-center justify-between border-b bg-background/50 px-4 py-3 backdrop-blur-sm">
-        <div className="flex items-center gap-2">
-          <MessageSquare className="h-5 w-5" />
-          <h3 className="font-semibold">实时对话</h3>
-          <span className="text-xs text-muted-foreground">
-            ({messageIds.length} 条消息)
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
-          {responding && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <LoadingOutlined className="animate-spin" />
-              <span>AI正在回复...</span>
-            </div>
-          )}
-          {/* 调试信息 */}
-          {process.env.NODE_ENV === 'development' && (
-            <div className="text-xs text-muted-foreground">
-              Debug: {interruptMessage ? '有中断消息' : '无中断消息'} | 
-              等待反馈: {waitingForFeedbackMessageId ? '是' : '否'}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* 消息列表 */}
-      <div className="flex-1 overflow-hidden">
-        <ScrollContainer
-          className="flex h-full w-full flex-col overflow-hidden"
-          scrollShadowColor="var(--app-background)"
-          autoScrollToBottom
-          ref={scrollContainerRef}
-        >
-          <ul className="flex flex-col">
-            {messageIds.length === 0 ? (
-              <div className="flex h-full items-center justify-center p-8">
-                <div className="text-center">
-                  <MessageSquare className="mx-auto h-12 w-12 text-muted-foreground" />
-                  <h3 className="mt-4 font-semibold">暂无对话消息</h3>
-                  <p className="text-sm text-muted-foreground">
-                    开始研究后，对话消息将在这里显示
-                  </p>
-                </div>
-              </div>
-            ) : (
-              messageIds.map((messageId) => (
-                <ConversationMessageItem
-                  key={messageId}
-                  messageId={messageId}
-                  waitForFeedback={waitingForFeedbackMessageId === messageId}
-                  interruptMessage={interruptMessage}
-                  onFeedback={handleFeedback}
-                  onSendMessage={handleSendMessage}
-                  onToggleResearch={handleToggleResearch}
-                />
-              ))
-            )}
-            <div className="flex h-8 w-full shrink-0"></div>
-          </ul>
-          {responding && (noOngoingResearch || !ongoingResearchIsOpen) && (
-            <LoadingAnimation className="ml-4" />
-          )}
-        </ScrollContainer>
-      </div>
-    </div>
-  );
+  return renderContent();
 }
 
-// 消息项组件，复用MessageListView的逻辑
+// 消息项组件，使用新的组件系统
 function ConversationMessageItem({
   className,
   messageId,
@@ -245,6 +246,20 @@ function ConversationMessageItem({
 
   if (!message) return null;
 
+  // 适配Message类型到新组件的格式
+  const adaptedMessage: NewMessage = {
+    id: message.id,
+    role: message.role as "user" | "assistant" | "system",
+    content: message.content || "",
+    timestamp: new Date(), // Message类型暂无timestamp字段
+    isStreaming: message.isStreaming || false,
+    metadata: {
+      model: message.agent,
+      reasoning: message.reasoningContent || undefined,
+      artifacts: [] // Message类型暂无artifacts字段
+    }
+  };
+
   if (
     message.role === "user" ||
     message.agent === "coordinator" ||
@@ -254,56 +269,64 @@ function ConversationMessageItem({
   ) {
     let content: React.ReactNode;
     
-    if (message.agent === "planner") {
-      content = (
-        <div className="w-full px-4">
-          <PlanCard
-            message={message}
-            waitForFeedback={waitForFeedback}
-            interruptMessage={interruptMessage}
-            onFeedback={onFeedback}
-            onSendMessage={onSendMessage}
-          />
-        </div>
-      );
-    } else if (message.agent === "podcast") {
-      content = (
-        <div className="w-full px-4">
-          <PodcastCard message={message} />
-        </div>
-      );
-    } else if (startOfResearch) {
-      content = (
-        <div className="w-full px-4">
-          <ResearchCard
-            researchId={message.id}
-            onToggleResearch={onToggleResearch}
-          />
-        </div>
-      );
-    } else {
-      content = message.content ? (
-        <div
-          className={cn(
-            "flex w-full px-4",
-            message.role === "user" && "justify-end",
-            className,
-          )}
-        >
-          <MessageBubble message={message}>
-            <div className="flex w-full flex-col text-wrap break-words">
-              <Markdown
-                className={cn(
-                  message.role === "user" &&
-                    "prose-invert not-dark:text-secondary dark:text-inherit",
-                )}
-              >
-                {message?.content}
-              </Markdown>
-            </div>
-          </MessageBubble>
-        </div>
-      ) : null;
+    // 简化版本：先只处理基本消息，特殊类型后续实现
+    if (message.content) {
+      if (message.agent === "planner") {
+        // TODO: 实现计划显示
+        content = (
+          <div className="w-full px-4">
+            <MessageContainer
+              message={adaptedMessage}
+              showAvatar={true}
+              showTimestamp={true}
+              showActions={false}
+              className="border-l-4 border-l-blue-500 bg-blue-50/50 dark:bg-blue-950/20"
+            />
+          </div>
+        );
+      } else if (message.agent === "podcast") {
+        // TODO: 实现播客显示
+        content = (
+          <div className="w-full px-4">
+            <MessageContainer
+              message={adaptedMessage}
+              showAvatar={true}
+              showTimestamp={true}
+              showActions={false}
+              className="border-l-4 border-l-purple-500 bg-purple-50/50 dark:bg-purple-950/20"
+            />
+          </div>
+        );
+      } else if (startOfResearch) {
+        // TODO: 实现研究进度显示
+        content = (
+          <div className="w-full px-4">
+            <MessageContainer
+              message={adaptedMessage}
+              showAvatar={true}
+              showTimestamp={true}
+              showActions={false}
+              className="border-l-4 border-l-green-500 bg-green-50/50 dark:bg-green-950/20"
+            />
+          </div>
+        );
+      } else {
+        // 基本消息显示
+        content = (
+          <div className="w-full px-4">
+            <MessageContainer
+              message={adaptedMessage}
+              showAvatar={true}
+              showTimestamp={true}
+              showActions={true}
+              onCopy={(content) => {
+                navigator.clipboard.writeText(content);
+              }}
+              className={className}
+            />
+          </div>
+        );
+      }
     }
 
     if (content) {
@@ -326,4 +349,4 @@ function ConversationMessageItem({
   }
 
   return null;
-} 
+}

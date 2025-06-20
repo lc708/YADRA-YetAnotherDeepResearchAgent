@@ -118,11 +118,6 @@ function generateNodeName(message: Message): string {
  * 判断Message是否应该转换为Artifact
  */
 function shouldConvertToArtifact(message: Message): boolean {
-  // 跳过正在流式传输的消息
-  if (message.isStreaming) {
-    return false;
-  }
-  
   // 跳过空内容的消息
   if (!message.content || message.content.trim() === "") {
     return false;
@@ -133,7 +128,61 @@ function shouldConvertToArtifact(message: Message): boolean {
     return false;
   }
   
-  return true;
+  // 🔥 新增：过滤掉过程节点的消息
+  // 检查是否是系统过程消息（如"🚀 开始执行"、"⏳ 正在协调"等）
+  const processIndicators = [
+    '🚀 开始执行',
+    '⏳ 正在',
+    '🔍 搜索完成',
+    '🎉 研究完成',
+    '❌ 错误',
+    '✅ 任务',
+    'Hi! I\'m YADRA',
+    'Hi there! I\'m YADRA',
+    'Hello'
+  ];
+  
+  // 如果内容是这些过程指示符之一，不转换为artifact
+  if (processIndicators.some(indicator => message.content.startsWith(indicator))) {
+    return false;
+  }
+  
+  // 🔥 新增：检查metadata中的事件类型
+  if (message.metadata) {
+    // 如果是进度事件、完成事件、错误事件等，不转换为artifact
+    if (message.metadata.progressEvent || 
+        message.metadata.completeEvent || 
+        message.metadata.errorEvent ||
+        message.metadata.nodeEvent) {
+      return false;
+    }
+  }
+  
+  // 🔥 新增：只有特定的agent输出才应该成为artifact
+  if (message.agent) {
+    const artifactAgents = ['planner', 'reporter', 'podcast'];
+    if (!artifactAgents.includes(message.agent)) {
+      // coordinator和researcher的普通消息不应该成为artifact
+      // 除非它们包含特定的内容（如研究计划、研究报告等）
+      if (!message.metadata?.planEvent && !message.metadata?.artifactEvent) {
+        return false;
+      }
+    }
+  }
+  
+  // 对于已完成的消息，如果通过了上述过滤，则转换为工件
+  if (!message.isStreaming) {
+    return true;
+  }
+  
+  // 对于正在流式传输的消息，如果内容已经足够丰富，也应该转换为工件
+  // 这样用户可以实时看到进展
+  if (message.isStreaming && message.content.trim().length >= 50) {
+    return true;
+  }
+  
+  // 跳过内容太少的流式消息
+  return false;
 }
 
 /**
@@ -368,4 +417,4 @@ export class WorkspaceStateAdapter {
 /**
  * 全局适配器实例
  */
-export const workspaceStateAdapter = new WorkspaceStateAdapter(); 
+export const workspaceStateAdapter = new WorkspaceStateAdapter();

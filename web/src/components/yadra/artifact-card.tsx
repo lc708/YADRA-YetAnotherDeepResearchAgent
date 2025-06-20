@@ -135,7 +135,7 @@ export function ArtifactCard({
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => onEdit(artifact)}
+                onClick={() => onEdit?.(artifact)}
                 className="h-7 w-7 p-0"
                 disabled
                 title="编辑功能正在开发中"

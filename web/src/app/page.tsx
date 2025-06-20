@@ -2,14 +2,14 @@
 
 import { useMemo } from "react";
 
-import { SiteHeader } from "./chat/components/site-header";
+// import { SiteHeader } from "./chat/components/site-header"; // TODO: 重新实现SiteHeader
 import { HeroSection } from "./landing/components/hero-section";
 import { Ray } from "./landing/components/ray";
 
 export default function HomePage() {
   return (
     <div className="flex flex-col items-center min-h-screen">
-      <SiteHeader />
+      {/* TODO: 重新实现SiteHeader */}
       <main className="flex-1 w-full">
         <HeroSection />
       </main>

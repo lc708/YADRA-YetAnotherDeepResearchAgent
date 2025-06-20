@@ -7,6 +7,7 @@ import logging
 import os
 from typing import Annotated, List, cast, Optional
 from uuid import uuid4
+import sys
 
 from fastapi import FastAPI, HTTPException, Query, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
@@ -64,6 +65,9 @@ from src.server.supabase_auth_api import (
     update_user_profile,
 )
 
+# 添加日志导入
+from src.utils.logger import setup_logging, app_logger
+
 logger = logging.getLogger(__name__)
 
 INTERNAL_SERVER_ERROR_DETAIL = "Internal Server Error"
@@ -99,6 +103,16 @@ async def get_graph_instance():
 # TODO: Fix circular import issue
 # from src.server.checkpoint_api import router as checkpoint_router
 # app.include_router(checkpoint_router)
+
+# Import and include research stream router
+from src.server.research_stream_api import router as research_stream_router
+
+app.include_router(research_stream_router)
+
+# Import and include research create router
+from src.server.research_create_api import router as research_ask_router
+
+app.include_router(research_ask_router)
 
 
 @app.post("/api/chat/stream")
@@ -595,17 +609,20 @@ async def create_task(
     return await create_or_update_task(current_user["user_id"], thread_id, task_name)
 
 
-# 启动时设置用户表
+# 在应用启动事件中初始化日志
 @app.on_event("startup")
-async def startup_event():
-    """Initialize resources on startup."""
-    # Setup user tables
+async def startup():
+    """Server startup event handler."""
+    # 初始化日志系统
+    setup_logging(log_dir="logs", log_level="INFO")
+    app_logger.info(
+        "🚀 YADRA Server starting up", version="1.0.0", python_version=sys.version
+    )
+
+    # 现有的启动逻辑
     await setup_user_tables()
-
-    # Pre-create the graph instance
     await get_graph_instance()
-
-    logger.info("Server startup complete")
+    app_logger.info("✅ Server startup complete")
 
 
 @app.on_event("shutdown")

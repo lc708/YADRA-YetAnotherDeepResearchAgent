@@ -24,6 +24,53 @@ import { messageToArtifact } from "~/core/adapters/state-adapter";
 // Enable Immer MapSet plugin
 enableMapSet();
 
+// 🚀 扩展性接口定义 - ASK API研究请求
+export interface ResearchRequest {
+  question: string;
+  askType: 'initial' | 'followup';
+  config: AskAPIConfig;
+  context?: {
+    sessionId?: number;
+    threadId?: string;
+    urlParam?: string;
+  };
+  interrupt_feedback?: string; // 🔥 添加interrupt_feedback支持
+}
+
+// 🚀 ASK API配置接口 - 支持所有用户可配置选项
+export interface AskAPIConfig {
+  // 基础配置
+  autoAcceptedPlan: boolean;
+  enableBackgroundInvestigation: boolean;
+  reportStyle: "academic" | "popular_science" | "news" | "social_media";
+  enableDeepThinking: boolean;
+  
+  // 研究参数
+  maxPlanIterations: number;
+  maxStepNum: number;
+  maxSearchResults: number;
+  
+  // 扩展配置 - 为未来迭代预留
+  [key: string]: any;
+}
+
+// 🚀 ASK API事件处理器类型
+export type AskAPIEventHandler = {
+  onNavigation?: (data: any) => void | Promise<void>;
+  onMetadata?: (data: any) => void | Promise<void>;
+  onNodeStart?: (data: any) => void | Promise<void>;
+  onNodeComplete?: (data: any) => void | Promise<void>;
+  onPlanGenerated?: (data: any) => void | Promise<void>;
+  onSearchResults?: (data: any) => void | Promise<void>;
+  onAgentOutput?: (data: any) => void | Promise<void>;
+  onMessageChunk?: (data: any) => void | Promise<void>;
+  onArtifact?: (data: any) => void | Promise<void>;
+  onProgress?: (data: any) => void | Promise<void>;
+  onInterrupt?: (data: any) => void | Promise<void>;
+  onComplete?: (data: any) => void | Promise<void>;
+  onError?: (data: any) => void | Promise<void>;
+};
+
 // 线程状态
 interface ThreadState {
   id: string;
@@ -39,14 +86,34 @@ interface ThreadState {
   ui: {
     lastInterruptMessageId: string | null;
     waitingForFeedbackMessageId: string | null;
+    currentInterrupt: {
+      interruptId: string;
+      message: string;
+      options: Array<{text: string; value: string}>;
+      threadId: string;
+      executionId: string;
+      nodeName: string;
+      timestamp: string;
+      messageId: string; // 关联的消息ID
+    } | null;
   };
 }
 
-// Store 状态
-interface UnifiedStoreState {
-  // 线程管理
+// Store 类型 - 使用 zustand 推断类型而不是预定义接口
+type UnifiedStore = {
+  // 线程管理 - 新架构
   threads: Map<string, ThreadState>;
   currentThreadId: string | null;
+  currentUrlParam: string | null;  // 新增：当前URL参数
+  urlParamToThreadId: Map<string, string>; // 新增：URL参数到thread_id的映射
+  
+  // 会话状态 - 新架构
+  sessionState: {
+    sessionMetadata: any | null;
+    executionHistory: any[];
+    currentConfig: any | null;
+    permissions: any | null;
+  } | null;
   
   // 全局 UI 状态
   responding: boolean;
@@ -61,15 +128,20 @@ interface UnifiedStoreState {
     historyVisible: boolean;
     podcastVisible: boolean;
   };
-}
-
-// Store 操作
-interface UnifiedStoreActions {
-  // 线程管理
+  
+  // 线程管理 - 新架构方法
   createThread: (threadId: string) => ThreadState;
   getThread: (threadId: string) => ThreadState | null;
   setCurrentThread: (threadId: string | null) => void;
   clearThread: (threadId: string) => void;
+  
+  // URL参数映射 - 新增方法
+  setUrlParamMapping: (urlParam: string, threadId: string) => void;
+  getThreadIdByUrlParam: (urlParam: string) => string | null;
+  setCurrentUrlParam: (urlParam: string | null) => void;
+  
+  // 会话状态管理 - 新增方法
+  setSessionState: (state: UnifiedStore['sessionState']) => void;
   
   // 消息操作
   addMessage: (threadId: string, message: Message) => void;
@@ -86,21 +158,29 @@ interface UnifiedStoreActions {
   setInterruptMessage: (threadId: string, messageId: string | null) => void;
   setWaitingForFeedback: (threadId: string, messageId: string | null) => void;
   
+  // 🔥 添加interrupt事件管理方法
+  setCurrentInterrupt: (threadId: string, interruptData: ThreadState['ui']['currentInterrupt']) => void;
+  getCurrentInterrupt: (threadId: string) => ThreadState['ui']['currentInterrupt'];
+  clearCurrentInterrupt: (threadId: string) => void;
+  
   // 工作区操作
-  setWorkspaceState: (update: Partial<UnifiedStoreState['workspace']>) => void;
+  setWorkspaceState: (update: Partial<UnifiedStore['workspace']>) => void;
   
   // 派生数据
   getArtifacts: (threadId: string) => Artifact[];
   getMessageById: (threadId: string, messageId: string) => Message | undefined;
-}
+};
 
 // 创建 Store
-export const useUnifiedStore = create<UnifiedStoreState & UnifiedStoreActions>()(
+export const useUnifiedStore = create<UnifiedStore>()(
   subscribeWithSelector(
     immer((set, get) => ({
       // 初始状态
       threads: new Map(),
       currentThreadId: null,
+      currentUrlParam: null,
+      urlParamToThreadId: new Map(),
+      sessionState: null,
       responding: false,
       workspace: {
         currentTraceId: null,
@@ -128,6 +208,7 @@ export const useUnifiedStore = create<UnifiedStoreState & UnifiedStoreActions>()
           ui: {
             lastInterruptMessageId: null,
             waitingForFeedbackMessageId: null,
+            currentInterrupt: null,
           },
         };
         
@@ -161,6 +242,7 @@ export const useUnifiedStore = create<UnifiedStoreState & UnifiedStoreActions>()
               ui: {
                 lastInterruptMessageId: null,
                 waitingForFeedbackMessageId: null,
+                currentInterrupt: null,
               },
             };
             state.threads.set(threadId, thread);
@@ -174,6 +256,30 @@ export const useUnifiedStore = create<UnifiedStoreState & UnifiedStoreActions>()
           if (state.currentThreadId === threadId) {
             state.currentThreadId = null;
           }
+        });
+      },
+      
+      // URL参数映射 - 新增方法
+      setUrlParamMapping: (urlParam: string, threadId: string) => {
+        set((state) => {
+          state.urlParamToThreadId.set(urlParam, threadId);
+        });
+      },
+      
+      getThreadIdByUrlParam: (urlParam: string) => {
+        return get().urlParamToThreadId.get(urlParam) || null;
+      },
+      
+      setCurrentUrlParam: (urlParam: string | null) => {
+        set((state) => {
+          state.currentUrlParam = urlParam;
+        });
+      },
+      
+      // 会话状态管理 - 新增方法
+      setSessionState: (sessionState: UnifiedStore['sessionState']) => {
+        set((state) => {
+          state.sessionState = sessionState;
         });
       },
       
@@ -279,8 +385,31 @@ export const useUnifiedStore = create<UnifiedStoreState & UnifiedStoreActions>()
         });
       },
       
+      // 🔥 添加interrupt事件管理方法
+      setCurrentInterrupt: (threadId: string, interruptData: ThreadState['ui']['currentInterrupt']) => {
+        set((state) => {
+          const thread = state.threads.get(threadId);
+          if (thread) {
+            thread.ui.currentInterrupt = interruptData;
+          }
+        });
+      },
+      
+      getCurrentInterrupt: (threadId: string) => {
+        return get().threads.get(threadId)?.ui.currentInterrupt || null;
+      },
+      
+      clearCurrentInterrupt: (threadId: string) => {
+        set((state) => {
+          const thread = state.threads.get(threadId);
+          if (thread) {
+            thread.ui.currentInterrupt = null;
+          }
+        });
+      },
+      
       // 工作区操作
-      setWorkspaceState: (update: Partial<UnifiedStoreState['workspace']>) => {
+      setWorkspaceState: (update: Partial<UnifiedStore['workspace']>) => {
         set((state) => {
           Object.assign(state.workspace, update);
         });
@@ -325,22 +454,60 @@ export const useCurrentThread = () => {
   return thread;
 };
 
-export const useThreadMessages = (threadId?: string) => {
-  const actualThreadId = threadId || useUnifiedStore((state) => state.currentThreadId);
-  const messages = useUnifiedStore(
-    (state) => {
-      if (!actualThreadId) return [];
-      const thread = state.threads.get(actualThreadId);
-      return thread?.messages || [];
+export const useThreadMessages = (threadIdOrUrlParam?: string) => {
+  const currentThreadId = useUnifiedStore((state) => state.currentThreadId);
+  const threads = useUnifiedStore((state) => state.threads);
+  const urlParamToThreadId = useUnifiedStore((state) => state.urlParamToThreadId);
+  
+  // 解析实际的thread_id：可能是URL参数，需要映射
+  const actualThreadId = React.useMemo(() => {
+    if (threadIdOrUrlParam) {
+      // 首先尝试作为thread_id直接使用
+      if (threads.has(threadIdOrUrlParam)) {
+        return threadIdOrUrlParam;
+      }
+      // 然后尝试作为URL参数映射
+      const mappedThreadId = urlParamToThreadId.get(threadIdOrUrlParam);
+      if (mappedThreadId && threads.has(mappedThreadId)) {
+        return mappedThreadId;
+      }
     }
-  );
-  return messages;
+    return currentThreadId;
+  }, [threadIdOrUrlParam, currentThreadId, threads, urlParamToThreadId]);
+  
+  return React.useMemo(() => {
+    if (!actualThreadId) return [];
+    const thread = threads.get(actualThreadId);
+    return thread?.messages || [];
+  }, [actualThreadId, threads]);
 };
 
-export const useThreadArtifacts = (threadId?: string) => {
-  const actualThreadId = threadId || useUnifiedStore((state) => state.currentThreadId);
+export const useThreadArtifacts = (threadIdOrUrlParam?: string) => {
+  const currentThreadId = useUnifiedStore((state) => state.currentThreadId);
+  const threads = useUnifiedStore((state) => state.threads);
   const getArtifacts = useUnifiedStore((state) => state.getArtifacts);
-  return actualThreadId ? getArtifacts(actualThreadId) : [];
+  const urlParamToThreadId = useUnifiedStore((state) => state.urlParamToThreadId);
+  
+  // 解析实际的thread_id：可能是URL参数，需要映射
+  const actualThreadId = React.useMemo(() => {
+    if (threadIdOrUrlParam) {
+      // 首先尝试作为thread_id直接使用
+      if (threads.has(threadIdOrUrlParam)) {
+        return threadIdOrUrlParam;
+      }
+      // 然后尝试作为URL参数映射
+      const mappedThreadId = urlParamToThreadId.get(threadIdOrUrlParam);
+      if (mappedThreadId && threads.has(mappedThreadId)) {
+        return mappedThreadId;
+      }
+    }
+    return currentThreadId;
+  }, [threadIdOrUrlParam, currentThreadId, threads, urlParamToThreadId]);
+  
+  return React.useMemo(() => {
+    if (!actualThreadId) return [];
+    return getArtifacts(actualThreadId);
+  }, [actualThreadId, threads, getArtifacts]);
 };
 
 export const useWorkspaceState = () => {
@@ -348,10 +515,27 @@ export const useWorkspaceState = () => {
 };
 
 // 兼容旧 API 的 wrapper
-export const useMessageIds = (threadId?: string) => {
+export const useMessageIds = (threadIdOrUrlParam?: string) => {
   // 分两步获取，避免 selector 重建
   const currentThreadId = useUnifiedStore((state) => state.currentThreadId);
-  const actualThreadId = threadId || currentThreadId;
+  const threads = useUnifiedStore((state) => state.threads);
+  const urlParamToThreadId = useUnifiedStore((state) => state.urlParamToThreadId);
+  
+  // 解析实际的thread_id：可能是URL参数，需要映射
+  const actualThreadId = React.useMemo(() => {
+    if (threadIdOrUrlParam) {
+      // 首先尝试作为thread_id直接使用
+      if (threads.has(threadIdOrUrlParam)) {
+        return threadIdOrUrlParam;
+      }
+      // 然后尝试作为URL参数映射
+      const mappedThreadId = urlParamToThreadId.get(threadIdOrUrlParam);
+      if (mappedThreadId && threads.has(mappedThreadId)) {
+        return mappedThreadId;
+      }
+    }
+    return currentThreadId;
+  }, [threadIdOrUrlParam, currentThreadId, threads, urlParamToThreadId]);
   
   // 使用 useShallow 避免不必要的重渲染
   return useUnifiedStore(
@@ -364,8 +548,8 @@ export const useMessageIds = (threadId?: string) => {
 };
 
 export const useMessage = (messageId: string, threadId?: string) => {
-  const actualThreadId = threadId || useUnifiedStore((state) => state.currentThreadId);
   return useUnifiedStore((state) => {
+    const actualThreadId = threadId || state.currentThreadId;
     if (!actualThreadId) return undefined;
     const thread = state.threads.get(actualThreadId);
     return thread?.messages.find(m => m.id === messageId);
@@ -375,6 +559,31 @@ export const useMessage = (messageId: string, threadId?: string) => {
 // 导出便捷方法
 export const setCurrentThreadId = (threadId: string) => {
   useUnifiedStore.getState().setCurrentThread(threadId);
+};
+
+// 新架构：URL参数相关导出函数
+export const setCurrentUrlParam = (urlParam: string | null) => {
+  useUnifiedStore.getState().setCurrentUrlParam(urlParam);
+};
+
+export const setUrlParamMapping = (urlParam: string, threadId: string) => {
+  useUnifiedStore.getState().setUrlParamMapping(urlParam, threadId);
+};
+
+export const getThreadIdByUrlParam = (urlParam: string) => {
+  return useUnifiedStore.getState().getThreadIdByUrlParam(urlParam);
+};
+
+export const useCurrentUrlParam = () => {
+  return useUnifiedStore((state) => state.currentUrlParam);
+};
+
+export const useSessionState = () => {
+  return useUnifiedStore((state) => state.sessionState);
+};
+
+export const setSessionState = (sessionState: any) => {
+  useUnifiedStore.getState().setSessionState(sessionState);
 };
 
 export const addMessage = (message: Message) => {
@@ -466,4 +675,612 @@ export const useWorkspaceActions = () => {
       setWorkspaceState({ feedback: null });
     },
   }), [setWorkspaceState]);
-}; 
+};
+
+// 新架构：使用研究流式API发送消息
+export const sendMessageWithNewAPI = async (
+  message: string,
+  options?: {
+    interruptFeedback?: string;
+    resources?: Resource[];
+  },
+  config?: {
+    abortSignal?: AbortSignal;
+  }
+) => {
+  const state = useUnifiedStore.getState();
+  const currentUrlParam = state.currentUrlParam;
+  const currentThreadId = state.currentThreadId;
+  
+  if (!currentUrlParam || !currentThreadId) {
+    throw new Error("No current URL parameter or thread ID available");
+  }
+  
+  // 动态导入API函数
+  const { createResearchStream } = await import("~/core/api/research-stream");
+  const { generateInteractionIDs, getVisitorId } = await import("~/core/utils");
+  const { buildResearchConfig } = await import("~/core/api/research-stream");
+  const { useSettingsStore } = await import("~/core/store/settings-store");
+  
+  try {
+    // 生成交互ID
+    const sessionUuid = currentThreadId; // 使用thread_id作为session_uuid
+    const contextUuid = generateInteractionIDs(sessionUuid).frontend_context_uuid;
+    
+    // 构建配置
+    const settings = useSettingsStore.getState().general;
+    const researchConfig = buildResearchConfig({
+      autoAcceptedPlan: settings.autoAcceptedPlan, // 🔥 传递用户的autoAcceptedPlan设置
+      enableBackgroundInvestigation: settings.enableBackgroundInvestigation,
+      reportStyle: settings.reportStyle,
+      enableDeepThinking: settings.enableDeepThinking,
+      maxPlanIterations: settings.maxPlanIterations,
+      maxStepNum: settings.maxStepNum,
+      maxSearchResults: settings.maxSearchResults,
+    });
+    
+    // 准备请求参数
+    const request = {
+      action: 'continue' as const,
+      message,
+      urlParam: currentUrlParam,
+      frontend_uuid: sessionUuid,
+      frontend_context_uuid: contextUuid,
+      visitor_id: getVisitorId(),
+      user_id: undefined, // TODO: 从认证状态获取
+      config: researchConfig,
+      context: {
+        previousArtifacts: [],
+        relatedContext: options?.interruptFeedback || '',
+        userFeedbackHistory: [],
+      },
+      resources: options?.resources || [],
+    };
+    
+    // 设置响应状态
+    state.setResponding(true);
+    
+    // 创建用户消息
+    const userMessage: Message = {
+      id: nanoid(),
+      content: message,
+      contentChunks: [message],
+      role: "user",
+      threadId: currentThreadId,
+      isStreaming: false,
+      resources: options?.resources || [],
+    };
+    
+    // 添加用户消息到store
+    state.addMessage(currentThreadId, userMessage);
+    
+    // 创建助手消息
+    const assistantMessage: Message = {
+      id: nanoid(),
+      content: "",
+      contentChunks: [],
+      role: "assistant", 
+      threadId: currentThreadId,
+      isStreaming: true,
+      agent: "researcher",
+    };
+    
+    // 添加助手消息到store
+    state.addMessage(currentThreadId, assistantMessage);
+    
+    // 创建流式连接
+    const stream = createResearchStream(request);
+    
+    // 处理流式响应
+    for await (const event of stream) {
+      // 检查是否被中止
+      if (config?.abortSignal?.aborted) {
+        break;
+      }
+      
+      switch (event.type) {
+        case 'navigation':
+          console.log('Navigation event:', event.data);
+          // 处理页面导航
+          if ('workspace_url' in event.data && event.data.workspace_url) {
+            // 如果需要导航到新页面，这里可以处理
+            // 但通常navigation事件是在初始请求时发送的
+          }
+          break;
+          
+        case 'metadata':
+          console.log('Execution metadata:', event.data);
+          // 更新会话元数据
+          if (state.sessionState) {
+            state.setSessionState({
+              ...state.sessionState,
+              sessionMetadata: {
+                ...state.sessionState.sessionMetadata,
+                ...event.data,
+              },
+            });
+          }
+          break;
+          
+        case 'node_start':
+          console.log('Node started:', event.data);
+          // 可以用于显示当前执行的节点状态
+          break;
+          
+        case 'node_complete':
+          console.log('Node completed:', event.data);
+          // 可以用于更新节点执行状态
+          break;
+          
+                 case 'plan_generated':
+           console.log('Plan generated:', event.data);
+           // 创建计划消息
+           if ('plan_content' in event.data && typeof event.data.plan_content === 'string') {
+             const planMessage: Message = {
+               id: nanoid(),
+               content: event.data.plan_content,
+               contentChunks: [event.data.plan_content],
+               role: "assistant",
+               threadId: currentThreadId,
+               isStreaming: false,
+               agent: "planner",
+             };
+             state.addMessage(currentThreadId, planMessage);
+           }
+           break;
+          
+        case 'search_results':
+          console.log('Search results:', event.data);
+          // 可以用于显示搜索结果或创建搜索结果消息
+          break;
+          
+                 case 'agent_output':
+           console.log('Agent output:', event.data);
+           // 处理智能体输出
+           if ('content' in event.data && 'agent_name' in event.data && 
+               typeof event.data.content === 'string' && typeof event.data.agent_name === 'string') {
+             // 确保agent_name是有效的agent类型
+             const validAgents = ["coordinator", "planner", "researcher", "coder", "reporter", "podcast"] as const;
+             const agentName = validAgents.includes(event.data.agent_name as any) 
+               ? event.data.agent_name as typeof validAgents[number]
+               : "researcher";
+             
+             const agentMessage: Message = {
+               id: nanoid(),
+               content: event.data.content,
+               contentChunks: [event.data.content],
+               role: "assistant",
+               threadId: currentThreadId,
+               isStreaming: false,
+               agent: agentName,
+             };
+             state.addMessage(currentThreadId, agentMessage);
+           }
+           break;
+          
+        case 'progress':
+          console.log('Progress update:', event.data);
+          // 可以用于更新进度条或状态显示
+          break;
+          
+        case 'message_chunk':
+          // 更新助手消息内容
+          if ('content' in event.data) {
+            const currentContent = state.getMessageById(currentThreadId, assistantMessage.id)?.content || '';
+            state.updateMessage(currentThreadId, assistantMessage.id, {
+              content: currentContent + event.data.content,
+            });
+          }
+          break;
+          
+                 case 'artifact':
+           console.log('Artifact generated:', event.data);
+           // 处理artifact - 创建artifact消息
+           if ('artifact_content' in event.data && typeof event.data.artifact_content === 'string') {
+             const artifactMessage: Message = {
+               id: nanoid(),
+               content: event.data.artifact_content,
+               contentChunks: [event.data.artifact_content],
+               role: "assistant",
+               threadId: currentThreadId,
+               isStreaming: false,
+               agent: "reporter",
+             };
+             state.addMessage(currentThreadId, artifactMessage);
+           }
+           break;
+          
+        case 'complete':
+          // 标记消息完成
+          state.updateMessage(currentThreadId, assistantMessage.id, {
+            isStreaming: false,
+          });
+          console.log('Execution completed:', event.data);
+          break;
+          
+        case 'error':
+          console.error('Stream error:', event.data);
+          if ('error_message' in event.data) {
+            state.updateMessage(currentThreadId, assistantMessage.id, {
+              content: `Error: ${event.data.error_message}`,
+              isStreaming: false,
+            });
+          }
+          break;
+      }
+    }
+    
+  } catch (error) {
+    console.error('Failed to send message with new API:', error);
+    throw error;
+  } finally {
+    state.setResponding(false);
+  }
+};
+
+// 🚀 新架构：使用ASK API发送研究请求
+export const sendAskMessage = async (
+  request: ResearchRequest,
+  eventHandler?: AskAPIEventHandler,
+  config?: {
+    abortSignal?: AbortSignal;
+    onNavigate?: (url: string) => void | Promise<void>;
+  }
+): Promise<{
+  urlParam: string;
+  threadId: string;
+  workspaceUrl: string;
+}> => {
+  const state = useUnifiedStore.getState();
+  
+  // 动态导入必要的工具函数
+  const { fetchStream } = await import("~/core/sse");
+  const { resolveServiceURL } = await import("~/core/api/resolve-service-url");
+  const { generateInitialQuestionIDs, getVisitorId } = await import("~/core/utils");
+  
+  try {
+    // 🔥 设置响应状态
+    state.setResponding(true);
+    
+    // 🔥 生成前端UUID和访客ID
+    const frontendUuid = generateInitialQuestionIDs().frontend_context_uuid;
+    const visitorId = getVisitorId();
+    
+    // 🔥 构建ASK API请求数据
+    const requestData = {
+      question: request.question,
+      ask_type: request.askType,
+      frontend_uuid: frontendUuid,
+      visitor_id: visitorId,
+      user_id: undefined, // TODO: 从认证状态获取
+      config: {
+        auto_accepted_plan: request.config.autoAcceptedPlan,
+        ...request.config // 扩展配置 - 放在前面避免重复
+      },
+      // followup场景的上下文信息
+      ...(request.context && {
+        session_id: request.context.sessionId,
+        thread_id: request.context.threadId,
+        url_param: request.context.urlParam,
+      }),
+      // 🔥 添加interrupt_feedback支持
+      ...(request.interrupt_feedback && {
+        interrupt_feedback: request.interrupt_feedback,
+      })
+    };
+    
+    console.log("[sendAskMessage] Starting ASK API SSE stream:", {
+      askType: request.askType,
+      question: request.question.substring(0, 50) + '...',
+      frontend_uuid: frontendUuid,
+      config: request.config
+    });
+    
+    // 🔥 发起SSE流请求
+    const sseStream = fetchStream(
+      resolveServiceURL('research/ask?stream=true'),
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestData),
+      }
+    );
+    
+    // 🔥 准备返回值变量
+    let navigationResult: {
+      urlParam: string;
+      threadId: string;
+      workspaceUrl: string;
+    } | null = null;
+    
+    let currentThreadId: string | null = null;
+    let assistantMessage: Message | null = null;
+    
+    // 🔥 处理SSE事件流
+    for await (const event of sseStream) {
+      // 检查是否被中止
+      if (config?.abortSignal?.aborted) {
+        console.log("[sendAskMessage] Request aborted");
+        break;
+      }
+      
+      console.log("[sendAskMessage] SSE Event:", event.event, event.data);
+      
+      try {
+        const eventData = JSON.parse(event.data);
+        
+        // 🚀 统一事件处理逻辑
+        switch (event.event) {
+          case 'navigation':
+            // 🔥 处理导航事件 - 这是ASK API的核心事件
+            if (eventData.url_param && eventData.thread_id && eventData.workspace_url) {
+              navigationResult = {
+                urlParam: eventData.url_param,
+                threadId: eventData.thread_id,
+                workspaceUrl: eventData.workspace_url
+              };
+              
+                             // 更新store状态
+               state.setCurrentUrlParam(eventData.url_param);
+               state.setUrlParamMapping(eventData.url_param, eventData.thread_id);
+               state.setCurrentThread(eventData.thread_id);
+               currentThreadId = eventData.thread_id;
+               
+               // 创建用户消息（只在initial时创建）
+               if (request.askType === 'initial' && currentThreadId) {
+                 const userMessage: Message = {
+                   id: nanoid(),
+                   content: request.question,
+                   contentChunks: [request.question],
+                   role: "user",
+                   threadId: currentThreadId,
+                   isStreaming: false,
+                 };
+                 state.addMessage(currentThreadId, userMessage);
+                
+                // 创建助手消息用于接收流式内容
+                assistantMessage = {
+                  id: nanoid(),
+                  content: "",
+                  contentChunks: [],
+                  role: "assistant",
+                  threadId: currentThreadId,
+                  isStreaming: true,
+                  agent: "researcher",
+                };
+                state.addMessage(currentThreadId, assistantMessage);
+              }
+              
+              // 调用导航回调
+              if (config?.onNavigate) {
+                await config.onNavigate(eventData.workspace_url);
+              }
+              
+              // 调用事件处理器
+              if (eventHandler?.onNavigation) {
+                await eventHandler.onNavigation(eventData);
+              }
+            }
+            break;
+            
+          case 'metadata':
+            // 🔥 处理元数据事件
+            console.log('Execution metadata:', eventData);
+            // 更新会话元数据
+            state.setSessionState({
+              sessionMetadata: eventData,
+              executionHistory: [],
+              currentConfig: request.config,
+              permissions: null,
+            });
+            
+            if (eventHandler?.onMetadata) {
+              await eventHandler.onMetadata(eventData);
+            }
+            break;
+            
+          case 'node_start':
+            console.log('Node started:', eventData);
+            if (eventHandler?.onNodeStart) {
+              await eventHandler.onNodeStart(eventData);
+            }
+            break;
+            
+          case 'node_complete':
+            console.log('Node completed:', eventData);
+            if (eventHandler?.onNodeComplete) {
+              await eventHandler.onNodeComplete(eventData);
+            }
+            break;
+            
+          case 'plan_generated':
+            // 🔥 处理计划生成事件
+            console.log('Plan generated:', eventData);
+            if (currentThreadId && 'plan_data' in eventData && eventData.plan_data) {
+              const planContent = typeof eventData.plan_data === 'string' 
+                ? eventData.plan_data 
+                : JSON.stringify(eventData.plan_data, null, 2);
+                
+              const planMessage: Message = {
+                id: nanoid(),
+                content: planContent,
+                contentChunks: [planContent],
+                role: "assistant",
+                threadId: currentThreadId,
+                isStreaming: false,
+                agent: "planner",
+              };
+              state.addMessage(currentThreadId, planMessage);
+            }
+            
+            if (eventHandler?.onPlanGenerated) {
+              await eventHandler.onPlanGenerated(eventData);
+            }
+            break;
+            
+          case 'search_results':
+            // 🔥 处理搜索结果事件
+            console.log('Search results:', eventData);
+            if (eventHandler?.onSearchResults) {
+              await eventHandler.onSearchResults(eventData);
+            }
+            break;
+            
+          case 'agent_output':
+            // 🔥 处理智能体输出事件
+            console.log('Agent output:', eventData);
+            if (currentThreadId && 'content' in eventData && 'agent_name' in eventData &&
+                typeof eventData.content === 'string' && typeof eventData.agent_name === 'string') {
+              
+              // 确保agent_name是有效的agent类型
+              const validAgents = ["coordinator", "planner", "researcher", "coder", "reporter", "podcast"] as const;
+              const agentName = validAgents.includes(eventData.agent_name as any)
+                ? eventData.agent_name as typeof validAgents[number]
+                : "researcher";
+              
+              const agentMessage: Message = {
+                id: nanoid(),
+                content: eventData.content,
+                contentChunks: [eventData.content],
+                role: "assistant",
+                threadId: currentThreadId,
+                isStreaming: false,
+                agent: agentName,
+              };
+              state.addMessage(currentThreadId, agentMessage);
+            }
+            
+            if (eventHandler?.onAgentOutput) {
+              await eventHandler.onAgentOutput(eventData);
+            }
+            break;
+            
+          case 'message_chunk':
+            // 🔥 处理消息块事件
+            if (currentThreadId && assistantMessage && 'content' in eventData) {
+              const currentContent = state.getMessageById(currentThreadId, assistantMessage.id)?.content || '';
+              state.updateMessage(currentThreadId, assistantMessage.id, {
+                content: currentContent + eventData.content,
+              });
+            }
+            
+            if (eventHandler?.onMessageChunk) {
+              await eventHandler.onMessageChunk(eventData);
+            }
+            break;
+            
+          case 'artifact':
+            // 🔥 处理工件事件
+            console.log('Artifact generated:', eventData);
+            if (currentThreadId && 'content' in eventData && typeof eventData.content === 'string') {
+              const artifactMessage: Message = {
+                id: nanoid(),
+                content: eventData.content,
+                contentChunks: [eventData.content],
+                role: "assistant",
+                threadId: currentThreadId,
+                isStreaming: false,
+                agent: "reporter",
+              };
+              state.addMessage(currentThreadId, artifactMessage);
+            }
+            
+            if (eventHandler?.onArtifact) {
+              await eventHandler.onArtifact(eventData);
+            }
+            break;
+            
+          case 'progress':
+            // 🔥 处理进度事件
+            console.log('Progress update:', eventData);
+            if (eventHandler?.onProgress) {
+              await eventHandler.onProgress(eventData);
+            }
+            break;
+            
+          case 'interrupt':
+            // 🔥 处理中断事件
+            console.log('Interrupt event:', eventData);
+            if (currentThreadId && assistantMessage) {
+              // 标记需要用户交互
+              state.setInterruptMessage(currentThreadId, assistantMessage.id);
+              
+              // 🔥 保存完整的interrupt数据 - 修正字段名匹配
+              if ('id' in eventData && 'content' in eventData && 'options' in eventData) {
+                const interruptData = {
+                  interruptId: eventData.id as string,  // 🔥 修正：id -> interruptId
+                  message: eventData.content as string,  // 🔥 修正：content -> message
+                  options: eventData.options as Array<{text: string; value: string}>,
+                  threadId: eventData.thread_id as string,
+                  executionId: eventData.execution_id || '', // 可能不存在
+                  nodeName: eventData.node_name || 'human_feedback', // 可能不存在
+                  timestamp: eventData.timestamp || new Date().toISOString(), // 可能不存在
+                  messageId: assistantMessage.id,
+                };
+                state.setCurrentInterrupt(currentThreadId, interruptData);
+                console.log('🔔 Interrupt data saved to store:', interruptData);
+              } else {
+                console.warn('⚠️ Interrupt event missing required fields:', eventData);
+              }
+            }
+            
+            if (eventHandler?.onInterrupt) {
+              await eventHandler.onInterrupt(eventData);
+            }
+            break;
+            
+          case 'complete':
+            // 🔥 处理完成事件
+            console.log('Execution completed:', eventData);
+            if (currentThreadId && assistantMessage) {
+              state.updateMessage(currentThreadId, assistantMessage.id, {
+                isStreaming: false,
+              });
+            }
+            
+            if (eventHandler?.onComplete) {
+              await eventHandler.onComplete(eventData);
+            }
+            break;
+            
+          case 'error':
+            // 🔥 处理错误事件
+            console.error('Stream error:', eventData);
+            if (currentThreadId && assistantMessage && 'error_message' in eventData) {
+              state.updateMessage(currentThreadId, assistantMessage.id, {
+                content: `Error: ${eventData.error_message}`,
+                isStreaming: false,
+              });
+            }
+            
+            if (eventHandler?.onError) {
+              await eventHandler.onError(eventData);
+            }
+            break;
+            
+          default:
+            console.log(`[sendAskMessage] Unknown event type: ${event.event}`, eventData);
+            break;
+        }
+        
+      } catch (parseError) {
+        console.error("[sendAskMessage] Failed to parse SSE event data:", parseError);
+      }
+    }
+    
+    // 🔥 返回导航结果
+    if (!navigationResult) {
+      throw new Error("No navigation event received from ASK API");
+    }
+    
+    return navigationResult;
+    
+  } catch (error) {
+    console.error('[sendAskMessage] ASK API SSE stream failed:', error);
+    throw error;
+  } finally {
+    state.setResponding(false);
+  }
+};
