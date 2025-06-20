@@ -56,6 +56,9 @@ export interface ResearchStreamRequest {
   // 会话标识（create时为空，其他操作时必填）
   url_param?: string;
   
+  // 🔥 新增：直接传递thread_id，用于连接到运行中的LangGraph任务
+  thread_id?: string;
+  
   // 前端ID体系
   frontend_uuid: string;         // 会话级UUID（create时生成，后续保持不变）
   frontend_context_uuid: string;  // 交互级UUID（每次操作都生成新的）

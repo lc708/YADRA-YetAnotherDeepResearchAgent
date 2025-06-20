@@ -34,7 +34,6 @@ import {
   setUrlParamMapping,
   setSessionState,
 } from "~/core/store/unified-store";
-import { getWorkspaceState } from "~/core/api/research-stream";
 import { parseJSON } from "~/core/utils";
 import { toast } from "sonner";
 
@@ -45,26 +44,42 @@ import { HeroInput } from "~/components/yadra/hero-input";
 //import { UserGuide } from "./components/user-guide";
 import { OutputStream } from "./components/output-stream";
 import { PodcastPanel } from "./components/podcast-panel";
+import { PlanActions } from '~/core/api/human-feedback';
+import { PlanCard } from '~/components/research/plan-card';
+import type { ResearchPlan } from '~/components/research/plan-card';
 
 export default function WorkspacePage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const urlParam = params.traceId as string; // 注意：这里是url_param，不是thread_id
+  
+  // 🔥 从URL查询参数获取ask响应数据
+  const threadIdFromParams = searchParams.get('thread_id');
+  const sessionIdFromParams = searchParams.get('session_id');
+  const frontendUuidFromParams = searchParams.get('frontend_uuid');
+  const actionFromParams = searchParams.get('action') as 'create' | 'continue' | null;
+  
   const [initialized, setInitialized] = useState(false);
   const [loading, setLoading] = useState(true);
   const [dataLoading, setDataLoading] = useState(false); // 数据加载状态（不阻塞界面）
   const [error, setError] = useState<string | null>(null);
   const [sseConnected, setSseConnected] = useState(false); // SSE连接状态
   const abortControllerRef = useRef<AbortController | null>(null);
+  const sseConnectionRef = useRef<boolean>(false); // 🔥 使用ref来防止重复连接
 
   // 🔥 SSE连接函数 - 支持两种场景
   const startSSEConnection = useCallback(async (threadId: string, action: 'create' | 'continue', message: string = '') => {
-    if (sseConnected) {
-      console.log('[WorkspacePage] SSE already connected, skipping');
+    // 🔥 使用ref来检查，避免React状态更新延迟导致的重复连接
+    if (sseConnectionRef.current) {
+      console.log('[WorkspacePage] SSE already connected (ref check), skipping');
       return;
     }
+    
+    // 立即设置ref，防止重复连接
+    sseConnectionRef.current = true;
+    setSseConnected(true);
 
     try {
-      setSseConnected(true);
       console.log(`[WorkspacePage] Starting SSE connection - Action: ${action}, ThreadId: ${threadId}`);
       
       // 动态导入SSE相关模块
@@ -94,6 +109,7 @@ export default function WorkspacePage() {
       const request = {
         action: action as 'create' | 'continue',
         url_param: urlParam,
+        thread_id: threadId,
         message: message, // 场景1有消息内容，场景2为空
         frontend_uuid: ids.frontend_uuid,
         frontend_context_uuid: ids.frontend_context_uuid,
@@ -416,6 +432,7 @@ export default function WorkspacePage() {
               setDataLoading(false);
               setInitialized(true);
               setSseConnected(false);
+              sseConnectionRef.current = false; // 🔥 重置ref
               return; // 结束SSE处理循环
             }
             break;
@@ -451,6 +468,7 @@ export default function WorkspacePage() {
               setDataLoading(false);
               setInitialized(true);
               setSseConnected(false);
+              sseConnectionRef.current = false; // 🔥 重置ref
               return; // 结束SSE处理循环
             }
             break;
@@ -463,12 +481,14 @@ export default function WorkspacePage() {
       
       console.log('[WorkspacePage] SSE stream completed');
       setSseConnected(false);
+      sseConnectionRef.current = false; // 🔥 重置ref
       setDataLoading(false);
       setInitialized(true);
       
     } catch (error) {
       console.error('[WorkspacePage] SSE connection failed:', error);
       setSseConnected(false);
+      sseConnectionRef.current = false; // 🔥 重置ref
       setDataLoading(false);
       setInitialized(true);
     }
@@ -509,116 +529,38 @@ export default function WorkspacePage() {
         // 设置当前URL参数
         setCurrentUrlParam(urlParam);
         
-        // 🚀 快速显示界面 - 先设置loading为false，让用户看到基础界面
+        // 🚀 快速显示界面
         setLoading(false);
         setDataLoading(true);
         
-        // 尝试获取现有工作区状态
-        try {
-        const workspaceData = await getWorkspaceState(urlParam);
-          console.log('[WorkspacePage] Existing workspace data found:', workspaceData);
+        // 🔥 新架构：从URL参数获取必要信息，直接启动SSE
+        if (threadIdFromParams && actionFromParams) {
+          console.log(`[WorkspacePage] Found thread_id in URL params: ${threadIdFromParams}`);
           
-          // 🔥 关键修复：确保在添加消息前正确设置线程映射
-          if (workspaceData.thread_id) {
-            console.log(`[WorkspacePage] Setting up thread mapping: ${urlParam} -> ${workspaceData.thread_id}`);
-            setUrlParamMapping(urlParam, workspaceData.thread_id);
-            setCurrentThreadId(workspaceData.thread_id);
-            
-            // 确保线程存在（如果不存在会自动创建）
-            const store = useUnifiedStore.getState();
-            store.setCurrentThread(workspaceData.thread_id);
-          }
-        
-        // 设置会话状态
-        setSessionState({
-          sessionMetadata: workspaceData.sessionMetadata,
-          executionHistory: workspaceData.sessionMetadata?.execution_history || [],
-          currentConfig: workspaceData.config?.currentConfig || null,
-          permissions: workspaceData.permissions || null,
-        });
-        
-          // 🔥 关键修复：恢复消息历史（确保线程映射已设置）
-          if (workspaceData.messages && workspaceData.messages.length > 0 && workspaceData.thread_id) {
-            console.log(`[WorkspacePage] Restoring ${workspaceData.messages.length} messages to thread ${workspaceData.thread_id}`);
+          // 设置线程映射
+          setUrlParamMapping(urlParam, threadIdFromParams);
+          setCurrentThreadId(threadIdFromParams);
           
-          const { nanoid } = await import("nanoid");
+          // 确保线程存在
           const store = useUnifiedStore.getState();
+          store.setCurrentThread(threadIdFromParams);
           
-          // 转换并添加消息到store
-          for (const msg of workspaceData.messages) {
-            const message = {
-              id: msg.id || nanoid(),
-              content: msg.content || '',
-              contentChunks: [msg.content || ''],
-              role: (msg.role === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
-              threadId: workspaceData.thread_id,
-              isStreaming: false,
-              agent: msg.agent || undefined,
-              resources: msg.resources || [],
-            };
-            
-              // 使用正确的threadId添加消息
-            store.addMessage(workspaceData.thread_id, message);
-          }
+          // 🔥 直接启动SSE连接，无需查询数据库
+          console.log(`[WorkspacePage] Starting SSE connection with action: ${actionFromParams}`);
+          await startSSEConnection(threadIdFromParams, actionFromParams);
           
-            console.log(`[WorkspacePage] Successfully restored ${workspaceData.messages.length} messages`);
-        }
-        
-        // 恢复配置
-        if (workspaceData.config?.currentConfig) {
-          const config = workspaceData.config.currentConfig;
-          if (config.enableBackgroundInvestigation !== undefined) {
-            setEnableBackgroundInvestigation(config.enableBackgroundInvestigation);
-          }
-          if (config.reportStyle) {
-            setReportStyle(config.reportStyle);
-          }
-        }
-        
-          // 🔥 关键逻辑：检查任务状态，决定是否需要 SSE 连接
-          const executionHistory = workspaceData.sessionMetadata?.execution_history || [];
-          const latestExecution = executionHistory[0]; // 最新的执行记录
-          const isStillRunning = latestExecution?.status === 'running';
-          const hasMessages = workspaceData.messages && workspaceData.messages.length > 0;
-          
-          console.log('[WorkspacePage] Execution status check:', {
-            hasMessages,
-            latestExecutionStatus: latestExecution?.status,
-            isStillRunning,
-            executionCount: executionHistory.length
-          });
-          
-          // 🚨 添加详细调试
-          console.log('[WorkspacePage] DEBUG - Full execution history:', executionHistory);
-          console.log('[WorkspacePage] DEBUG - Latest execution object:', latestExecution);
-          console.log('[WorkspacePage] DEBUG - Status comparison:', {
-            actualStatus: latestExecution?.status,
-            expectedStatus: 'running',
-            isEqual: latestExecution?.status === 'running',
-            statusType: typeof latestExecution?.status
-          });
-          
-          if (isStillRunning) {
-            // 场景2：任务还在运行，需要建立 SSE 连接获取实时更新
-            console.log('[WorkspacePage] ✅ Task is still running, starting SSE connection for live updates...');
-            await startSSEConnection(workspaceData.thread_id, 'continue');
+        } else {
+          // 兼容旧链接：如果没有URL参数，尝试从store获取thread_id
+          const existingThreadId = useUnifiedStore.getState().getThreadIdByUrlParam(urlParam);
+          if (existingThreadId) {
+            console.log(`[WorkspacePage] Found existing thread_id in store: ${existingThreadId}`);
+            setCurrentThreadId(existingThreadId);
+            await startSSEConnection(existingThreadId, 'continue');
           } else {
-            // 任务已完成，只显示历史数据
-            console.log('[WorkspacePage] ❌ Task completed, showing historical data only');
-            console.log('[WorkspacePage] DEBUG - Why not running?', {
-              hasLatestExecution: !!latestExecution,
-              status: latestExecution?.status,
-              isRunning: latestExecution?.status === 'running'
-            });
+            console.log('[WorkspacePage] No thread_id found, workspace may be empty');
             setDataLoading(false);
             setInitialized(true);
           }
-          
-        } catch (workspaceError) {
-          console.log('[WorkspacePage] No existing workspace data found:', workspaceError);
-          setError('无法加载工作区数据，请检查URL是否正确');
-          setDataLoading(false);
-        setInitialized(true);
         }
         
       } catch (error) {
@@ -630,7 +572,7 @@ export default function WorkspacePage() {
     };
 
     initializeWorkspace();
-  }, [urlParam, initialized, startSSEConnection]); // 🔥 添加 startSSEConnection 依赖
+  }, [urlParam, initialized]); // 🔥 移除 startSSEConnection 依赖，避免重复执行
 
   // 实现消息发送处理函数 - 支持workspace页面的两种场景
   const handleSendMessage = useCallback(
@@ -673,6 +615,60 @@ export default function WorkspacePage() {
     },
     [setFeedback],
   );
+
+  // 人机反馈处理函数
+  const handlePlanFeedback = useCallback(async (
+    action: 'approve' | 'modify' | 'skipToReport' | 'reask',
+    planId: string,
+    data?: string
+  ) => {
+    const threadId = useUnifiedStore.getState().getThreadIdByUrlParam(urlParam);
+    if (!threadId) {
+      console.error('No thread ID found for plan feedback');
+      return;
+    }
+
+    try {
+             // 使用unified store的setResponding
+       useUnifiedStore.getState().setResponding(true);
+       
+       switch (action) {
+         case 'approve':
+           await PlanActions.startResearch(threadId, planId);
+           console.log('[WorkspacePage] Plan approved, starting research');
+           break;
+         case 'modify':
+           if (data) {
+             await PlanActions.editPlan(threadId, planId, data);
+             console.log('[WorkspacePage] Plan modification submitted');
+           }
+           break;
+         case 'skipToReport':
+           await PlanActions.skipToReport(threadId, planId);
+           console.log('[WorkspacePage] Skipping to report generation');
+           break;
+         case 'reask':
+           await PlanActions.reask(threadId, planId);
+           // 这个会跳转页面，所以不需要额外处理
+           break;
+       }
+       
+       // 重新启动SSE连接以接收反馈响应
+       if (action !== 'reask') {
+         setSseConnected(false);
+         setTimeout(() => {
+           const threadId = useUnifiedStore.getState().getThreadIdByUrlParam(urlParam);
+           if (threadId) {
+             startSSEConnection(threadId, 'continue');
+           }
+         }, 100);
+       }
+     } catch (error) {
+       console.error(`[WorkspacePage] Plan ${action} failed:`, error);
+       setError(`操作失败: ${error}`);
+       useUnifiedStore.getState().setResponding(false);
+     }
+     }, [urlParam, startSSEConnection, setError]);
 
   // 清理函数
   useEffect(() => {

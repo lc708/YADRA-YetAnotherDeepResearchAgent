@@ -68,6 +68,8 @@ interface PlanCardProps {
   onModify?: (planId: string, modifications: string) => void;
   onReject?: (planId: string, reason: string) => void;
   onEdit?: (planId: string, newPlan: Partial<ResearchPlan>) => void;
+  onSkipToReport?: (planId: string) => void;
+  onReask?: (planId: string) => void;
   className?: string;
 }
 
@@ -256,11 +258,11 @@ const PlanActions: React.FC<{
   onApprove?: (planId: string) => void;
   onModify?: (planId: string, modifications: string) => void;
   onReject?: (planId: string, reason: string) => void;
-}> = ({ plan, onApprove, onModify, onReject }) => {
+  onSkipToReport?: (planId: string) => void;
+  onReask?: (planId: string) => void;
+}> = ({ plan, onApprove, onModify, onReject, onSkipToReport, onReask }) => {
   const [showModifyInput, setShowModifyInput] = useState(false);
-  const [showRejectInput, setShowRejectInput] = useState(false);
   const [modifications, setModifications] = useState("");
-  const [rejectReason, setRejectReason] = useState("");
 
   const handleModify = () => {
     if (modifications.trim()) {
@@ -270,48 +272,57 @@ const PlanActions: React.FC<{
     }
   };
 
-  const handleReject = () => {
-    if (rejectReason.trim()) {
-      onReject?.(plan.id, rejectReason);
-      setRejectReason("");
-      setShowRejectInput(false);
-    }
-  };
-
   return (
     <div className="p-4 border-t bg-muted/20">
       <AnimatePresence mode="wait">
-        {!showModifyInput && !showRejectInput ? (
+        {!showModifyInput ? (
           <motion.div
             key="actions"
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            className="flex items-center gap-2"
+            className="space-y-3"
           >
-            <Button
-              onClick={() => onApprove?.(plan.id)}
-              className="flex-1"
-              size="sm"
-            >
-              ✅ 批准计划
-            </Button>
-            <Button
-              onClick={() => setShowModifyInput(true)}
-              variant="outline"
-              size="sm"
-            >
-              ✏️ 修改
-            </Button>
-            <Button
-              onClick={() => setShowRejectInput(true)}
-              variant="outline"
-              size="sm"
-            >
-              ❌ 拒绝
-            </Button>
+            {/* 主要操作按钮 */}
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={() => onApprove?.(plan.id)}
+                className="flex-1"
+                size="sm"
+              >
+                🚀 开始研究
+              </Button>
+              <Button
+                onClick={() => onSkipToReport?.(plan.id)}
+                variant="outline"
+                size="sm"
+                className="flex-1"
+              >
+                📊 立即输出报告
+              </Button>
+            </div>
+            
+            {/* 次要操作按钮 */}
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={() => setShowModifyInput(true)}
+                variant="outline"
+                size="sm"
+                className="flex-1"
+              >
+                ✏️ 编辑计划
+              </Button>
+              <Button
+                onClick={() => onReask?.(plan.id)}
+                variant="outline"
+                size="sm"
+                className="flex-1"
+              >
+                🔄 重新提问
+              </Button>
+            </div>
           </motion.div>
-        ) : showModifyInput ? (
+        ) : (
           <motion.div
             key="modify"
             initial={{ opacity: 0, y: 10 }}
@@ -337,34 +348,6 @@ const PlanActions: React.FC<{
               </Button>
             </div>
           </motion.div>
-        ) : (
-          <motion.div
-            key="reject"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="space-y-3"
-          >
-            <h4 className="text-sm font-medium">拒绝理由</h4>
-            <Textarea
-              value={rejectReason}
-              onChange={(e) => setRejectReason(e.target.value)}
-              placeholder="请说明拒绝的原因..."
-              rows={3}
-            />
-            <div className="flex gap-2">
-              <Button onClick={handleReject} variant="destructive" size="sm">
-                确认拒绝
-              </Button>
-              <Button 
-                onClick={() => setShowRejectInput(false)} 
-                variant="outline" 
-                size="sm"
-              >
-                取消
-              </Button>
-            </div>
-          </motion.div>
         )}
       </AnimatePresence>
     </div>
@@ -381,6 +364,8 @@ export const PlanCard: React.FC<PlanCardProps> = ({
   onModify,
   onReject,
   onEdit,
+  onSkipToReport,
+  onReask,
   className
 }) => {
   const [isExpanded, setIsExpanded] = useState(variant === "detailed");
@@ -542,6 +527,8 @@ export const PlanCard: React.FC<PlanCardProps> = ({
                 onApprove={onApprove}
                 onModify={onModify}
                 onReject={onReject}
+                onSkipToReport={onSkipToReport}
+                onReask={onReask}
               />
             )}
           </motion.div>

@@ -1,14 +1,15 @@
 /**
- * Research Create API Client
- * 两步分离架构的第一步：快速创建研究会话
+ * Research Ask API Client
+ * 统一的研究询问接口，支持initial和followup两种场景
  */
 
 import { generateInitialQuestionIDs, getVisitorId } from "~/core/utils";
 import { resolveServiceURL } from "./resolve-service-url";
 
 // 请求类型
-export interface CreateResearchRequest {
+export interface ResearchAskRequest {
   question: string;
+  ask_type: 'initial' | 'followup';
   frontend_uuid: string;
   visitor_id: string;
   user_id?: string;
@@ -19,7 +20,7 @@ export interface CreateResearchRequest {
       max_research_depth?: number;
       enable_deep_thinking?: boolean;
       enable_background_investigation?: boolean;
-      auto_accepted_plan?: boolean; // 🔥 支持用户配置的auto_accepted_plan
+      auto_accepted_plan?: boolean;
     };
     model?: {
       provider?: string;
@@ -36,48 +37,73 @@ export interface CreateResearchRequest {
     };
     preferences?: Record<string, any>;
   };
+  
+  // followup场景的必要信息
+  session_id?: number;
+  thread_id?: string;
+  url_param?: string;
 }
 
 // 响应类型
-export interface CreateResearchResponse {
+export interface ResearchAskResponse {
+  ask_type: string;
   url_param: string;
   frontend_uuid: string;
   session_id: number;
+  thread_id: string;
   workspace_url: string;
   estimated_duration: number;
   created_at: string;
 }
 
 /**
- * 创建研究任务
+ * 发起研究询问（支持initial和followup）
  * @param question 用户问题
+ * @param askType 询问类型
  * @param config 配置参数
- * @returns Promise<CreateResearchResponse>
+ * @param followupInfo followup场景的必要信息
+ * @returns Promise<ResearchAskResponse>
  */
-export async function createResearchSession(
+export async function askResearch(
   question: string,
-  config?: CreateResearchRequest['config']
-): Promise<CreateResearchResponse> {
+  askType: 'initial' | 'followup',
+  config?: ResearchAskRequest['config'],
+  followupInfo?: {
+    session_id: number;
+    thread_id: string;
+    url_param: string;
+  }
+): Promise<ResearchAskResponse> {
   // 生成前端UUID和访客ID
   const frontendUuid = generateInitialQuestionIDs().frontend_context_uuid;
   const visitorId = getVisitorId();
   
   // 构建请求数据
-  const requestData: CreateResearchRequest = {
+  const requestData: ResearchAskRequest = {
     question,
+    ask_type: askType,
     frontend_uuid: frontendUuid,
     visitor_id: visitorId,
-    config: config || {}
+    config: config || {},
+    
+    // followup场景的必要信息
+    ...(askType === 'followup' && followupInfo ? {
+      session_id: followupInfo.session_id,
+      thread_id: followupInfo.thread_id,
+      url_param: followupInfo.url_param,
+    } : {})
   };
 
-  console.log('[CreateResearchAPI] Creating research session:', {
+  console.log(`[ResearchAskAPI] ${askType} research ask:`, {
     question: question.substring(0, 50) + '...',
+    ask_type: askType,
     frontend_uuid: frontendUuid,
-    visitor_id: visitorId
+    visitor_id: visitorId,
+    ...(followupInfo ? { followup_info: followupInfo } : {})
   });
 
   try {
-    const response = await fetch(resolveServiceURL('research/create'), {
+    const response = await fetch(resolveServiceURL('research/ask'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -90,9 +116,10 @@ export async function createResearchSession(
       throw new Error(`API request failed: ${response.status} - ${errorData.detail || response.statusText}`);
     }
 
-    const data: CreateResearchResponse = await response.json();
+    const data: ResearchAskResponse = await response.json();
     
-    console.log('[CreateResearchAPI] Research session created successfully:', {
+    console.log(`[ResearchAskAPI] ${askType} ask successful:`, {
+      ask_type: data.ask_type,
       url_param: data.url_param,
       workspace_url: data.workspace_url,
       estimated_duration: data.estimated_duration
@@ -101,14 +128,46 @@ export async function createResearchSession(
     return data;
     
   } catch (error) {
-    console.error('[CreateResearchAPI] Failed to create research session:', error);
+    console.error(`[ResearchAskAPI] Failed to ${askType} ask:`, error);
     
     if (error instanceof Error) {
       throw error;
     } else {
-      throw new Error('Failed to create research session: Unknown error');
+      throw new Error(`Failed to ${askType} research: Unknown error`);
     }
   }
+}
+
+/**
+ * 创建初始研究任务（向后兼容的函数名）
+ * @param question 用户问题
+ * @param config 配置参数
+ * @returns Promise<ResearchAskResponse>
+ */
+export async function createResearchSession(
+  question: string,
+  config?: ResearchAskRequest['config']
+): Promise<ResearchAskResponse> {
+  return askResearch(question, 'initial', config);
+}
+
+/**
+ * 发起followup询问
+ * @param question 用户问题  
+ * @param followupInfo followup必要信息
+ * @param config 配置参数
+ * @returns Promise<ResearchAskResponse>
+ */
+export async function followupResearch(
+  question: string,
+  followupInfo: {
+    session_id: number;
+    thread_id: string;
+    url_param: string;
+  },
+  config?: ResearchAskRequest['config']
+): Promise<ResearchAskResponse> {
+  return askResearch(question, 'followup', config, followupInfo);
 }
 
 /**

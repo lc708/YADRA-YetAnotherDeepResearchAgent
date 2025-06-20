@@ -48,8 +48,22 @@ export function ConversationPanel({
   onSendMessage,
 }: ConversationPanelProps) {
   const scrollContainerRef = useRef<ScrollContainerRef>(null);
-  const messageIds = useMessageIds() || []; // 添加默认值防止undefined
+  
+  // 🔥 调试：打印参数和获取的消息
+  console.log('[ConversationPanel] traceId:', traceId);
+  
+  const messageIds = useMessageIds(traceId) || []; // 🔥 修复：传入traceId参数
   const threadData = useCurrentThread();
+  
+  // 🔥 调试：打印获取的消息数量和thread信息
+  console.log('[ConversationPanel] messageIds:', messageIds);
+  console.log('[ConversationPanel] messageIds.length:', messageIds.length);
+  console.log('[ConversationPanel] currentThread:', threadData);
+  
+  // 🔥 获取URL参数到thread_id的映射，用于调试
+  const urlParamToThreadId = useUnifiedStore((state) => state.urlParamToThreadId);
+  const mappedThreadId = urlParamToThreadId.get(traceId);
+  console.log('[ConversationPanel] URL param mapping:', traceId, '->', mappedThreadId);
   
   // 修复条件Hook调用 - 始终调用useMessage，然后根据条件使用结果
   const lastInterruptMessageId = threadData?.ui.lastInterruptMessageId;
@@ -158,6 +172,12 @@ export function ConversationPanel({
           <span className="text-xs text-muted-foreground">
             ({(messageIds?.length || 0)} 条消息)
           </span>
+          {/* 🔥 添加调试信息 */}
+          {process.env.NODE_ENV === 'development' && (
+            <span className="text-xs text-blue-400 ml-2">
+              [Debug: traceId={traceId}, messages={messageIds?.length || 0}]
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {responding && (

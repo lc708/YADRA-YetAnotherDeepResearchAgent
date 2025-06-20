@@ -62,6 +62,7 @@ class ResearchStreamRequest(BaseModel):
     action: ActionType
     message: str
     url_param: Optional[str] = None
+    thread_id: Optional[str] = None
     frontend_uuid: str
     frontend_context_uuid: str
     visitor_id: str
@@ -641,12 +642,14 @@ class ResearchStreamService:
                 "data": safe_json_dumps(asdict(error_event))
             } 
 
-    async def create_research_stream(self, request: ResearchStreamRequest) -> AsyncGenerator[Dict[str, str], None]:
+    async def create_research_stream(
+        self, 
+        request: ResearchStreamRequest,
+        existing_session_id: Optional[int] = None,
+        existing_thread_id: Optional[str] = None
+    ) -> AsyncGenerator[Dict[str, str], None]:
         """创建新的研究流"""
         try:
-            # 生成thread_id
-            thread_id = str(uuid.uuid4())
-            
             # 解析配置 - 支持新旧格式
             # 如果有research_config字段，使用它；否则从扁平化的config中提取
             if "research_config" in request.config:
@@ -669,17 +672,30 @@ class ResearchStreamService:
                 "output_format": request.config.get("outputFormat", "markdown")
             })
             
-            # 创建会话记录
-            session_data, url_param = await self.session_repo.create_session(
-                thread_id=thread_id,
-                frontend_uuid=request.frontend_uuid,
-                visitor_id=request.visitor_id,
-                user_id=request.user_id,
-                initial_question=request.message,
-                research_config=research_config,
-                model_config=model_config,
-                output_config=output_config
-            )
+            # 🔥 根据是否有现有session决定创建或复用
+            if existing_session_id and existing_thread_id:
+                # 使用现有session，避免重复创建
+                thread_id = existing_thread_id
+                # 通过thread_id获取session信息
+                session_data = await self.session_repo.get_session_by_thread_id(existing_thread_id)
+                if not session_data:
+                    raise HTTPException(status_code=404, detail="指定的session不存在")
+                url_param = session_data.url_param
+                logger.info(f"Using existing session: {existing_session_id}, thread_id: {thread_id}")
+            else:
+                # 创建新session（原有逻辑）
+                thread_id = str(uuid.uuid4())
+                session_data, url_param = await self.session_repo.create_session(
+                    thread_id=thread_id,
+                    frontend_uuid=request.frontend_uuid,
+                    visitor_id=request.visitor_id,
+                    user_id=request.user_id,
+                    initial_question=request.message,
+                    research_config=research_config,
+                    model_config=model_config,
+                    output_config=output_config
+                )
+                logger.info(f"Created new session: {session_data.id}, thread_id: {thread_id}")
             
             # 创建执行记录
             execution_record = await self.session_repo.create_execution_record(
@@ -718,7 +734,7 @@ class ResearchStreamService:
             # 获取LangGraph实例
             graph = await self._get_graph()
             
-            # 处理LangGraph流式执行
+            # 处理LangGraph流式执行 - 直接执行，无需预创建checkpoint
             async for event in self._process_langgraph_stream(
                 graph, initial_state, thread_id, execution_id, request
             ):
@@ -743,22 +759,52 @@ class ResearchStreamService:
             }
     
     async def continue_research_stream(self, request: ResearchStreamRequest) -> AsyncGenerator[Dict[str, str], None]:
-        """继续现有的研究流"""
+        """继续现有的研究流 - 获取历史数据和当前状态"""
         try:
-            # 获取现有会话
-            session = await self.session_repo.get_session_by_url_param(request.url_param)
-            if not session:
-                raise HTTPException(status_code=404, detail="会话不存在")
+            # 🔥 优先使用thread_id，如果没有则通过url_param获取
+            thread_id = request.thread_id
             
-            thread_id = session.thread_id
+            if not thread_id and request.url_param:
+                # 通过url_param获取thread_id
+                session = await self.session_repo.get_session_by_url_param(request.url_param)
+                if not session:
+                    raise HTTPException(status_code=404, detail="会话不存在")
+                thread_id = session.thread_id
             
-            # 🔥 关键修复：如果消息为空，这是状态查询请求，不需要执行LangGraph
-            if not request.message.strip():
-                logger.info(f"Received status query request for thread_id: {thread_id}")
+            if not thread_id:
+                raise HTTPException(status_code=400, detail="必须提供thread_id或url_param")
+            
+            logger.info(f"🔍 Attempting to connect to thread_id: {thread_id}")
+            
+            # 🔥 场景判断
+            if request.message and request.message.strip():
+                # 场景1：有新消息，需要继续执行
+                logger.info(f"📝 Continuing thread {thread_id} with new message")
                 
-                # 发送metadata事件表示连接建立
+                # 生成执行ID
+                execution_id = f"continue_{uuid.uuid4().hex[:8]}"
+                
+                # 准备输入状态
+                inputs = {"messages": [{"role": "user", "content": request.message}]}
+                
+                # 获取LangGraph实例
+                graph = await self._get_graph()
+                
+                # 使用_process_langgraph_stream处理流式执行
+                async for event in self._process_langgraph_stream(
+                    graph, inputs, thread_id, execution_id, request
+                ):
+                    yield event
+            else:
+                # 场景2：监控模式 - 获取历史数据和当前状态
+                logger.info(f"🔄 Entering monitoring mode for thread {thread_id}")
+                
+                # 生成监听会话ID
+                monitoring_id = f"monitor_{uuid.uuid4().hex[:8]}"
+                
+                # 发送metadata事件表示开始连接
                 metadata_event = MetadataEvent(
-                    execution_id=f"status_query_{uuid.uuid4().hex[:8]}",
+                    execution_id=monitoring_id,
                     thread_id=thread_id,
                     frontend_uuid=request.frontend_uuid,
                     frontend_context_uuid=request.frontend_context_uuid,
@@ -766,9 +812,9 @@ class ResearchStreamService:
                     user_id=request.user_id,
                     config_used=request.config,
                     model_info={
-                        "model_name": "status_query",
-                        "provider": "system",
-                        "version": "1.0"
+                        "model_name": "monitoring",
+                        "provider": "database",
+                        "version": "2.0"
                     },
                     estimated_duration=0,
                     start_time=self._get_current_timestamp(),
@@ -780,30 +826,107 @@ class ResearchStreamService:
                     "data": safe_json_dumps(asdict(metadata_event))
                 }
                 
-                # 检查是否有正在运行的任务
-                execution_records = await self.session_repo.get_execution_records_by_session_id(session.id)
-                latest_execution = execution_records[0] if execution_records else None
+                # 🔥 获取历史数据
+                session = await self.session_repo.get_session_by_thread_id(thread_id)
+                if not session:
+                    logger.error(f"❌ Session not found for thread_id: {thread_id}")
+                    
+                    error_event = ErrorEvent(
+                        error_code="SESSION_NOT_FOUND",
+                        error_message=f"未找到thread_id对应的会话: {thread_id}",
+                        error_details={"thread_id": thread_id},
+                        thread_id=thread_id,
+                        execution_id=monitoring_id,
+                        retry_after=None,
+                        suggestions=["检查thread_id是否正确", "确认会话是否存在"],
+                        timestamp=self._get_current_timestamp()
+                    )
+                    
+                    yield {
+                        "event": SSEEventType.ERROR.value,
+                        "data": safe_json_dumps(asdict(error_event))
+                    }
+                    return
                 
-                if latest_execution and latest_execution.get("status") == "running":
-                    logger.info(f"Found running task for thread_id: {thread_id}, starting live monitoring")
-                    # 如果有正在运行的任务，启动实际的LangGraph监听
-                    # 这里可以实现对现有LangGraph执行的监听逻辑
-                    # 暂时发送complete事件表示查询完成
-                    pass
-                else:
-                    logger.info(f"No running task found for thread_id: {thread_id}, sending complete")
+                logger.info(f"Using existing session: {session.id}, thread_id: {thread_id}")
                 
-                # 发送complete事件表示状态查询完成
+                # 🔥 获取LangGraph状态来判断任务是否还在运行
+                try:
+                    graph = await self._get_graph()
+                    config = {"configurable": {"thread_id": thread_id}}
+                    
+                    # 获取当前状态
+                    current_state = await graph.aget_state(config)
+                    is_running = current_state and current_state.next and len(current_state.next) > 0
+                    
+                    logger.info(f"🔍 Task status - Running: {is_running}, Next nodes: {current_state.next if current_state else 'None'}")
+                    
+                except Exception as state_error:
+                    logger.warning(f"⚠️ Could not get LangGraph state: {state_error}")
+                    is_running = False
+                
+                # 获取历史消息
+                messages = await self.session_repo.get_messages_by_session_id(session.id)
+                
+                # 发送历史消息作为事件流
+                for idx, msg in enumerate(messages):
+                    chunk_event = MessageChunkEvent(
+                        chunk_id=f"history_{idx}",
+                        content=msg.content,
+                        chunk_type="history",
+                        agent_name=msg.source_agent or "assistant",
+                        sequence=idx,
+                        is_final=True,
+                        metadata={
+                            "role": msg.role,
+                            "content_type": msg.content_type,
+                            "created_at": msg.created_at.isoformat() if hasattr(msg.created_at, 'isoformat') else str(msg.created_at),
+                            "is_historical": True,
+                            "task_running": is_running
+                        },
+                        thread_id=thread_id,
+                        execution_id=monitoring_id,
+                        timestamp=self._get_current_timestamp()
+                    )
+                    
+                    yield {
+                        "event": SSEEventType.MESSAGE_CHUNK.value,
+                        "data": safe_json_dumps(asdict(chunk_event))
+                    }
+                
+                # 🔥 如果任务还在运行，通知前端可能有新的更新
+                if is_running:
+                    # 发送进度事件表示任务仍在进行
+                    progress_event = ProgressEvent(
+                        current_node=current_state.next[0] if current_state.next else "unknown",
+                        completed_nodes=[],
+                        remaining_nodes=current_state.next if current_state.next else [],
+                        current_step_description="任务正在后台运行中...",
+                        thread_id=thread_id,
+                        execution_id=monitoring_id,
+                        timestamp=self._get_current_timestamp()
+                    )
+                    
+                    yield {
+                        "event": SSEEventType.PROGRESS.value,
+                        "data": safe_json_dumps(asdict(progress_event))
+                    }
+                
+                # 发送完成事件
                 complete_event = CompleteEvent(
-                    execution_id=metadata_event.execution_id,
+                    execution_id=monitoring_id,
                     thread_id=thread_id,
                     total_duration_ms=0,
                     tokens_consumed={"input": 0, "output": 0},
                     total_cost=0.0,
                     artifacts_generated=[],
-                    final_status="status_query_complete",
+                    final_status="monitoring_complete" if not is_running else "task_running",
                     completion_time=self._get_current_timestamp(),
-                    summary={"type": "status_query", "running_tasks": 0},
+                    summary={
+                        "type": "monitoring",
+                        "messages_count": len(messages),
+                        "task_status": "running" if is_running else "completed"
+                    },
                     timestamp=self._get_current_timestamp()
                 )
                 
@@ -811,65 +934,24 @@ class ResearchStreamService:
                     "event": SSEEventType.COMPLETE.value,
                     "data": safe_json_dumps(asdict(complete_event))
                 }
-                return
-            
-            # 🔥 原有的continue逻辑（当有实际消息时）
-            logger.info(f"Continuing research with message: {request.message[:50]}...")
-            
-            # 创建执行记录
-            execution_record = await self.session_repo.create_execution_record(
-                session_id=session.id,
-                frontend_context_uuid=request.frontend_context_uuid,
-                action_type=request.action,
-                user_message=request.message
-            )
-            execution_id = execution_record.execution_id
-            
-            # 获取现有消息历史
-            messages = await self.session_repo.get_messages_by_session_id(session.id)
-            
-            # 准备继续状态
-            continue_state = {
-                "messages": [
-                    {"role": msg.role, "content": msg.content, "name": msg.source_agent}
-                    for msg in messages
-                ] + [{"role": "user", "content": request.message}],
-                "research_topic": session.initial_question,
-                "locale": "zh-CN",
-                "auto_accepted_plan": (
-                    request.config.get("research_config", {}).get("auto_accepted_plan") or 
-                    request.config.get("auto_accepted_plan", False)
-                ),
-                "enable_background_investigation": True,
-                "plan_iterations": 0
-            }
-            
-            # 获取LangGraph实例
-            graph = await self._get_graph()
-            
-            # 处理LangGraph流式执行
-            async for event in self._process_langgraph_stream(
-                graph, continue_state, thread_id, execution_id, request
-            ):
-                yield event
                 
         except Exception as e:
-            logger.error(f"继续研究流失败: {e}")
+            logger.error(f"Continue research stream failed: {e}")
             error_event = ErrorEvent(
                 error_code="CONTINUE_STREAM_ERROR",
                 error_message=str(e),
                 error_details={"error_type": type(e).__name__},
-                thread_id=request.url_param or "",
+                thread_id=request.thread_id or "",
                 execution_id="",
                 retry_after=30,
-                suggestions=["检查会话状态", "稍后重试"],
+                suggestions=["检查thread_id", "确认会话存在", "稍后重试"],
                 timestamp=self._get_current_timestamp()
             )
             
             yield {
                 "event": SSEEventType.ERROR.value,
                 "data": safe_json_dumps(asdict(error_event))
-            } 
+            }
 
 # 依赖注入
 async def get_session_repository_dependency() -> SessionRepository:

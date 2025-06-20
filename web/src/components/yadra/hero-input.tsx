@@ -139,8 +139,11 @@ export function HeroInput({
   const [basicModel, setBasicModel] = useState<string | null>(null);
   const [reasoningModel, setReasoningModel] = useState<string | null>(null);
   
-  // 判断是否可以操作（有输入内容）
-  const canOperate = currentPrompt.trim() !== "";
+  // 判断是否可以操作（有输入内容且不在响应中）
+  const canOperate = currentPrompt.trim() !== "" && !responding;
+  
+  // 在workspace模式下，如果正在响应，显示终止按钮
+  const showStopButton = context === 'workspace' && responding;
 
   // 计算下拉框位置
   const calculateDropdownPosition = useCallback(() => {
@@ -310,7 +313,16 @@ export function HeroInput({
           
           // Step 2: 立即跳转到workspace页面
           console.log('[HandleSubmit] Navigating to workspace...');
-          router.push(createResponse.workspace_url);
+          
+          // 🔥 通过URL查询参数传递ask响应数据，避免后续workspace查询
+          const workspaceUrl = new URL(createResponse.workspace_url, window.location.origin);
+          workspaceUrl.searchParams.set('thread_id', createResponse.thread_id);
+          workspaceUrl.searchParams.set('session_id', createResponse.session_id.toString());
+          workspaceUrl.searchParams.set('frontend_uuid', createResponse.frontend_uuid);
+          workspaceUrl.searchParams.set('action', 'continue'); // SSE action类型
+          
+          console.log('[HandleSubmit] Workspace URL with params:', workspaceUrl.toString());
+          router.push(workspaceUrl.toString());
           
           // 设置正在提交状态为false（导航后在workspace页面处理）
           setIsSubmitting(false);
