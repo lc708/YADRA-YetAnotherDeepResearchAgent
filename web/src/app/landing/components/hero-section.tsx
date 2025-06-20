@@ -35,7 +35,8 @@ export function HeroSection() {
         </div>
 
         <div className="w-full max-w-4xl space-y-8">
-          <HeroInput />
+          {/* HeroInput已隐藏 - 用户将直接在工作区页面输入问题 */}
+          {/* <HeroInput /> */}
           
           {/* 示例问题网格 */}
           <div className="space-y-4">
@@ -45,7 +46,7 @@ export function HeroSection() {
               transition={{ delay: 0.3, duration: 0.5 }}
               className="text-center"
             >
-              <p className="text-sm text-gray-400 mb-4">或者选择以下热门研究主题：</p>
+              <p className="text-sm text-gray-400 mb-4">选择以下热门研究主题，或前往工作区开始研究：</p>
             </motion.div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-w-5xl mx-auto">
@@ -57,11 +58,8 @@ export function HeroSection() {
                   transition={{ delay: 0.4 + index * 0.1, duration: 0.5 }}
                   className="group cursor-pointer"
                   onClick={() => {
-                    // 触发HeroInput的发送逻辑
-                    const event = new CustomEvent('heroQuestionSelect', { 
-                      detail: { question } 
-                    });
-                    window.dispatchEvent(event);
+                    // 跳转到工作区并传递问题参数
+                    window.location.href = `/workspace?q=${encodeURIComponent(question)}`;
                   }}
                 >
                   <div className="relative overflow-hidden rounded-xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm transition-all duration-300 hover:border-white/20 hover:bg-white/10 hover:scale-105 active:scale-95">

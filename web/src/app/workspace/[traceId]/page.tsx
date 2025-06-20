@@ -3,7 +3,7 @@
 import { ArrowLeft, MessageSquare, FileText, Settings, Maximize2, Minimize2, History, Headphones, Activity } from "lucide-react";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { cn } from "~/lib/utils";
 
 import { Button } from "~/components/ui/button";
@@ -47,6 +47,13 @@ import { PodcastPanel } from "./components/podcast-panel";
 import { PlanActions } from '~/core/api/human-feedback';
 import { PlanCard } from '~/components/research/plan-card';
 import type { ResearchPlan } from '~/components/research/plan-card';
+
+// 布局模式枚举
+enum LayoutMode {
+  WELCOME = 'welcome',
+  CONVERSATION = 'conversation', 
+  MULTI_PANEL = 'multi_panel'
+}
 
 export default function WorkspacePage() {
   const params = useParams();
@@ -515,6 +522,44 @@ export default function WorkspacePage() {
   const podcastVisible = usePodcastPanelVisible();
   const feedback = useWorkspaceFeedback();
 
+  // 🚀 计算布局模式
+  const layoutMode = useMemo(() => {
+    if (!hasMessages) return LayoutMode.WELCOME;
+    
+    const visiblePanels = [conversationVisible, artifactVisible, historyVisible, podcastVisible].filter(Boolean);
+    
+    // 如果只有对话面板可见
+    if (visiblePanels.length === 1 && conversationVisible) {
+      return LayoutMode.CONVERSATION;
+    }
+    
+    // 如果有多个面板可见
+    if (visiblePanels.length > 1) {
+      return LayoutMode.MULTI_PANEL;
+    }
+    
+    // 有消息但没有可见面板，默认显示对话
+    return LayoutMode.CONVERSATION;
+  }, [hasMessages, conversationVisible, artifactVisible, historyVisible, podcastVisible]);
+
+  // 🚀 计算可见面板和宽度
+  const visiblePanels = useMemo(() => {
+    return [
+      { type: 'conversation', visible: conversationVisible },
+      { type: 'artifacts', visible: artifactVisible },
+      { type: 'history', visible: historyVisible },
+      { type: 'podcast', visible: podcastVisible },
+    ].filter(panel => panel.visible);
+  }, [conversationVisible, artifactVisible, historyVisible, podcastVisible]);
+
+  const panelWidthClass = useMemo(() => {
+    const count = visiblePanels.length;
+    if (count === 1) return "w-full";
+    if (count === 2) return "w-1/2"; 
+    if (count === 3) return "w-1/3";
+    return "w-1/4";
+  }, [visiblePanels.length]);
+
   // 🚀 重构后的工作区初始化逻辑
   useEffect(() => {
     if (!urlParam || initialized) return;
@@ -679,6 +724,55 @@ export default function WorkspacePage() {
     };
   }, []);
 
+  // 欢迎内容组件
+  const WelcomeContent = () => (
+    <div className="flex flex-1 items-center justify-center h-full">
+      <div className="text-center max-w-2xl mx-auto px-4">
+        <div className="mb-8">
+          <h1 className="text-4xl font-bold text-white mb-4">
+            你好，我能帮你什么？
+          </h1>
+          <p className="text-xl text-gray-300">
+            开始您的深度研究之旅
+          </p>
+        </div>
+        
+        {dataLoading && (
+          <div className="mb-6">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-400 mx-auto mb-2"></div>
+            <p className="text-blue-400">正在准备研究环境...</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  // 🚀 全局输入框组件（用于欢迎和单对话模式）
+  const GlobalInputContainer = () => (
+    <div className="absolute bottom-4 left-0 right-0 z-50">
+      <div className="max-w-4xl mx-auto px-4">
+        <div className="backdrop-blur-sm bg-black/20 rounded-lg p-4">
+          <HeroInput 
+            placeholder={hasMessages ? "继续研究对话..." : "开始您的研究之旅..."}
+            onSendMessage={handleSendMessage}
+            className="w-full"
+          />
+        </div>
+      </div>
+    </div>
+  );
+
+  // 🚀 面板内输入框组件（用于多面板模式）
+  const PanelInputContainer = () => (
+    <div className="absolute bottom-0 left-0 right-0 backdrop-blur-sm bg-black/20 p-4 z-10">
+      <HeroInput 
+        placeholder="继续研究对话..."
+        onSendMessage={handleSendMessage}
+        className="w-full"
+      />
+    </div>
+  );
+
   // 优化loading状态 - 快速显示基础界面，后台加载数据
   if (loading && !urlParam) {
     // 只有在没有urlParam时才显示loading（这种情况不应该发生）
@@ -713,210 +807,185 @@ export default function WorkspacePage() {
   }
 
   return (
-    <div className="flex h-screen flex-col bg-gradient-to-br from-slate-900 via-slate-800 to-black">
-      {/* 顶部导航栏 - 固定高度 */}
-      <div className="flex-shrink-0 flex items-center justify-between border-b border-white/20 bg-black/20 px-4 py-3 backdrop-blur-sm">
-        <div className="flex items-center gap-4 min-w-0 flex-1">
-          <Button variant="ghost" size="sm" asChild className="flex-shrink-0">
-            <Link href="/">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              <span className="hidden sm:inline">返回首页</span>
-              <span className="sm:hidden">返回</span>
-            </Link>
-          </Button>
-          
-          <div className="h-6 w-px bg-white/20 flex-shrink-0" />
-          
-          <div className="min-w-0 flex-1 max-w-md">
-            <div className="flex items-center gap-2">
-            <h1 className="text-lg font-semibold text-white">研究工作区</h1>
-              {dataLoading && (
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-400"></div>
-              )}
-            </div>
-            <p className="text-xs text-gray-400 truncate" title={urlParam || `会话: ${urlParam}`}>
-              {urlParam ? `查询: ${urlParam.length > 30 ? urlParam.substring(0, 30) + '...' : urlParam}` : `会话: ${urlParam.slice(0, 8)}...`}
-              {dataLoading && (
-                <span className="ml-2 text-blue-400">正在加载数据...</span>
-              )}
-            </p>
+    <div className="h-full flex flex-col bg-gradient-to-br from-slate-900 via-slate-800 to-black relative">
+      {/* 顶部导航栏 - 仅在有消息时显示 */}
+      {hasMessages && (
+        <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 bg-transparent">
+          <div className="flex items-center gap-2">
+            <h1 className="text-lg font-semibold text-white">当前研究</h1>
+            {dataLoading && (
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-400"></div>
+            )}
+          </div>
+
+          {/* 面板控制按钮 */}
+          <div className="flex items-center gap-1">
+            <Button
+              variant={conversationVisible ? "default" : "outline"}
+              size="sm"
+              onClick={toggleConversationPanel}
+              className="gap-1 bg-transparent border-white/20 text-white hover:bg-white/10"
+            >
+              <MessageSquare className="h-4 w-4" />
+              <span className="hidden lg:inline">对话</span>
+              {conversationVisible ? <Minimize2 className="h-3 w-3 hidden sm:inline" /> : <Maximize2 className="h-3 w-3 hidden sm:inline" />}
+            </Button>
+            
+            <Button
+              variant={artifactVisible ? "default" : "outline"}
+              size="sm"
+              onClick={toggleArtifactsPanel}
+              className="gap-1 bg-transparent border-white/20 text-white hover:bg-white/10"
+            >
+              <FileText className="h-4 w-4" />
+              <span className="hidden lg:inline">工件</span>
+              {artifactVisible ? <Minimize2 className="h-3 w-3 hidden sm:inline" /> : <Maximize2 className="h-3 w-3 hidden sm:inline" />}
+            </Button>
+            
+            <Button
+              variant={historyVisible ? "default" : "outline"}
+              size="sm"
+              onClick={toggleHistoryPanel}
+              className="gap-1 bg-transparent border-white/20 text-white hover:bg-white/10"
+            >
+              <Activity className="h-4 w-4" />
+              <span className="hidden lg:inline">输出流</span>
+              {historyVisible ? <Minimize2 className="h-3 w-3 hidden sm:inline" /> : <Maximize2 className="h-3 w-3 hidden sm:inline" />}
+            </Button>
+            
+            <Button
+              variant={podcastVisible ? "default" : "outline"}
+              size="sm"
+              onClick={togglePodcastPanel}
+              className="gap-1 bg-transparent border-white/20 text-white hover:bg-white/10"
+            >
+              <Headphones className="h-4 w-4" />
+              <span className="hidden lg:inline">播客</span>
+              {podcastVisible ? <Minimize2 className="h-3 w-3 hidden sm:inline" /> : <Maximize2 className="h-3 w-3 hidden sm:inline" />}
+            </Button>
           </div>
         </div>
+      )}
 
-        {/* 面板控制按钮 */}
-        <div className="flex items-center gap-1 flex-shrink-0">
-          <Button
-            variant={conversationVisible ? "default" : "outline"}
-            size="sm"
-            onClick={toggleConversationPanel}
-            className="gap-1"
-          >
-            <MessageSquare className="h-4 w-4" />
-            <span className="hidden lg:inline">对话</span>
-            {conversationVisible ? <Minimize2 className="h-3 w-3 hidden sm:inline" /> : <Maximize2 className="h-3 w-3 hidden sm:inline" />}
-          </Button>
-          
-          <Button
-            variant={artifactVisible ? "default" : "outline"}
-            size="sm"
-            onClick={toggleArtifactsPanel}
-            className="gap-1"
-          >
-            <FileText className="h-4 w-4" />
-            <span className="hidden lg:inline">工件</span>
-            {artifactVisible ? <Minimize2 className="h-3 w-3 hidden sm:inline" /> : <Maximize2 className="h-3 w-3 hidden sm:inline" />}
-          </Button>
-          
-          <Button
-            variant={historyVisible ? "default" : "outline"}
-            size="sm"
-            onClick={toggleHistoryPanel}
-            className="gap-1"
-          >
-            <Activity className="h-4 w-4" />
-            <span className="hidden lg:inline">输出流</span>
-            {historyVisible ? <Minimize2 className="h-3 w-3 hidden sm:inline" /> : <Maximize2 className="h-3 w-3 hidden sm:inline" />}
-          </Button>
-          
-          <Button
-            variant={podcastVisible ? "default" : "outline"}
-            size="sm"
-            onClick={togglePodcastPanel}
-            className="gap-1"
-          >
-            <Headphones className="h-4 w-4" />
-            <span className="hidden lg:inline">播客</span>
-            {podcastVisible ? <Minimize2 className="h-3 w-3 hidden sm:inline" /> : <Maximize2 className="h-3 w-3 hidden sm:inline" />}
-          </Button>
-        </div>
-      </div>
-
-      {/* 主要内容区域 - 自适应高度，确保不会超出屏幕 */}
-      <div className="flex flex-1 overflow-hidden min-h-0">
-        {/* 计算可见面板数量和宽度 */}
-        {(() => {
-          const visiblePanels = [conversationVisible, artifactVisible, historyVisible, podcastVisible].filter(Boolean).length;
-          const panelWidth = visiblePanels === 1 ? "w-full" : visiblePanels === 2 ? "w-1/2" : visiblePanels === 3 ? "w-1/3" : "w-1/4";
-          
-          return (
-            <>
-              {/* 对话面板 */}
-              {conversationVisible && (
-                <div className={cn("flex flex-col border-r border-gray-200 dark:border-gray-700 min-h-0", panelWidth)}>
+      {/* 主要内容区域 - 根据布局模式渲染 */}
+      <div className="flex-1 overflow-hidden min-h-0 relative">
+        {layoutMode === LayoutMode.WELCOME ? (
+          // 🚀 欢迎模式：居中显示欢迎内容
+          <WelcomeContent />
+        ) : (
+          // 🚀 对话和多面板模式：显示面板系统
+          <div className="flex h-full">
+            {/* 对话面板 */}
+            {conversationVisible && (
+              <div className={cn("flex flex-col h-full relative", panelWidthClass, {
+                "border-r border-white/10": visiblePanels.length > 1
+              })}>
+                <div className="flex-1 overflow-hidden">
                   <ConversationPanel traceId={urlParam} onSendMessage={handleSendMessage} />
                 </div>
-              )}
+                {/* 在多面板模式下，输入框属于对话面板 */}
+                {layoutMode === LayoutMode.MULTI_PANEL && <PanelInputContainer />}
+              </div>
+            )}
 
-              {/* 工件面板 */}
-              {artifactVisible && (
-                <div className={cn("flex flex-col min-h-0", panelWidth, {
-                  "border-r border-gray-200 dark:border-gray-700": historyVisible || podcastVisible
-                })}>
-                  <div className="flex-shrink-0 border-b border-gray-200 px-4 py-3 dark:border-gray-700">
-                    <div className="flex items-center justify-between">
-                      <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                        研究工件
-                      </h2>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => toggleArtifactsPanel()}
-                        className="h-8 w-8 p-0"
-                      >
-                        <Minimize2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="flex-1 overflow-hidden min-h-0">
-                    <ArtifactFeed traceId={urlParam} />
+            {/* 工件面板 */}
+            {artifactVisible && (
+              <div className={cn("flex flex-col h-full", panelWidthClass, {
+                "border-r border-white/10": historyVisible || podcastVisible
+              })}>
+                <div className="flex-shrink-0 px-4 py-3 border-b border-white/10">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-lg font-semibold text-white">
+                      研究工件
+                    </h2>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => toggleArtifactsPanel()}
+                      className="h-8 w-8 p-0 text-white hover:bg-white/10"
+                    >
+                      <Minimize2 className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
-              )}
+                <div className="flex-1 overflow-hidden">
+                  <ArtifactFeed traceId={urlParam} />
+                </div>
+              </div>
+            )}
 
-              {/* 历史面板 */}
-              {historyVisible && (
-                <div className={cn("flex flex-col min-h-0", panelWidth, {
-                  "border-r border-gray-200 dark:border-gray-700": podcastVisible
-                })}>
-                  <div className="flex-shrink-0 border-b border-gray-200 px-4 py-3 dark:border-gray-700">
-                    <div className="flex items-center justify-between">
-                      <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                        实时输出流
-                      </h2>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => toggleHistoryPanel()}
-                        className="h-8 w-8 p-0"
-                      >
-                        <Minimize2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="flex-1 overflow-hidden min-h-0">
-                    <OutputStream traceId={urlParam} />
+            {/* 输出流面板 */}
+            {historyVisible && (
+              <div className={cn("flex flex-col h-full", panelWidthClass, {
+                "border-r border-white/10": podcastVisible
+              })}>
+                <div className="flex-shrink-0 px-4 py-3 border-b border-white/10">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-lg font-semibold text-white">
+                      实时输出流
+                    </h2>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => toggleHistoryPanel()}
+                      className="h-8 w-8 p-0 text-white hover:bg-white/10"
+                    >
+                      <Minimize2 className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
-              )}
+                <div className="flex-1 overflow-hidden">
+                  <OutputStream traceId={urlParam} />
+                </div>
+              </div>
+            )}
 
-              {/* 播客面板 */}
-              {podcastVisible && (
-                <div className={cn("flex flex-col min-h-0", panelWidth)}>
+            {/* 播客面板 */}
+            {podcastVisible && (
+              <div className={cn("flex flex-col h-full", panelWidthClass)}>
+                <div className="flex-shrink-0 px-4 py-3 border-b border-white/10">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-lg font-semibold text-white">
+                      播客内容
+                    </h2>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => togglePodcastPanel()}
+                      className="h-8 w-8 p-0 text-white hover:bg-white/10"
+                    >
+                      <Minimize2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+                <div className="flex-1 overflow-hidden">
                   <PodcastPanel traceId={urlParam} />
                 </div>
-              )}
-            </>
-          );
-        })()}
+              </div>
+            )}
 
-        {/* 当所有面板都隐藏时显示空状态 */}
-        {!conversationVisible && !artifactVisible && !historyVisible && !podcastVisible && (
-          <div className="flex flex-1 items-center justify-center">
-            <div className="text-center">
-              <FileText className="mx-auto h-12 w-12 text-gray-400" />
-              <h3 className="mt-4 text-lg font-medium text-gray-900 dark:text-gray-100">
-                开始您的研究
-              </h3>
-              <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                使用下方输入框开始您的深度研究之旅
-              </p>
-            </div>
+            {/* 当有对话但所有面板都隐藏时显示提示 */}
+            {hasMessages && visiblePanels.length === 0 && (
+              <div className="flex flex-1 items-center justify-center">
+                <div className="text-center">
+                  <MessageSquare className="mx-auto h-12 w-12 text-gray-400" />
+                  <h3 className="mt-4 text-lg font-medium text-white">
+                    选择要查看的面板
+                  </h3>
+                  <p className="mt-2 text-sm text-gray-400">
+                    使用右上角的按钮开启对话、工件或其他面板
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
 
-      {/* 底部输入区域 - 固定高度，不会被遮挡 */}
-      {/* 
-        🔧 高度优化说明：
-        
-        问题：UserGuide和DebugPanel在输入框上方增加了额外高度，可能导致输入框超出屏幕
-        
-        解决方案：
-        1. 减少space-y-4到space-y-2，紧凑布局
-        2. UserGuide设为默认折叠状态
-        3. DebugPanel仅开发模式显示，生产环境不影响
-        4. 考虑将这些辅助组件移到侧边或其他位置
-        
-        未来考虑：
-        - 将UserGuide移到对话面板内部
-        - 实现可折叠的底部区域
-        - 根据屏幕高度动态调整
-      */}
-      <div className="flex-shrink-0 border-t border-white/20 bg-black/20 backdrop-blur-sm">
-        <div className="mx-auto max-w-4xl">
-
-          {/* 输入框区域 - 主要交互区域 */}
-          <div className="px-4 pb-4">
-            <HeroInput 
-              traceId={urlParam}
-              placeholder={hasMessages ? "继续研究对话..." : "开始您的研究之旅..."}
-              onSendMessage={handleSendMessage}
-              context="workspace"
-              className="w-full"
-            />
-          </div>
-        </div>
-      </div>
+      {/* 全局输入框 - 仅在欢迎和单对话模式显示 */}
+      {(layoutMode === LayoutMode.WELCOME || layoutMode === LayoutMode.CONVERSATION) && (
+        <GlobalInputContainer />
+      )}
     </div>
   );
 }

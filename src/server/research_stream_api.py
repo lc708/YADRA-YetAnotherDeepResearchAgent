@@ -2,7 +2,7 @@ import asyncio
 import json
 import uuid
 from datetime import datetime
-from typing import Dict, Any, Optional, AsyncGenerator, List
+from typing import Dict, Any, Optional, AsyncGenerator, List, cast
 from enum import Enum
 from dataclasses import dataclass, asdict
 import logging
@@ -17,6 +17,9 @@ from src.graph.async_builder import create_graph
 from src.graph.types import State
 from src.utils.url_param_generator import generate_url_param
 from src.server.repositories.session_repository import SessionRepository, get_session_repository
+
+# 添加LangChain消息类型导入
+from langchain_core.messages import BaseMessage, ToolMessage, AIMessageChunk
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +51,7 @@ class SSEEventType(Enum):
     MESSAGE_CHUNK = "message_chunk"
     ARTIFACT = "artifact"
     PROGRESS = "progress"
+    INTERRUPT = "interrupt"  # 🔥 添加interrupt事件类型
     COMPLETE = "complete"
     ERROR = "error"
 
@@ -165,6 +169,16 @@ class ProgressEvent:
     current_step_description: str
     thread_id: str
     execution_id: str
+    timestamp: str
+
+@dataclass
+class InterruptEvent:
+    interrupt_id: str
+    message: str
+    options: List[Dict[str, str]]  # [{"text": "开始研究", "value": "accepted"}]
+    thread_id: str
+    execution_id: str
+    node_name: str  # 触发interrupt的节点名称
     timestamp: str
 
 @dataclass
@@ -354,25 +368,114 @@ class ResearchStreamService:
             # 执行LangGraph工作流
             config = {"configurable": {"thread_id": thread_id}}
             
-            # 使用updates stream mode来获取更详细的执行信息
-            async for event in graph.astream(initial_state, config, stream_mode="updates"):
+            # 🔥 使用messages和updates混合模式来捕获interrupt事件（参考app.py实现）
+            async for agent, _, event_data in graph.astream(
+                initial_state, 
+                config, 
+                stream_mode=["messages", "updates"], 
+                subgraphs=True
+            ):
                 current_timestamp = self._get_current_timestamp()
                 
-                # 处理LangGraph updates事件
-                # event格式: {node_name: {state_updates}}
-                if isinstance(event, dict):
-                    for node_name, node_output in event.items():
-                        if node_name == "__start__":
-                            continue
+                # 🔥 处理LangGraph事件 - 完全参考app.py的正确实现
+                if isinstance(event_data, dict):
+                    if "__interrupt__" in event_data:
+                        # 处理interrupt事件（完全参考app.py实现）
+                        interrupt_data = event_data["__interrupt__"][0]
+                        interrupt_value = interrupt_data.value
+                        
+                        logger.info(f"🔄 收到interrupt事件: {interrupt_value}")
+                        
+                        # 检查是否是reask类型的interrupt
+                        if (
+                            isinstance(interrupt_value, tuple)
+                            and len(interrupt_value) == 2
+                            and interrupt_value[0] == "reask"
+                        ):
+                            # 处理reask interrupt
+                            original_input = interrupt_value[1]
+                            reask_event = {
+                                "thread_id": thread_id,
+                                "id": interrupt_data.ns[0],
+                                "role": "assistant",
+                                "content": "正在恢复原始输入状态...",
+                                "finish_reason": "reask",
+                                "original_input": original_input,
+                            }
+                            yield {
+                                "event": "reask",
+                                "data": safe_json_dumps(reask_event)
+                            }
+                        else:
+                            # 处理标准interrupt
+                            # 检查 interrupt_value 是否包含 options
+                            if (
+                                isinstance(interrupt_value, dict)
+                                and "options" in interrupt_value
+                            ):
+                                message_content = interrupt_value.get(
+                                    "message", "Please Review the Plan."
+                                )
+                                options = interrupt_value.get("options", [])
+                            else:
+                                # 兼容旧格式
+                                message_content = str(interrupt_value)
+                                options = [
+                                    {"text": "开始研究", "value": "accepted"},
+                                    {"text": "编辑计划", "value": "edit_plan"},
+                                    {"text": "立即生成报告", "value": "skip_research"},
+                                    {"text": "重新提问", "value": "reask"},
+                                ]
+
+                            interrupt_event = {
+                                "thread_id": thread_id,
+                                "id": interrupt_data.ns[0],
+                                "role": "assistant",
+                                "content": message_content,
+                                "finish_reason": "interrupt",
+                                "options": options,
+                            }
                             
-                        # 发送节点开始事件
-                        if node_name != current_node:
-                            # 如果之前有节点在执行，发送完成事件
-                            if current_node and current_node != "coordinator":
-                                completed_nodes.append(current_node)
-                                node_complete_event = NodeEvent(
+                            yield {
+                                "event": SSEEventType.INTERRUPT.value,
+                                "data": safe_json_dumps(interrupt_event)
+                            }
+                        
+                        # interrupt后不发送complete事件，等待用户反馈
+                        logger.info(f"🔄 Interrupt发送完成，等待用户反馈")
+                        return
+                    else:
+                        # 处理updates事件
+                        for node_name, node_output in event_data.items():
+                            if node_name == "__start__":
+                                continue
+                            
+                            # 发送节点开始事件
+                            if node_name != current_node:
+                                # 如果之前有节点在执行，发送完成事件
+                                if current_node and current_node != "coordinator":
+                                    completed_nodes.append(current_node)
+                                    node_complete_event = NodeEvent(
+                                        node_name=current_node,
+                                        node_type="complete",
+                                        thread_id=thread_id,
+                                        execution_id=execution_id,
+                                        input_data=None,
+                                        output_data=None,
+                                        duration_ms=None,
+                                        timestamp=current_timestamp
+                                    )
+                                    
+                                    yield {
+                                        "event": SSEEventType.NODE_COMPLETE.value,
+                                        "data": safe_json_dumps(asdict(node_complete_event))
+                                    }
+                                
+                                # 发送新节点开始事件
+                                current_node = node_name
+                                node_start_event = NodeEvent(
                                     node_name=current_node,
-                                    node_type="complete",
+                                    node_type="start",
                                     thread_id=thread_id,
                                     execution_id=execution_id,
                                     input_data=None,
@@ -382,247 +485,334 @@ class ResearchStreamService:
                                 )
                                 
                                 yield {
-                                    "event": SSEEventType.NODE_COMPLETE.value,
-                                    "data": safe_json_dumps(asdict(node_complete_event))
+                                    "event": SSEEventType.NODE_START.value,
+                                    "data": safe_json_dumps(asdict(node_start_event))
                                 }
                             
-                            # 发送新节点开始事件
-                            current_node = node_name
-                            node_start_event = NodeEvent(
-                                node_name=current_node,
-                                node_type="start",
+                            # 处理节点输出
+                            if isinstance(node_output, dict):
+                                # 处理消息
+                                if "messages" in node_output:
+                                    messages = node_output["messages"]
+                                    if isinstance(messages, list) and messages:
+                                        last_message = messages[-1]
+                                        content = getattr(last_message, 'content', str(last_message))
+                                        
+                                        if content:
+                                            # 🔥 保存消息到数据库
+                                            try:
+                                                await self.session_repo.save_message(
+                                                    session_id=session.id,
+                                                    execution_id=execution_id,
+                                                    role="assistant",
+                                                    content=content,
+                                                    content_type="text",
+                                                    frontend_context_uuid=request.frontend_context_uuid,
+                                                    source_agent=node_name
+                                                )
+                                            except Exception as e:
+                                                logger.error(f"保存消息失败: {e}")
+                                            
+                                            # 计算token和成本
+                                            token_info = self._calculate_tokens_and_cost(content, is_input=False)
+                                            
+                                            # 提取URL和图片
+                                            extracted = self._extract_urls_and_images(content)
+                                            
+                                            # 发送消息块事件
+                                            chunk_event = MessageChunkEvent(
+                                                chunk_id=str(uuid.uuid4()),
+                                                content=content,
+                                                chunk_type=self._determine_chunk_type(current_node, content),
+                                                agent_name=node_name,
+                                                sequence=len(messages),
+                                                is_final=False,
+                                                metadata={
+                                                    "urls": extracted["urls"],
+                                                    "images": extracted["images"],
+                                                    "token_info": token_info,
+                                                    "node": current_node
+                                                },
+                                                thread_id=thread_id,
+                                                execution_id=execution_id,
+                                                timestamp=current_timestamp
+                                            )
+                                            
+                                            yield {
+                                                "event": SSEEventType.MESSAGE_CHUNK.value,
+                                                "data": safe_json_dumps(asdict(chunk_event))
+                                            }
+                                
+                                # 处理计划生成
+                                if "current_plan" in node_output:
+                                    plan_data = node_output["current_plan"]
+                                    
+                                    # 🔥 保存plan作为artifact到数据库
+                                    try:
+                                        # 处理Plan对象的序列化
+                                        if isinstance(plan_data, str):
+                                            plan_content = plan_data
+                                        elif hasattr(plan_data, 'dict'):
+                                            # Pydantic模型，使用.dict()方法
+                                            plan_content = json.dumps(plan_data.dict(), ensure_ascii=False, indent=2)
+                                        elif hasattr(plan_data, '__dict__'):
+                                            # 普通对象，使用__dict__
+                                            plan_content = json.dumps(plan_data.__dict__, ensure_ascii=False, indent=2)
+                                        else:
+                                            # 其他情况，使用safe_json_dumps
+                                            plan_content = safe_json_dumps(plan_data)
+                                        
+                                        await self.session_repo.save_artifact(
+                                            session_id=session.id,
+                                            execution_id=execution_id,
+                                            artifact_type="research_plan",
+                                            title="研究计划",
+                                            content=plan_content,
+                                            description="由AI生成的研究计划",
+                                            content_format="json",
+                                            source_agent=node_name,
+                                            generation_context={"node": current_node, "timestamp": current_timestamp}
+                                        )
+                                    except Exception as e:
+                                        logger.error(f"保存plan artifact失败: {e}")
+                                        logger.error(f"Plan data type: {type(plan_data)}")
+                                        logger.error(f"Plan data content: {str(plan_data)[:200]}...")
+                                    
+                                    plan_event = PlanEvent(
+                                        plan_data=plan_data if isinstance(plan_data, dict) else {"plan": str(plan_data)},
+                                        plan_iterations=node_output.get("plan_iterations", 0),
+                                        thread_id=thread_id,
+                                        execution_id=execution_id,
+                                        timestamp=current_timestamp
+                                    )
+                                    
+                                    yield {
+                                        "event": SSEEventType.PLAN_GENERATED.value,
+                                        "data": safe_json_dumps(asdict(plan_event))
+                                    }
+                                
+                                # 处理背景调查结果
+                                if "background_investigation_results" in node_output:
+                                    search_content = node_output["background_investigation_results"]
+                                    
+                                    # 🔥 保存搜索结果到数据库
+                                    try:
+                                        await self.session_repo.save_message(
+                                            session_id=session.id,
+                                            execution_id=execution_id,
+                                            role="assistant",
+                                            content=search_content,
+                                            content_type="search_results",
+                                            frontend_context_uuid=request.frontend_context_uuid,
+                                            source_agent=node_name
+                                        )
+                                    except Exception as e:
+                                        logger.error(f"保存搜索结果失败: {e}")
+                                    
+                                    extracted = self._extract_urls_and_images(search_content)
+                                    
+                                    # 解析搜索结果
+                                    search_results = self._parse_search_results(search_content)
+                                    
+                                    search_event = SearchResultsEvent(
+                                        query=node_output.get("research_topic", ""),
+                                        results=search_results,
+                                        source="tavily",
+                                        thread_id=thread_id,
+                                        execution_id=execution_id,
+                                        timestamp=current_timestamp
+                                    )
+                                    
+                                    yield {
+                                        "event": SSEEventType.SEARCH_RESULTS.value,
+                                        "data": safe_json_dumps(asdict(search_event))
+                                    }
+                                
+                                # 处理最终报告
+                                if "final_report" in node_output:
+                                    report_content = node_output["final_report"]
+                                    
+                                    # 🔥 保存最终报告到数据库
+                                    try:
+                                        await self.session_repo.save_artifact(
+                                            session_id=session.id,
+                                            execution_id=execution_id,
+                                            artifact_type="summary",
+                                            title="研究报告",
+                                            content=report_content,
+                                            description="最终研究报告",
+                                            content_format="markdown",
+                                            source_agent=node_name,
+                                            generation_context={"node": current_node, "research_topic": node_output.get("research_topic", "")}
+                                        )
+                                    except Exception as e:
+                                        logger.error(f"保存最终报告失败: {e}")
+                                    
+                                    # 创建报告artifact
+                                    artifact_event = ArtifactEvent(
+                                        artifact_id=str(uuid.uuid4()),
+                                        type="summary",
+                                        title="研究报告",
+                                        content=report_content,
+                                        format="markdown",
+                                        metadata={
+                                            "node": current_node,
+                                            "research_topic": node_output.get("research_topic", "")
+                                        },
+                                        thread_id=thread_id,
+                                        execution_id=execution_id,
+                                        timestamp=current_timestamp
+                                    )
+                                    
+                                    yield {
+                                        "event": SSEEventType.ARTIFACT.value,
+                                        "data": safe_json_dumps(asdict(artifact_event))
+                                    }
+                            
+                            # 发送进度更新
+                            remaining_nodes = self._get_remaining_nodes(current_node, completed_nodes)
+                            progress_event = ProgressEvent(
+                                current_node=current_node,
+                                completed_nodes=completed_nodes.copy(),
+                                remaining_nodes=remaining_nodes,
+                                current_step_description=self._get_node_description(current_node),
                                 thread_id=thread_id,
                                 execution_id=execution_id,
-                                input_data=None,
-                                output_data=None,
-                                duration_ms=None,
                                 timestamp=current_timestamp
                             )
                             
                             yield {
-                                "event": SSEEventType.NODE_START.value,
-                                "data": safe_json_dumps(asdict(node_start_event))
+                                "event": SSEEventType.PROGRESS.value,
+                                "data": safe_json_dumps(asdict(progress_event))
                             }
-                        
-                        # 处理节点输出
-                        if isinstance(node_output, dict):
-                            # 处理消息
-                            if "messages" in node_output:
-                                messages = node_output["messages"]
-                                if isinstance(messages, list) and messages:
-                                    last_message = messages[-1]
-                                    content = getattr(last_message, 'content', str(last_message))
-                                    
-                                    if content:
-                                        # 🔥 保存消息到数据库
-                                        try:
-                                            await self.session_repo.save_message(
-                                                session_id=session.id,
-                                                execution_id=execution_id,
-                                                role="assistant",
-                                                content=content,
-                                                content_type="text",
-                                                frontend_context_uuid=request.frontend_context_uuid,
-                                                source_agent=node_name
-                                            )
-                                        except Exception as e:
-                                            logger.error(f"保存消息失败: {e}")
-                                        
-                                        # 计算token和成本
-                                        token_info = self._calculate_tokens_and_cost(content, is_input=False)
-                                        
-                                        # 提取URL和图片
-                                        extracted = self._extract_urls_and_images(content)
-                                        
-                                        # 发送消息块事件
-                                        chunk_event = MessageChunkEvent(
-                                            chunk_id=str(uuid.uuid4()),
-                                            content=content,
-                                            chunk_type=self._determine_chunk_type(current_node, content),
-                                            agent_name=node_name,
-                                            sequence=len(messages),
-                                            is_final=False,
-                                            metadata={
-                                                "urls": extracted["urls"],
-                                                "images": extracted["images"],
-                                                "token_info": token_info,
-                                                "node": current_node
-                                            },
-                                            thread_id=thread_id,
-                                            execution_id=execution_id,
-                                            timestamp=current_timestamp
-                                        )
-                                        
-                                        yield {
-                                            "event": SSEEventType.MESSAGE_CHUNK.value,
-                                            "data": safe_json_dumps(asdict(chunk_event))
-                                        }
-                            
-                            # 处理计划生成
-                            if "current_plan" in node_output:
-                                plan_data = node_output["current_plan"]
-                                
-                                # 🔥 保存plan作为artifact到数据库
-                                try:
-                                    # 处理Plan对象的序列化
-                                    if isinstance(plan_data, str):
-                                        plan_content = plan_data
-                                    elif hasattr(plan_data, 'dict'):
-                                        # Pydantic模型，使用.dict()方法
-                                        plan_content = json.dumps(plan_data.dict(), ensure_ascii=False, indent=2)
-                                    elif hasattr(plan_data, '__dict__'):
-                                        # 普通对象，使用__dict__
-                                        plan_content = json.dumps(plan_data.__dict__, ensure_ascii=False, indent=2)
-                                    else:
-                                        # 其他情况，使用safe_json_dumps
-                                        plan_content = safe_json_dumps(plan_data)
-                                    
-                                    await self.session_repo.save_artifact(
-                                        session_id=session.id,
-                                        execution_id=execution_id,
-                                        artifact_type="research_plan",
-                                        title="研究计划",
-                                        content=plan_content,
-                                        description="由AI生成的研究计划",
-                                        content_format="json",
-                                        source_agent=node_name,
-                                        generation_context={"node": current_node, "timestamp": current_timestamp}
-                                    )
-                                except Exception as e:
-                                    logger.error(f"保存plan artifact失败: {e}")
-                                    logger.error(f"Plan data type: {type(plan_data)}")
-                                    logger.error(f"Plan data content: {str(plan_data)[:200]}...")
-                                
-                                plan_event = PlanEvent(
-                                    plan_data=plan_data if isinstance(plan_data, dict) else {"plan": str(plan_data)},
-                                    plan_iterations=node_output.get("plan_iterations", 0),
-                                    thread_id=thread_id,
-                                    execution_id=execution_id,
-                                    timestamp=current_timestamp
-                                )
-                                
-                                yield {
-                                    "event": SSEEventType.PLAN_GENERATED.value,
-                                    "data": safe_json_dumps(asdict(plan_event))
-                                }
-                            
-                            # 处理背景调查结果
-                            if "background_investigation_results" in node_output:
-                                search_content = node_output["background_investigation_results"]
-                                
-                                # 🔥 保存搜索结果到数据库
-                                try:
-                                    await self.session_repo.save_message(
-                                        session_id=session.id,
-                                        execution_id=execution_id,
-                                        role="assistant",
-                                        content=search_content,
-                                        content_type="search_results",
-                                        frontend_context_uuid=request.frontend_context_uuid,
-                                        source_agent=node_name
-                                    )
-                                except Exception as e:
-                                    logger.error(f"保存搜索结果失败: {e}")
-                                
-                                extracted = self._extract_urls_and_images(search_content)
-                                
-                                # 解析搜索结果
-                                search_results = self._parse_search_results(search_content)
-                                
-                                search_event = SearchResultsEvent(
-                                    query=node_output.get("research_topic", ""),
-                                    results=search_results,
-                                    source="tavily",
-                                    thread_id=thread_id,
-                                    execution_id=execution_id,
-                                    timestamp=current_timestamp
-                                )
-                                
-                                yield {
-                                    "event": SSEEventType.SEARCH_RESULTS.value,
-                                    "data": safe_json_dumps(asdict(search_event))
-                                }
-                            
-                            # 处理最终报告
-                            if "final_report" in node_output:
-                                report_content = node_output["final_report"]
-                                
-                                # 🔥 保存最终报告到数据库
-                                try:
-                                    await self.session_repo.save_artifact(
-                                        session_id=session.id,
-                                        execution_id=execution_id,
-                                        artifact_type="summary",
-                                        title="研究报告",
-                                        content=report_content,
-                                        description="最终研究报告",
-                                        content_format="markdown",
-                                        source_agent=node_name,
-                                        generation_context={"node": current_node, "research_topic": node_output.get("research_topic", "")}
-                                    )
-                                except Exception as e:
-                                    logger.error(f"保存最终报告失败: {e}")
-                                
-                                # 创建报告artifact
-                                artifact_event = ArtifactEvent(
-                                    artifact_id=str(uuid.uuid4()),
-                                    type="summary",
-                                    title="研究报告",
-                                    content=report_content,
-                                    format="markdown",
-                                    metadata={
-                                        "node": current_node,
-                                        "research_topic": node_output.get("research_topic", "")
-                                    },
-                                    thread_id=thread_id,
-                                    execution_id=execution_id,
-                                    timestamp=current_timestamp
-                                )
-                                
-                                yield {
-                                    "event": SSEEventType.ARTIFACT.value,
-                                    "data": safe_json_dumps(asdict(artifact_event))
-                                }
-                        
-                        # 发送进度更新
-                        remaining_nodes = self._get_remaining_nodes(current_node, completed_nodes)
-                        progress_event = ProgressEvent(
-                            current_node=current_node,
-                            completed_nodes=completed_nodes.copy(),
-                            remaining_nodes=remaining_nodes,
-                            current_step_description=self._get_node_description(current_node),
-                            thread_id=thread_id,
-                            execution_id=execution_id,
-                            timestamp=current_timestamp
+                
+                # 🔥 处理messages流 - 完全参考app.py实现
+                try:
+                    # 安全地处理可能的单元素或双元素情况
+                    if isinstance(event_data, tuple) and len(event_data) >= 2:
+                        message_chunk, message_metadata = cast(
+                            tuple[BaseMessage, dict[str, any]], event_data
                         )
+                    elif isinstance(event_data, tuple) and len(event_data) == 1:
+                        message_chunk = event_data[0]
+                        message_metadata = {}
+                    else:
+                        # 如果不是预期的格式，跳过处理
+                        continue
+                    
+                    # 确保message_chunk是BaseMessage类型
+                    if not isinstance(message_chunk, BaseMessage):
+                        continue
                         
+                    event_stream_message: dict[str, any] = {
+                        "thread_id": thread_id,
+                        "agent": agent[0].split(":")[0] if agent else "unknown",
+                        "id": message_chunk.id,
+                        "role": "assistant",
+                        "content": message_chunk.content,
+                    }
+                    
+                    if message_chunk.additional_kwargs.get("reasoning_content"):
+                        event_stream_message["reasoning_content"] = message_chunk.additional_kwargs[
+                            "reasoning_content"
+                        ]
+                    if message_chunk.response_metadata.get("finish_reason"):
+                        event_stream_message["finish_reason"] = message_chunk.response_metadata.get(
+                            "finish_reason"
+                        )
+                    
+                    if isinstance(message_chunk, ToolMessage):
+                        # Tool Message - Return the result of the tool call
+                        event_stream_message["tool_call_id"] = message_chunk.tool_call_id
                         yield {
-                            "event": SSEEventType.PROGRESS.value,
-                            "data": safe_json_dumps(asdict(progress_event))
+                            "event": "tool_call_result",
+                            "data": safe_json_dumps(event_stream_message)
                         }
+                    elif isinstance(message_chunk, AIMessageChunk):
+                        # AI Message - Raw message tokens
+                        if message_chunk.tool_calls:
+                            # AI Message - Tool Call
+                            event_stream_message["tool_calls"] = message_chunk.tool_calls
+                            event_stream_message["tool_call_chunks"] = (
+                                message_chunk.tool_call_chunks
+                            )
+                            yield {
+                                "event": "tool_calls",
+                                "data": safe_json_dumps(event_stream_message)
+                            }
+                        elif message_chunk.tool_call_chunks:
+                            # AI Message - Tool Call Chunks
+                            event_stream_message["tool_call_chunks"] = (
+                                message_chunk.tool_call_chunks
+                            )
+                            yield {
+                                "event": "tool_call_chunks",
+                                "data": safe_json_dumps(event_stream_message)
+                            }
+                        else:
+                            # AI Message - Raw message tokens
+                            yield {
+                                "event": SSEEventType.MESSAGE_CHUNK.value,
+                                "data": safe_json_dumps(event_stream_message)
+                            }
+                except Exception as message_error:
+                    logger.warning(f"⚠️ Messages流处理错误: {message_error}, event_data类型: {type(event_data)}")
+                    # 不中断流，继续处理其他事件
+                    continue
             
-            # 工作流完成
-            end_time = datetime.utcnow()
-            duration_ms = int((end_time - start_time).total_seconds() * 1000)
-            final_token_info = self._calculate_tokens_and_cost("", is_input=False)
-            
-            complete_event = CompleteEvent(
-                execution_id=execution_id,
-                thread_id=thread_id,
-                total_duration_ms=duration_ms,
-                tokens_consumed=final_token_info,
-                total_cost=0.0,
-                artifacts_generated=[],
-                final_status="completed",
-                completion_time=self._get_current_timestamp(),
-                summary={"nodes_completed": completed_nodes},
-                timestamp=self._get_current_timestamp()
-            )
-            
-            yield {
-                "event": SSEEventType.COMPLETE.value,
-                "data": safe_json_dumps(asdict(complete_event))
-            }
+            # 🔥 检查LangGraph是否真正完成
+            try:
+                config = {"configurable": {"thread_id": thread_id}}
+                current_state = await graph.aget_state(config)
+                
+                # 🔥 修复interrupt状态检测逻辑
+                has_interrupt = False
+                if current_state and hasattr(current_state, 'tasks') and current_state.tasks:
+                    # 检查是否有pending的interrupt任务
+                    for task in current_state.tasks:
+                        if hasattr(task, 'interrupts') and task.interrupts:
+                            has_interrupt = True
+                            break
+                
+                # 更准确的完成状态判断
+                is_truly_complete = (
+                    current_state and 
+                    not has_interrupt and  # 没有pending的interrupt
+                    (not current_state.next or len(current_state.next) == 0)  # 没有下一个节点
+                )
+                
+                logger.info(f"🔍 LangGraph状态检查 - 是否有interrupt: {has_interrupt}, 是否真正完成: {is_truly_complete}, next节点: {current_state.next if current_state else 'None'}")
+                
+                if is_truly_complete:
+                    # 只有在真正完成时才发送complete事件
+                    end_time = datetime.utcnow()
+                    duration_ms = int((end_time - start_time).total_seconds() * 1000)
+                    final_token_info = self._calculate_tokens_and_cost("", is_input=False)
+                    
+                    complete_event = CompleteEvent(
+                        execution_id=execution_id,
+                        thread_id=thread_id,
+                        total_duration_ms=duration_ms,
+                        tokens_consumed=final_token_info,
+                        total_cost=0.0,
+                        artifacts_generated=[],
+                        final_status="completed",
+                        completion_time=self._get_current_timestamp(),
+                        summary={"nodes_completed": completed_nodes},
+                        timestamp=self._get_current_timestamp()
+                    )
+                    
+                    yield {
+                        "event": SSEEventType.COMPLETE.value,
+                        "data": safe_json_dumps(asdict(complete_event))
+                    }
+                else:
+                    # 工作流未完成（可能在interrupt等待用户反馈）
+                    logger.info(f"🔄 LangGraph工作流未完成，等待后续操作 - interrupt: {has_interrupt}")
+                    
+            except Exception as state_error:
+                logger.warning(f"⚠️ 无法获取LangGraph状态: {state_error}")
+                # 如果无法获取状态，保守地不发送complete事件
             
         except Exception as e:
             logger.error(f"LangGraph执行错误: {e}")
@@ -710,7 +900,7 @@ class ResearchStreamService:
             navigation_event = NavigationEvent(
                 url_param=url_param,
                 thread_id=thread_id,
-                workspace_url=f"/workspace/{url_param}",
+                workspace_url=f"/workspace?id={url_param}",
                 frontend_uuid=request.frontend_uuid,
                 frontend_context_uuid=request.frontend_context_uuid,
                 timestamp=self._get_current_timestamp()
@@ -775,6 +965,34 @@ class ResearchStreamService:
                 raise HTTPException(status_code=400, detail="必须提供thread_id或url_param")
             
             logger.info(f"🔍 Attempting to connect to thread_id: {thread_id}")
+            
+            # 🔥 检查是否有interrupt_feedback，优先处理
+            interrupt_feedback = None
+            if request.context and "interrupt_feedback" in request.context:
+                interrupt_feedback = request.context["interrupt_feedback"]
+                logger.info(f"📋 Processing interrupt feedback: {interrupt_feedback}")
+                
+                # 构建resume消息
+                resume_msg = f"[{interrupt_feedback.upper()}]"
+                if request.message and request.message.strip():
+                    resume_msg += f" {request.message}"
+                
+                # 生成执行ID
+                execution_id = f"feedback_{uuid.uuid4().hex[:8]}"
+                
+                # 准备Command输入来恢复执行
+                from langgraph.types import Command
+                inputs = Command(resume=resume_msg)
+                
+                # 获取LangGraph实例
+                graph = await self._get_graph()
+                
+                # 使用_process_langgraph_stream处理流式执行
+                async for event in self._process_langgraph_stream(
+                    graph, inputs, thread_id, execution_id, request
+                ):
+                    yield event
+                return
             
             # 🔥 场景判断
             if request.message and request.message.strip():

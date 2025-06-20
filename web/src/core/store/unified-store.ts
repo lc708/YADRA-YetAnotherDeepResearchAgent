@@ -24,6 +24,53 @@ import { messageToArtifact } from "~/core/adapters/state-adapter";
 // Enable Immer MapSet plugin
 enableMapSet();
 
+// 🚀 扩展性接口定义 - ASK API研究请求
+export interface ResearchRequest {
+  question: string;
+  askType: 'initial' | 'followup';
+  config: AskAPIConfig;
+  context?: {
+    sessionId?: number;
+    threadId?: string;
+    urlParam?: string;
+  };
+  interrupt_feedback?: string; // 🔥 添加interrupt_feedback支持
+}
+
+// 🚀 ASK API配置接口 - 支持所有用户可配置选项
+export interface AskAPIConfig {
+  // 基础配置
+  autoAcceptedPlan: boolean;
+  enableBackgroundInvestigation: boolean;
+  reportStyle: "academic" | "popular_science" | "news" | "social_media";
+  enableDeepThinking: boolean;
+  
+  // 研究参数
+  maxPlanIterations: number;
+  maxStepNum: number;
+  maxSearchResults: number;
+  
+  // 扩展配置 - 为未来迭代预留
+  [key: string]: any;
+}
+
+// 🚀 ASK API事件处理器类型
+export type AskAPIEventHandler = {
+  onNavigation?: (data: any) => void | Promise<void>;
+  onMetadata?: (data: any) => void | Promise<void>;
+  onNodeStart?: (data: any) => void | Promise<void>;
+  onNodeComplete?: (data: any) => void | Promise<void>;
+  onPlanGenerated?: (data: any) => void | Promise<void>;
+  onSearchResults?: (data: any) => void | Promise<void>;
+  onAgentOutput?: (data: any) => void | Promise<void>;
+  onMessageChunk?: (data: any) => void | Promise<void>;
+  onArtifact?: (data: any) => void | Promise<void>;
+  onProgress?: (data: any) => void | Promise<void>;
+  onInterrupt?: (data: any) => void | Promise<void>;
+  onComplete?: (data: any) => void | Promise<void>;
+  onError?: (data: any) => void | Promise<void>;
+};
+
 // 线程状态
 interface ThreadState {
   id: string;
@@ -39,6 +86,16 @@ interface ThreadState {
   ui: {
     lastInterruptMessageId: string | null;
     waitingForFeedbackMessageId: string | null;
+    currentInterrupt: {
+      interruptId: string;
+      message: string;
+      options: Array<{text: string; value: string}>;
+      threadId: string;
+      executionId: string;
+      nodeName: string;
+      timestamp: string;
+      messageId: string; // 关联的消息ID
+    } | null;
   };
 }
 
@@ -101,6 +158,11 @@ type UnifiedStore = {
   setInterruptMessage: (threadId: string, messageId: string | null) => void;
   setWaitingForFeedback: (threadId: string, messageId: string | null) => void;
   
+  // 🔥 添加interrupt事件管理方法
+  setCurrentInterrupt: (threadId: string, interruptData: ThreadState['ui']['currentInterrupt']) => void;
+  getCurrentInterrupt: (threadId: string) => ThreadState['ui']['currentInterrupt'];
+  clearCurrentInterrupt: (threadId: string) => void;
+  
   // 工作区操作
   setWorkspaceState: (update: Partial<UnifiedStore['workspace']>) => void;
   
@@ -146,6 +208,7 @@ export const useUnifiedStore = create<UnifiedStore>()(
           ui: {
             lastInterruptMessageId: null,
             waitingForFeedbackMessageId: null,
+            currentInterrupt: null,
           },
         };
         
@@ -179,6 +242,7 @@ export const useUnifiedStore = create<UnifiedStore>()(
               ui: {
                 lastInterruptMessageId: null,
                 waitingForFeedbackMessageId: null,
+                currentInterrupt: null,
               },
             };
             state.threads.set(threadId, thread);
@@ -317,6 +381,29 @@ export const useUnifiedStore = create<UnifiedStore>()(
           const thread = state.threads.get(threadId);
           if (thread) {
             thread.ui.waitingForFeedbackMessageId = messageId;
+          }
+        });
+      },
+      
+      // 🔥 添加interrupt事件管理方法
+      setCurrentInterrupt: (threadId: string, interruptData: ThreadState['ui']['currentInterrupt']) => {
+        set((state) => {
+          const thread = state.threads.get(threadId);
+          if (thread) {
+            thread.ui.currentInterrupt = interruptData;
+          }
+        });
+      },
+      
+      getCurrentInterrupt: (threadId: string) => {
+        return get().threads.get(threadId)?.ui.currentInterrupt || null;
+      },
+      
+      clearCurrentInterrupt: (threadId: string) => {
+        set((state) => {
+          const thread = state.threads.get(threadId);
+          if (thread) {
+            thread.ui.currentInterrupt = null;
           }
         });
       },
@@ -825,6 +912,373 @@ export const sendMessageWithNewAPI = async (
     
   } catch (error) {
     console.error('Failed to send message with new API:', error);
+    throw error;
+  } finally {
+    state.setResponding(false);
+  }
+};
+
+// 🚀 新架构：使用ASK API发送研究请求
+export const sendAskMessage = async (
+  request: ResearchRequest,
+  eventHandler?: AskAPIEventHandler,
+  config?: {
+    abortSignal?: AbortSignal;
+    onNavigate?: (url: string) => void | Promise<void>;
+  }
+): Promise<{
+  urlParam: string;
+  threadId: string;
+  workspaceUrl: string;
+}> => {
+  const state = useUnifiedStore.getState();
+  
+  // 动态导入必要的工具函数
+  const { fetchStream } = await import("~/core/sse");
+  const { resolveServiceURL } = await import("~/core/api/resolve-service-url");
+  const { generateInitialQuestionIDs, getVisitorId } = await import("~/core/utils");
+  
+  try {
+    // 🔥 设置响应状态
+    state.setResponding(true);
+    
+    // 🔥 生成前端UUID和访客ID
+    const frontendUuid = generateInitialQuestionIDs().frontend_context_uuid;
+    const visitorId = getVisitorId();
+    
+    // 🔥 构建ASK API请求数据
+    const requestData = {
+      question: request.question,
+      ask_type: request.askType,
+      frontend_uuid: frontendUuid,
+      visitor_id: visitorId,
+      user_id: undefined, // TODO: 从认证状态获取
+      config: {
+        auto_accepted_plan: request.config.autoAcceptedPlan,
+        ...request.config // 扩展配置 - 放在前面避免重复
+      },
+      // followup场景的上下文信息
+      ...(request.context && {
+        session_id: request.context.sessionId,
+        thread_id: request.context.threadId,
+        url_param: request.context.urlParam,
+      }),
+      // 🔥 添加interrupt_feedback支持
+      ...(request.interrupt_feedback && {
+        interrupt_feedback: request.interrupt_feedback,
+      })
+    };
+    
+    console.log("[sendAskMessage] Starting ASK API SSE stream:", {
+      askType: request.askType,
+      question: request.question.substring(0, 50) + '...',
+      frontend_uuid: frontendUuid,
+      config: request.config
+    });
+    
+    // 🔥 发起SSE流请求
+    const sseStream = fetchStream(
+      resolveServiceURL('research/ask?stream=true'),
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestData),
+      }
+    );
+    
+    // 🔥 准备返回值变量
+    let navigationResult: {
+      urlParam: string;
+      threadId: string;
+      workspaceUrl: string;
+    } | null = null;
+    
+    let currentThreadId: string | null = null;
+    let assistantMessage: Message | null = null;
+    
+    // 🔥 处理SSE事件流
+    for await (const event of sseStream) {
+      // 检查是否被中止
+      if (config?.abortSignal?.aborted) {
+        console.log("[sendAskMessage] Request aborted");
+        break;
+      }
+      
+      console.log("[sendAskMessage] SSE Event:", event.event, event.data);
+      
+      try {
+        const eventData = JSON.parse(event.data);
+        
+        // 🚀 统一事件处理逻辑
+        switch (event.event) {
+          case 'navigation':
+            // 🔥 处理导航事件 - 这是ASK API的核心事件
+            if (eventData.url_param && eventData.thread_id && eventData.workspace_url) {
+              navigationResult = {
+                urlParam: eventData.url_param,
+                threadId: eventData.thread_id,
+                workspaceUrl: eventData.workspace_url
+              };
+              
+                             // 更新store状态
+               state.setCurrentUrlParam(eventData.url_param);
+               state.setUrlParamMapping(eventData.url_param, eventData.thread_id);
+               state.setCurrentThread(eventData.thread_id);
+               currentThreadId = eventData.thread_id;
+               
+               // 创建用户消息（只在initial时创建）
+               if (request.askType === 'initial' && currentThreadId) {
+                 const userMessage: Message = {
+                   id: nanoid(),
+                   content: request.question,
+                   contentChunks: [request.question],
+                   role: "user",
+                   threadId: currentThreadId,
+                   isStreaming: false,
+                 };
+                 state.addMessage(currentThreadId, userMessage);
+                
+                // 创建助手消息用于接收流式内容
+                assistantMessage = {
+                  id: nanoid(),
+                  content: "",
+                  contentChunks: [],
+                  role: "assistant",
+                  threadId: currentThreadId,
+                  isStreaming: true,
+                  agent: "researcher",
+                };
+                state.addMessage(currentThreadId, assistantMessage);
+              }
+              
+              // 调用导航回调
+              if (config?.onNavigate) {
+                await config.onNavigate(eventData.workspace_url);
+              }
+              
+              // 调用事件处理器
+              if (eventHandler?.onNavigation) {
+                await eventHandler.onNavigation(eventData);
+              }
+            }
+            break;
+            
+          case 'metadata':
+            // 🔥 处理元数据事件
+            console.log('Execution metadata:', eventData);
+            // 更新会话元数据
+            state.setSessionState({
+              sessionMetadata: eventData,
+              executionHistory: [],
+              currentConfig: request.config,
+              permissions: null,
+            });
+            
+            if (eventHandler?.onMetadata) {
+              await eventHandler.onMetadata(eventData);
+            }
+            break;
+            
+          case 'node_start':
+            console.log('Node started:', eventData);
+            if (eventHandler?.onNodeStart) {
+              await eventHandler.onNodeStart(eventData);
+            }
+            break;
+            
+          case 'node_complete':
+            console.log('Node completed:', eventData);
+            if (eventHandler?.onNodeComplete) {
+              await eventHandler.onNodeComplete(eventData);
+            }
+            break;
+            
+          case 'plan_generated':
+            // 🔥 处理计划生成事件
+            console.log('Plan generated:', eventData);
+            if (currentThreadId && 'plan_data' in eventData && eventData.plan_data) {
+              const planContent = typeof eventData.plan_data === 'string' 
+                ? eventData.plan_data 
+                : JSON.stringify(eventData.plan_data, null, 2);
+                
+              const planMessage: Message = {
+                id: nanoid(),
+                content: planContent,
+                contentChunks: [planContent],
+                role: "assistant",
+                threadId: currentThreadId,
+                isStreaming: false,
+                agent: "planner",
+              };
+              state.addMessage(currentThreadId, planMessage);
+            }
+            
+            if (eventHandler?.onPlanGenerated) {
+              await eventHandler.onPlanGenerated(eventData);
+            }
+            break;
+            
+          case 'search_results':
+            // 🔥 处理搜索结果事件
+            console.log('Search results:', eventData);
+            if (eventHandler?.onSearchResults) {
+              await eventHandler.onSearchResults(eventData);
+            }
+            break;
+            
+          case 'agent_output':
+            // 🔥 处理智能体输出事件
+            console.log('Agent output:', eventData);
+            if (currentThreadId && 'content' in eventData && 'agent_name' in eventData &&
+                typeof eventData.content === 'string' && typeof eventData.agent_name === 'string') {
+              
+              // 确保agent_name是有效的agent类型
+              const validAgents = ["coordinator", "planner", "researcher", "coder", "reporter", "podcast"] as const;
+              const agentName = validAgents.includes(eventData.agent_name as any)
+                ? eventData.agent_name as typeof validAgents[number]
+                : "researcher";
+              
+              const agentMessage: Message = {
+                id: nanoid(),
+                content: eventData.content,
+                contentChunks: [eventData.content],
+                role: "assistant",
+                threadId: currentThreadId,
+                isStreaming: false,
+                agent: agentName,
+              };
+              state.addMessage(currentThreadId, agentMessage);
+            }
+            
+            if (eventHandler?.onAgentOutput) {
+              await eventHandler.onAgentOutput(eventData);
+            }
+            break;
+            
+          case 'message_chunk':
+            // 🔥 处理消息块事件
+            if (currentThreadId && assistantMessage && 'content' in eventData) {
+              const currentContent = state.getMessageById(currentThreadId, assistantMessage.id)?.content || '';
+              state.updateMessage(currentThreadId, assistantMessage.id, {
+                content: currentContent + eventData.content,
+              });
+            }
+            
+            if (eventHandler?.onMessageChunk) {
+              await eventHandler.onMessageChunk(eventData);
+            }
+            break;
+            
+          case 'artifact':
+            // 🔥 处理工件事件
+            console.log('Artifact generated:', eventData);
+            if (currentThreadId && 'content' in eventData && typeof eventData.content === 'string') {
+              const artifactMessage: Message = {
+                id: nanoid(),
+                content: eventData.content,
+                contentChunks: [eventData.content],
+                role: "assistant",
+                threadId: currentThreadId,
+                isStreaming: false,
+                agent: "reporter",
+              };
+              state.addMessage(currentThreadId, artifactMessage);
+            }
+            
+            if (eventHandler?.onArtifact) {
+              await eventHandler.onArtifact(eventData);
+            }
+            break;
+            
+          case 'progress':
+            // 🔥 处理进度事件
+            console.log('Progress update:', eventData);
+            if (eventHandler?.onProgress) {
+              await eventHandler.onProgress(eventData);
+            }
+            break;
+            
+          case 'interrupt':
+            // 🔥 处理中断事件
+            console.log('Interrupt event:', eventData);
+            if (currentThreadId && assistantMessage) {
+              // 标记需要用户交互
+              state.setInterruptMessage(currentThreadId, assistantMessage.id);
+              
+              // 🔥 保存完整的interrupt数据 - 修正字段名匹配
+              if ('id' in eventData && 'content' in eventData && 'options' in eventData) {
+                const interruptData = {
+                  interruptId: eventData.id as string,  // 🔥 修正：id -> interruptId
+                  message: eventData.content as string,  // 🔥 修正：content -> message
+                  options: eventData.options as Array<{text: string; value: string}>,
+                  threadId: eventData.thread_id as string,
+                  executionId: eventData.execution_id || '', // 可能不存在
+                  nodeName: eventData.node_name || 'human_feedback', // 可能不存在
+                  timestamp: eventData.timestamp || new Date().toISOString(), // 可能不存在
+                  messageId: assistantMessage.id,
+                };
+                state.setCurrentInterrupt(currentThreadId, interruptData);
+                console.log('🔔 Interrupt data saved to store:', interruptData);
+              } else {
+                console.warn('⚠️ Interrupt event missing required fields:', eventData);
+              }
+            }
+            
+            if (eventHandler?.onInterrupt) {
+              await eventHandler.onInterrupt(eventData);
+            }
+            break;
+            
+          case 'complete':
+            // 🔥 处理完成事件
+            console.log('Execution completed:', eventData);
+            if (currentThreadId && assistantMessage) {
+              state.updateMessage(currentThreadId, assistantMessage.id, {
+                isStreaming: false,
+              });
+            }
+            
+            if (eventHandler?.onComplete) {
+              await eventHandler.onComplete(eventData);
+            }
+            break;
+            
+          case 'error':
+            // 🔥 处理错误事件
+            console.error('Stream error:', eventData);
+            if (currentThreadId && assistantMessage && 'error_message' in eventData) {
+              state.updateMessage(currentThreadId, assistantMessage.id, {
+                content: `Error: ${eventData.error_message}`,
+                isStreaming: false,
+              });
+            }
+            
+            if (eventHandler?.onError) {
+              await eventHandler.onError(eventData);
+            }
+            break;
+            
+          default:
+            console.log(`[sendAskMessage] Unknown event type: ${event.event}`, eventData);
+            break;
+        }
+        
+      } catch (parseError) {
+        console.error("[sendAskMessage] Failed to parse SSE event data:", parseError);
+      }
+    }
+    
+    // 🔥 返回导航结果
+    if (!navigationResult) {
+      throw new Error("No navigation event received from ASK API");
+    }
+    
+    return navigationResult;
+    
+  } catch (error) {
+    console.error('[sendAskMessage] ASK API SSE stream failed:', error);
     throw error;
   } finally {
     state.setResponding(false);
