@@ -99,6 +99,7 @@ class NavigationEvent:
 class MetadataEvent:
     execution_id: str
     thread_id: str
+    session_id: Optional[int]  # 🔥 添加session_id字段
     frontend_uuid: str
     frontend_context_uuid: str
     visitor_id: str
@@ -107,6 +108,7 @@ class MetadataEvent:
     model_info: Dict[str, str]
     estimated_duration: int
     start_time: str
+    execution_type: str = "continue"  # 🔥 添加execution_type字段：continue/feedback/monitor
     timestamp: str
 
 
@@ -367,6 +369,7 @@ class ResearchStreamService:
         thread_id: str,
         execution_id: str,
         request: ResearchStreamRequest,
+        execution_type: str = "continue",
     ) -> AsyncGenerator[Dict[str, str], None]:
         """处理LangGraph流式执行"""
 
@@ -384,6 +387,7 @@ class ResearchStreamService:
             metadata_event = MetadataEvent(
                 execution_id=execution_id,
                 thread_id=thread_id,
+                session_id=session.id,
                 frontend_uuid=request.frontend_uuid,
                 frontend_context_uuid=request.frontend_context_uuid,
                 visitor_id=request.visitor_id,
@@ -404,6 +408,7 @@ class ResearchStreamService:
                 },
                 estimated_duration=120,
                 start_time=start_time.isoformat() + "Z",
+                execution_type=execution_type,
                 timestamp=self._get_current_timestamp(),
             )
 
@@ -1030,20 +1035,9 @@ class ResearchStreamService:
             )
             execution_id = execution_record.execution_id
 
-            # 发送navigation事件
-            navigation_event = NavigationEvent(
-                url_param=url_param,
-                thread_id=thread_id,
-                workspace_url=f"/workspace?id={url_param}",
-                frontend_uuid=request.frontend_uuid,
-                frontend_context_uuid=request.frontend_context_uuid,
-                timestamp=self._get_current_timestamp(),
-            )
-
-            yield {
-                "event": SSEEventType.NAVIGATION.value,
-                "data": safe_json_dumps(asdict(navigation_event)),
-            }
+            # 🔥 移除重复的navigation事件发送
+            # research_create_api已经发送了包含session_id的navigation事件
+            # 这里不再重复发送，避免双重navigation事件问题
 
             # 准备LangGraph初始状态
             initial_state = {
@@ -1064,7 +1058,7 @@ class ResearchStreamService:
 
             # 处理LangGraph流式执行 - 直接执行，无需预创建checkpoint
             async for event in self._process_langgraph_stream(
-                graph, initial_state, thread_id, execution_id, request
+                graph, initial_state, thread_id, execution_id, request, execution_type="create"
             ):
                 yield event
 
@@ -1121,8 +1115,8 @@ class ResearchStreamService:
                 if request.message and request.message.strip():
                     resume_msg += f" {request.message}"
 
-                # 生成执行ID
-                execution_id = f"feedback_{uuid.uuid4().hex[:8]}"
+                # 生成执行ID - 🔥 修复：使用标准UUID格式
+                execution_id = str(uuid.uuid4())
 
                 # 准备Command输入来恢复执行
                 from langgraph.types import Command
@@ -1134,7 +1128,7 @@ class ResearchStreamService:
 
                 # 使用_process_langgraph_stream处理流式执行
                 async for event in self._process_langgraph_stream(
-                    graph, inputs, thread_id, execution_id, request
+                    graph, inputs, thread_id, execution_id, request, execution_type="feedback"
                 ):
                     yield event
                 return
@@ -1144,8 +1138,8 @@ class ResearchStreamService:
                 # 场景1：有新消息，需要继续执行
                 logger.info(f"📝 Continuing thread {thread_id} with new message")
 
-                # 生成执行ID
-                execution_id = f"continue_{uuid.uuid4().hex[:8]}"
+                # 生成执行ID - 🔥 修复：使用标准UUID格式
+                execution_id = str(uuid.uuid4())
 
                 # 准备输入状态
                 inputs = {"messages": [{"role": "user", "content": request.message}]}
@@ -1155,20 +1149,21 @@ class ResearchStreamService:
 
                 # 使用_process_langgraph_stream处理流式执行
                 async for event in self._process_langgraph_stream(
-                    graph, inputs, thread_id, execution_id, request
+                    graph, inputs, thread_id, execution_id, request, execution_type="continue"
                 ):
                     yield event
             else:
                 # 场景2：监控模式 - 获取历史数据和当前状态
                 logger.info(f"🔄 Entering monitoring mode for thread {thread_id}")
 
-                # 生成监听会话ID
-                monitoring_id = f"monitor_{uuid.uuid4().hex[:8]}"
+                # 生成监听会话ID - 🔥 修复：使用标准UUID格式
+                monitoring_id = str(uuid.uuid4())
 
                 # 发送metadata事件表示开始连接
                 metadata_event = MetadataEvent(
                     execution_id=monitoring_id,
                     thread_id=thread_id,
+                    session_id=None,
                     frontend_uuid=request.frontend_uuid,
                     frontend_context_uuid=request.frontend_context_uuid,
                     visitor_id=request.visitor_id,
@@ -1181,6 +1176,7 @@ class ResearchStreamService:
                     },
                     estimated_duration=0,
                     start_time=self._get_current_timestamp(),
+                    execution_type="monitor",
                     timestamp=self._get_current_timestamp(),
                 )
 

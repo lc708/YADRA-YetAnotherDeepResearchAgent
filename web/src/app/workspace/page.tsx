@@ -328,23 +328,37 @@ export default function WorkspacePage() {
 
     // 处理PlanCard回调函数
     const handlePlanApprove = async (planId: string) => {
-      if (!currentThreadId) return;
+      if (!currentThreadId || !urlParam) return;
       
-      // 对应interrupt的"accepted"选项
+      // 获取session_id
+      const sessionState = useUnifiedStore.getState().sessionState;
+      const sessionId = sessionState?.sessionMetadata?.session_id;
+      
+      // 🔍 详细调试信息
+      console.log('🔍 [handlePlanApprove] Debug sessionState:', {
+        sessionState: sessionState,
+        sessionMetadata: sessionState?.sessionMetadata,
+        session_id: sessionId,
+        session_id_type: typeof sessionId,
+        currentThreadId: currentThreadId,
+        urlParam: urlParam
+      });
+      
+      if (!sessionId) {
+        console.error('❌ [handlePlanApprove] Session ID not found for followup request');
+        console.error('❌ sessionState详细状态:', sessionState);
+        return;
+      }
+      
+      // 🔥 HITL场景：不传递config，使用原始研究配置
       await sendAskMessage({
         question: "",
         askType: "followup",
-        config: {
-          autoAcceptedPlan: true,
-          enableBackgroundInvestigation: false,
-          reportStyle: "academic",
-          enableDeepThinking: false,
-          maxPlanIterations: 3,
-          maxStepNum: 10,
-          maxSearchResults: 10
-        },
+        config: {} as any, // 🔥 修复：HITL场景下不传递config，后端会使用原始配置
         context: {
-          threadId: currentThreadId
+          sessionId: sessionId,
+          threadId: currentThreadId,
+          urlParam: urlParam
         },
         interrupt_feedback: "accepted" // 🔥 正确位置：顶级字段
       });
@@ -353,23 +367,38 @@ export default function WorkspacePage() {
     };
 
     const handlePlanModify = async (planId: string, modifications: string) => {
-      if (!currentThreadId) return;
+      if (!currentThreadId || !urlParam) return;
       
-      // 对应interrupt的"edit_plan"选项
+      // 获取session_id
+      const sessionState = useUnifiedStore.getState().sessionState;
+      const sessionId = sessionState?.sessionMetadata?.session_id;
+      
+      // 🔍 详细调试信息
+      console.log('🔍 [handlePlanModify] Debug sessionState:', {
+        sessionState: sessionState,
+        sessionMetadata: sessionState?.sessionMetadata,
+        session_id: sessionId,
+        session_id_type: typeof sessionId,
+        currentThreadId: currentThreadId,
+        urlParam: urlParam,
+        modifications: modifications
+      });
+      
+      if (!sessionId) {
+        console.error('❌ [handlePlanModify] Session ID not found for followup request');
+        console.error('❌ sessionState详细状态:', sessionState);
+        return;
+      }
+      
+      // 🔥 HITL场景：不传递config，使用原始研究配置
       await sendAskMessage({
         question: modifications,
         askType: "followup",
-        config: {
-          autoAcceptedPlan: false,
-          enableBackgroundInvestigation: false,
-          reportStyle: "academic",
-          enableDeepThinking: false,
-          maxPlanIterations: 3,
-          maxStepNum: 10,
-          maxSearchResults: 10
-        },
+        config: {} as any, // 🔥 修复：HITL场景下不传递config，后端会使用原始配置
         context: {
-          threadId: currentThreadId
+          sessionId: sessionId,
+          threadId: currentThreadId,
+          urlParam: urlParam
         },
         interrupt_feedback: "edit_plan" // 🔥 正确位置：顶级字段
       });
@@ -378,23 +407,37 @@ export default function WorkspacePage() {
     };
 
     const handlePlanSkipToReport = async (planId: string) => {
-      if (!currentThreadId) return;
+      if (!currentThreadId || !urlParam) return;
       
-      // 对应interrupt的跳转报告选项
+      // 获取session_id
+      const sessionState = useUnifiedStore.getState().sessionState;
+      const sessionId = sessionState?.sessionMetadata?.session_id;
+      
+      // 🔍 详细调试信息
+      console.log('🔍 [handlePlanSkipToReport] Debug sessionState:', {
+        sessionState: sessionState,
+        sessionMetadata: sessionState?.sessionMetadata,
+        session_id: sessionId,
+        session_id_type: typeof sessionId,
+        currentThreadId: currentThreadId,
+        urlParam: urlParam
+      });
+      
+      if (!sessionId) {
+        console.error('❌ [handlePlanSkipToReport] Session ID not found for followup request');
+        console.error('❌ sessionState详细状态:', sessionState);
+        return;
+      }
+      
+      // 🔥 HITL场景：不传递config，使用原始研究配置
       await sendAskMessage({
         question: "",
         askType: "followup",
-        config: {
-          autoAcceptedPlan: true,
-          enableBackgroundInvestigation: false,
-          reportStyle: "academic",
-          enableDeepThinking: false,
-          maxPlanIterations: 3,
-          maxStepNum: 10,
-          maxSearchResults: 10
-        },
+        config: {} as any, // 🔥 修复：HITL场景下不传递config，后端会使用原始配置
         context: {
-          threadId: currentThreadId
+          sessionId: sessionId,
+          threadId: currentThreadId,
+          urlParam: urlParam
         },
         interrupt_feedback: "goto_reporter" // 🔥 正确位置：顶级字段
       });
@@ -405,9 +448,24 @@ export default function WorkspacePage() {
     const handlePlanReask = (planId: string) => {
       if (!currentThreadId) return;
       
-      // 重新提问功能
-      useUnifiedStore.getState().clearCurrentInterrupt(currentThreadId);
-      // 可以触发重新输入状态
+      // 🔥 过渡方案：重置当前研究状态，回到workspace初始根界面
+      const store = useUnifiedStore.getState();
+      
+      // 1. 清除当前interrupt状态
+      store.clearCurrentInterrupt(currentThreadId);
+      
+      // 2. 清除当前线程状态
+      store.clearThread(currentThreadId);
+      
+      // 3. 重置URL参数和当前线程
+      store.setCurrentThread(null);
+      store.setCurrentUrlParam(null);
+      
+      // 4. 重置会话状态
+      store.setSessionState(null);
+      
+      // 5. 导航回到workspace根路径
+      window.location.href = '/workspace';
     };
 
     const plan = convertInterruptToPlan();

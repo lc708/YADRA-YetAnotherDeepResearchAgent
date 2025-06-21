@@ -278,6 +278,17 @@ export const useUnifiedStore = create<UnifiedStore>()(
       
       // 会话状态管理 - 新增方法
       setSessionState: (sessionState: UnifiedStore['sessionState']) => {
+        // 🔍 调试每次sessionState更新
+        const currentState = get().sessionState;
+        console.log('🔍 [setSessionState] Updating sessionState:', {
+          from: currentState,
+          to: sessionState,
+          session_id_before: currentState?.sessionMetadata?.session_id,
+          session_id_after: sessionState?.sessionMetadata?.session_id,
+          timestamp: new Date().toISOString(),
+          stack: new Error().stack?.split('\n').slice(1, 6) // 获取调用栈前5行
+        });
+        
         set((state) => {
           state.sessionState = sessionState;
         });
@@ -954,8 +965,21 @@ export const sendAskMessage = async (
       visitor_id: visitorId,
       user_id: undefined, // TODO: 从认证状态获取
       config: {
+        // 🔥 修复：统一使用下划线命名，避免重复字段
         auto_accepted_plan: request.config.autoAcceptedPlan,
-        ...request.config // 扩展配置 - 放在前面避免重复
+        enable_background_investigation: request.config.enableBackgroundInvestigation,
+        report_style: request.config.reportStyle,
+        enable_deep_thinking: request.config.enableDeepThinking,
+        max_plan_iterations: request.config.maxPlanIterations,
+        max_step_num: request.config.maxStepNum,
+        max_search_results: request.config.maxSearchResults,
+        // 🔥 保留扩展配置但排除已映射的字段
+        ...Object.fromEntries(
+          Object.entries(request.config).filter(([key]) => 
+            !['autoAcceptedPlan', 'enableBackgroundInvestigation', 'reportStyle', 
+              'enableDeepThinking', 'maxPlanIterations', 'maxStepNum', 'maxSearchResults'].includes(key)
+          )
+        )
       },
       // followup场景的上下文信息
       ...(request.context && {
@@ -1028,6 +1052,42 @@ export const sendAskMessage = async (
                state.setCurrentThread(eventData.thread_id);
                currentThreadId = eventData.thread_id;
                
+               // 🔥 保存session_id到sessionState（如果提供）
+               if (eventData.session_id) {
+                 const currentSessionState = state.sessionState || {
+                   sessionMetadata: null,
+                   executionHistory: [],
+                   currentConfig: null,
+                   permissions: null,
+                 };
+                 
+                 const newSessionState = {
+                   ...currentSessionState,
+                   sessionMetadata: {
+                     ...currentSessionState.sessionMetadata,
+                     session_id: eventData.session_id,
+                     thread_id: eventData.thread_id,
+                     url_param: eventData.url_param,
+                   }
+                 };
+                 
+                 console.log('🔍 [Navigation Event] Saving session_id:', {
+                   eventData_session_id: eventData.session_id,
+                   eventData_thread_id: eventData.thread_id,
+                   eventData_url_param: eventData.url_param,
+                   currentSessionState: currentSessionState,
+                   newSessionState: newSessionState
+                 });
+                 
+                 state.setSessionState(newSessionState);
+                 
+                 // 🔍 验证sessionState是否正确保存 - 修复：使用实时获取
+                 const currentStoreState = useUnifiedStore.getState();
+                 console.log('🔍 [Navigation Event] After setSessionState, store sessionState:', currentStoreState.sessionState);
+               } else {
+                 console.log('⚠️ [Navigation Event] No session_id in eventData:', eventData);
+               }
+               
                // 创建用户消息（只在initial时创建）
                if (request.askType === 'initial' && currentThreadId) {
                  const userMessage: Message = {
@@ -1068,13 +1128,42 @@ export const sendAskMessage = async (
           case 'metadata':
             // 🔥 处理元数据事件
             console.log('Execution metadata:', eventData);
-            // 更新会话元数据
-            state.setSessionState({
-              sessionMetadata: eventData,
+            
+            // 🔥 修复：合并保存sessionState，避免覆盖session_id等关键信息 - 使用实时获取
+            const currentStoreState = useUnifiedStore.getState();
+            console.log('🔍 [Metadata Event] Current store sessionState:', currentStoreState.sessionState);
+            const currentSessionState = currentStoreState.sessionState || {
+              sessionMetadata: null,
               executionHistory: [],
-              currentConfig: request.config,
+              currentConfig: null,
               permissions: null,
+            };
+            console.log('🔍 [Metadata Event] Using currentSessionState:', currentSessionState);
+            
+            // 合并sessionMetadata：保留现有字段，新字段覆盖同名字段
+            const mergedSessionMetadata = {
+              ...currentSessionState.sessionMetadata,  // 保留现有数据（包括session_id）
+              ...eventData,  // 新数据覆盖同名字段
+            };
+            
+            const newSessionState = {
+              ...currentSessionState,  // 保留现有sessionState结构
+              sessionMetadata: mergedSessionMetadata,  // 合并后的metadata
+              currentConfig: request.config,  // 更新当前配置
+              executionHistory: currentSessionState.executionHistory || [],  // 保留执行历史
+            };
+            
+            console.log('🔍 [Metadata Event] Merging sessionState:', {
+              currentSessionState: currentSessionState,
+              eventData: eventData,
+              mergedSessionMetadata: mergedSessionMetadata,
+              newSessionState: newSessionState,
+              session_id_before: currentSessionState.sessionMetadata?.session_id,
+              session_id_after: mergedSessionMetadata.session_id,
+              session_id_in_eventData: eventData.session_id  // 🔥 恢复：现在metadata事件包含session_id
             });
+            
+            state.setSessionState(newSessionState);
             
             if (eventHandler?.onMetadata) {
               await eventHandler.onMetadata(eventData);

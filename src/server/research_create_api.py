@@ -16,7 +16,7 @@ import json
 
 from fastapi import APIRouter, HTTPException, Depends, Query, Request
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from dotenv import load_dotenv
 
 from src.server.repositories.session_repository import (
@@ -36,7 +36,7 @@ router = APIRouter(prefix="/api/research", tags=["research"])
 # 请求和响应模型
 class ResearchAskRequest(BaseModel):
     question: str = Field(
-        ..., min_length=1, max_length=2000, description="用户研究问题"
+        ..., min_length=0, max_length=2000, description="用户研究问题"
     )
     ask_type: Literal["initial", "followup"] = Field(
         ..., description="询问类型：initial=新建研究，followup=追问"
@@ -58,6 +58,17 @@ class ResearchAskRequest(BaseModel):
         None,
         description="HITL interrupt反馈：accepted, edit_plan, skip_research, reask等",
     )
+
+    @model_validator(mode='after')
+    def validate_question_for_hitl(self):
+        """条件验证：HITL场景允许question为空，否则要求有内容"""
+        # 如果有interrupt_feedback，允许question为空
+        if self.interrupt_feedback:
+            return self
+        # 否则要求question有内容
+        if not self.question.strip():
+            raise ValueError("question不能为空（除非提供interrupt_feedback）")
+        return self
 
 
 class ResearchAskResponse(BaseModel):
@@ -139,7 +150,7 @@ class ResearchAskService:
                     await self._prepare_followup_session(request)
                 )
                 logger.info(
-                    f"Pre-prepared followup session: {session_data.session_id}, thread_id: {thread_id}"
+                    f"Pre-prepared followup session: {session_data.id}, thread_id: {thread_id}"
                 )
             else:
                 raise ValueError(f"Unsupported ask_type: {request.ask_type}")
@@ -148,6 +159,7 @@ class ResearchAskService:
             navigation_event = {
                 "url_param": url_param,
                 "thread_id": thread_id,
+                "session_id": session_data.id,  # 添加session_id
                 "workspace_url": f"/workspace?id={url_param}",
                 "frontend_uuid": request.frontend_uuid,
                 "timestamp": datetime.now().isoformat(),
@@ -304,7 +316,7 @@ class ResearchAskService:
             raise HTTPException(status_code=404, detail="会话不存在")
 
         # 验证session_id是否匹配
-        if session_overview["session_id"] != request.session_id:
+        if session_overview["id"] != request.session_id:
             raise HTTPException(status_code=400, detail="session_id不匹配")
 
         if session_overview["thread_id"] != request.thread_id:
@@ -424,7 +436,7 @@ class ResearchAskService:
             raise HTTPException(status_code=404, detail="会话不存在")
 
         # 验证session_id是否匹配
-        if session_overview["session_id"] != request.session_id:
+        if session_overview["id"] != request.session_id:
             raise HTTPException(status_code=400, detail="session_id不匹配")
 
         if session_overview["thread_id"] != request.thread_id:
@@ -465,23 +477,43 @@ class ResearchAskService:
         return response
 
     def _parse_config(self, config: Dict[str, Any]) -> tuple:
-        """解析配置参数"""
+        """解析配置参数 - 支持嵌套和扁平结构"""
         research_config = {
             "auto_accepted_plan": (
-                config.get("research", {}).get("auto_accepted_plan", False)
+                config.get("research", {}).get("auto_accepted_plan") or
+                config.get("auto_accepted_plan") or
+                False
             ),
             "enable_background_investigation": (
-                config.get("research", {}).get("enable_background_investigation", True)
+                config.get("research", {}).get("enable_background_investigation") or
+                config.get("enable_background_investigation") or
+                True
             ),
-            "report_style": config.get("research", {}).get("report_style", "academic"),
+            "report_style": (
+                config.get("research", {}).get("report_style") or
+                config.get("report_style") or
+                "academic"
+            ),
             "enable_deep_thinking": (
-                config.get("research", {}).get("enable_deep_thinking", False)
+                config.get("research", {}).get("enable_deep_thinking") or
+                config.get("enable_deep_thinking") or
+                False
             ),
             "max_plan_iterations": (
-                config.get("research", {}).get("max_research_depth", 3)
+                config.get("research", {}).get("max_research_depth") or
+                config.get("max_plan_iterations") or
+                3
             ),
-            "max_step_num": 5,
-            "max_search_results": 5,
+            "max_step_num": (
+                config.get("research", {}).get("max_step_num") or
+                config.get("max_step_num") or
+                5
+            ),
+            "max_search_results": (
+                config.get("research", {}).get("max_search_results") or
+                config.get("max_search_results") or
+                5
+            ),
         }
 
         model_config = config.get("model", {})
