@@ -4,8 +4,10 @@
 
 ![Python Version](https://img.shields.io/badge/python-3.12+-blue.svg)
 ![LangGraph](https://img.shields.io/badge/powered%20by-LangGraph-orange.svg)
+![Next.js](https://img.shields.io/badge/frontend-Next.js%2015-black.svg)
+![TypeScript](https://img.shields.io/badge/typescript-5.0+-3178c6.svg)
 
-一个基于 LangGraph 的智能深度研究代理，支持多步骤推理、背景调查和多语言交互。
+一个基于 LangGraph 的智能深度研究代理，支持多步骤推理、实时流式响应和现代化 Web 界面。
 
 [🚀 快速开始](#快速开始) • [📖 功能特性](#功能特性) • [🛠️ 安装](#安装) • [📝 使用方法](#使用方法) • [🔧 配置](#配置)
 
@@ -13,35 +15,53 @@
 
 ## 📖 项目简介
 
-YADRA（Yet Another Deep Research Agent）是一个现代化的AI研究代理，旨在帮助用户进行深度信息研究和分析。它结合了大语言模型的强大能力和结构化的工作流引擎，能够自动化执行复杂的研究任务。
+YADRA（Yet Another Deep Research Agent）是一个现代化的AI研究代理，采用前后端分离架构，为用户提供直观的深度信息研究和分析体验。它结合了大语言模型的强大能力和结构化的工作流引擎，能够自动化执行复杂的研究任务，并通过实时流式响应提供流畅的用户体验。
 
 ### ✨ 核心特性
 
-- 🧠 **智能工作流**: 基于 LangGraph 的多步骤推理和计划执行
-- 🌐 **背景调查**: 自动进行网络搜索以增强上下文理解
+- 🧠 **智能工作流**: 基于 LangGraph 的多步骤推理和自适应计划执行
+- 🌊 **实时流式响应**: SSE (Server-Sent Events) 技术提供实时数据更新
+- 🌐 **现代化 Web UI**: 基于 Next.js 15 的响应式前端界面
+- 🏗️ **统一数据架构**: Phase 2 数据库架构，支持会话管理和历史记录
 - 🗣️ **多语言支持**: 同时支持中文和英文交互
-- 🔄 **交互式模式**: 提供友好的命令行界面和内置问题模板
-- 🌐 **Web API**: FastAPI 驱动的 RESTful API 服务
-- 🔌 **MCP 集成**: 支持 MCP 扩展工具能力
-- 📊 **多格式输出**: 支持文本、图表等多种输出格式
+- 🔄 **人机交互模式**: 支持用户反馈和计划确认的 HITL (Human-in-the-Loop) 功能
+- 🌐 **背景调查**: 自动进行网络搜索以增强上下文理解
+- 🔌 **MCP 集成**: 支持 Model Context Protocol 扩展工具能力
+- 📊 **多格式输出**: 支持文本、图表、播客等多种输出格式
 - 🐳 **容器化部署**: 完整的 Docker 支持
 
 ## 🛠️ 技术栈
 
+### 后端
 - **核心框架**: LangGraph, LangChain
 - **Web 框架**: FastAPI, Uvicorn
-- **包管理**: uv (推荐) 或 pip
+- **包管理**: uv (推荐)
+- **数据库**: PostgreSQL (Supabase)
 - **数据处理**: Pandas, NumPy
 - **网络爬虫**: httpx, readabilipy
-- **搜索引擎**: DuckDuckGo, Brave Search, arXiv, Tavily等
-- **部署**: Docker, Docker Compose
+- **搜索引擎**: Tavily, DuckDuckGo, Brave Search, arXiv等
+
+### 前端
+- **框架**: Next.js 15 (App Router)
+- **语言**: TypeScript 5.0+
+- **包管理**: pnpm
+- **UI组件**: Tailwind CSS, Radix UI
+- **状态管理**: Zustand (Unified Store)
+- **实时通信**: Server-Sent Events (SSE)
+
+### 数据库架构
+- **Phase 2 数据库结构**: 5表架构，支持会话映射和消息历史
+- **表结构**: `session_mapping`, `research_sessions`, `message_history`, `plans`, `artifact_storage`
+- **特性**: 统一会话管理、消息类型扩展、计划序列化支持
 
 ## 🚀 快速开始
 
 ### 环境要求
 
 - Python 3.12 或更高版本
-- uv 包管理器（推荐）或 pip
+- Node.js 18+ 和 pnpm
+- uv 包管理器（推荐）
+- PostgreSQL 数据库（推荐使用 Supabase）
 
 ### 1. 克隆项目
 
@@ -55,8 +75,9 @@ cd YADRA-YetAnotherDeepResearchAgent
 #### 使用 bootstrap.sh 脚本（推荐）
 
 ```bash
-# 开发模式（推荐）- 启用热重载
+# 开发模式（推荐）- 启用热重载和实时调试
 ./bootstrap.sh --dev    # 或 -d, dev, development
+
 # 生产模式
 ./bootstrap.sh
 
@@ -64,116 +85,111 @@ cd YADRA-YetAnotherDeepResearchAgent
 bootstrap.bat
 ```
 
-**开发模式 vs 生产模式**：
-- **开发模式**：后端启用 `--reload`，前端运行 `pnpm dev`
-- **生产模式**：后端无热重载，前端运行 `pnpm start`
+**开发模式特性**：
+- 🔥 **后端热重载**: `--reload` 模式，代码变更自动重启
+- ⚡ **前端快速刷新**: Next.js 开发模式，支持 HMR
+- 🐛 **调试模式**: 启用详细日志和错误追踪
+- 🔄 **实时 SSE**: 开发环境下的实时数据流
 
-#### 使用传统方法
+### 3. 配置文件设置
 
+#### 环境变量配置
+
+项目根目录的 `.env` 文件配置：
 ```bash
-python -m venv .venv
-source .venv/bin/activate  # macOS/Linux
-# 或
-.venv\Scripts\activate     # Windows
+# 数据库配置
+DATABASE_URL=
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
 
-pip install -e .
+# API 配置
+NEXT_PUBLIC_API_URL="http://localhost:8000/api"
+DEBUG=True
+APP_ENV=development
+
+# 搜索配置
+SEARCH_API=tavily
+TAVILY_API_KEY={已配置}
+
+# 代理配置
+AGENT_RECURSION_LIMIT=30
 ```
 
-### 3. 配置
-
-#### 后端配置
+#### 后端模型配置
 
 ```bash
 # 复制配置文件模板
 cp conf.yaml.example conf.yaml
 
-# 编辑配置文件，添加你的 API 密钥
+# 编辑配置文件，添加你的 LLM API 密钥
 nano conf.yaml
-
-# 设置根目录环境变量
-cp .env.example .env
-# 编辑 .env 文件，添加必要的环境变量
 ```
 
-#### 前端配置（Web UI）
+示例 `conf.yaml` 配置：
+```yaml
+BASIC_MODEL:
+  base_url: https://api.openai.com/v1
+  model: "gpt-4o"
+  api_key: "your-openai-api-key"
+
+REASONING_MODEL:
+  base_url: https://api.anthropic.com
+  model: "claude-3-5-sonnet-20241022"
+  api_key: "your-anthropic-api-key"
+```
+
+### 4. 数据库初始化
+
+Phase 2 数据库架构会在首次启动时自动初始化：
 
 ```bash
-# 进入前端目录
-cd web
+# 检查数据库连接（可选）
+python scripts/setup_postgres.py
 
-# 复制环境变量模板
-cp .env.template .env.local
-
-# 编辑 .env.local，配置以下必需变量：
-# - NEXT_PUBLIC_API_URL=http://localhost:8000/api
-# - NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-# - NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
+# 设置会话映射架构（可选，自动执行）
+python scripts/setup_session_mapping_schema.py
 ```
 
-### 4. Supabase 配置（用于工件管理）
+### 5. 运行应用
 
-如果您需要使用前端 Web UI 和工件管理功能，请配置 Supabase：
-
-```bash
-# 详细设置指南请参考
-# docs/20250614-supabase-setup.md
-```
-
-**必需的环境变量**：
-- `NEXT_PUBLIC_SUPABASE_URL` - 您的 Supabase 项目 URL
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY` - 您的 Supabase 匿名密钥
-
-详细的 Supabase 设置说明请查看 [docs/20250614-supabase-setup.md](docs/20250614-supabase-setup.md)。
-
-### 5. 运行
-
-#### 全栈应用（推荐）
+#### 全栈应用（推荐使用方式）
 
 ```bash
 # 开发模式 - 同时启动后端和前端
 ./bootstrap.sh --dev
 
-# 访问应用
-# - 前端: http://localhost:3001
-# - 后端 API: http://localhost:8000
-# - API 文档: http://localhost:8000/docs
+# 应用访问地址
+# 🌐 前端 Web UI: http://localhost:3001
+# 🔌 后端 API: http://localhost:8000
+# 📚 API 文档: http://localhost:8000/docs
+# 🔄 实时 WebSocket: ws://localhost:8000/ws
 ```
 
-#### 仅后端（命令行模式）
+#### 单独启动服务
 
 ```bash
-# 交互式模式（推荐新手）
-python main.py --interactive
+# 仅启动后端
+python server.py --reload --debug
 
-# 直接提问
-python main.py "人工智能的最新发展趋势是什么？"
-
-# 启用调试模式
-python main.py --debug --interactive
-```
-
-#### 仅后端（Web 服务模式）
-
-```bash
-# 启动 API 服务器
-python server.py
-
-# 或使用自定义配置
-python server.py --host 0.0.0.0 --port 8080 --reload
-```
-
-#### 仅前端
-
-```bash
-cd web
-pnpm install
-pnpm dev
-# 访问 http://localhost:3001
+# 仅启动前端（新终端）
+cd web && pnpm dev
 ```
 
 ## 📝 使用方法
 
-### 命令行参数
+### Web UI 使用（推荐）
+
+1. 访问 `http://localhost:3000`
+2. 在输入框中输入你的研究问题
+3. 配置研究参数（可选）：
+   - 最大计划迭代次数
+   - 最大执行步骤数
+   - 自动接受计划
+   - 报告风格选择
+4. 点击发送，观察实时流式响应
+5. 查看生成的工件、播客和研究结果
+
+### 命令行使用
 
 ```bash
 python main.py [选项] [查询内容]
@@ -186,163 +202,299 @@ python main.py [选项] [查询内容]
   --no-background-investigation  禁用背景调查
 ```
 
-### Web API 使用
+### API 使用
 
-启动服务器后，访问 `http://localhost:8000/docs` 查看 API 文档。
-
-主要端点：
-- `POST /ask` - 提交研究问题
-- `GET /status` - 查看服务状态
-- `GET /health` - 健康检查
-
-### 内置问题模板
-
-项目包含了多个预设的研究问题，涵盖：
-
-**中文问题**:
-- 人工智能在医疗保健领域的应用因素
-- 量子计算对密码学的影响
-- 可再生能源技术的最新发展
-- 气候变化对全球农业的影响
-- 等等...
-
-**英文问题**:
-- AI adoption factors in healthcare
-- Quantum computing impact on cryptography
-- Latest renewable energy developments
-- Climate change effects on agriculture
-- 等等...
-
-## 🔧 配置
-
-### 基础配置
-
-编辑 `conf.yaml` 文件：
-
-```yaml
-BASIC_MODEL:
-  base_url: https://your-api-endpoint.com
-  model: "your-model-name"
-  api_key: "your-api-key"
-```
-
-### 高级配置
-
-- **MCP 集成**: 在 `src/workflow.py` 中配置 MCP 服务器
-- **工具扩展**: 在 `src/tools/` 目录下添加自定义工具
-- **提示词模板**: 在 `src/prompts/` 目录下自定义提示词
-
-## 🐳 Docker 部署
-
-### 使用 Docker Compose
+主要 API 端点：
 
 ```bash
-# 构建并启动服务
+# 创建研究会话
+POST /research/create
+{
+  "query": "研究问题",
+  "research_config": {
+    "max_plan_iterations": 2,
+    "max_step_num": 5,
+    "auto_accepted_plan": false
+  }
+}
+
+# 获取会话状态
+GET /research/status/{session_id}
+
+# SSE 流式响应
+GET /research/stream/{session_id}
+
+# 健康检查
+GET /health
+```
+
+### 新架构特性
+
+#### 统一数据流架构
+- **实时页面**: 完全使用 SSE 流式数据，无数据库查询延迟
+- **历史页面**: 完全使用数据库数据，确保数据持久性
+- **数据一致性**: 后端确保 SSE 事件与数据库完全同步
+
+#### 会话管理
+- **智能 URL 参数**: 自动生成可读的会话标识符
+- **会话恢复**: 支持页面刷新后的会话状态恢复
+- **多会话切换**: 支持同时管理多个研究会话
+
+#### 人机交互功能
+- **计划确认**: 用户可审核和修改 AI 生成的研究计划
+- **步骤干预**: 在关键步骤支持用户反馈和调整
+- **配置灵活性**: 支持自动接受计划或手动确认模式
+
+## 🔧 高级配置
+
+### 研究配置参数
+
+```typescript
+interface ResearchConfig {
+  max_plan_iterations: number;    // 最大计划迭代次数 (1-5)
+  max_step_num: number;          // 最大执行步骤数 (3-10)
+  auto_accepted_plan: boolean;   // 是否自动接受计划
+  report_style: "academic" | "popular_science" | "news" | "social_media";
+  max_search_results: number;    // 最大搜索结果数
+}
+```
+
+### MCP 服务器配置
+
+在前端设置页面或通过 API 配置 MCP 服务器：
+
+```json
+{
+  "name": "filesystem",
+  "command": "uvx",
+  "args": ["mcp-server-filesystem", "/path/to/allowed/files"],
+  "env": {}
+}
+```
+
+### 数据库模式
+
+Phase 2 架构包含以下核心表：
+
+```sql
+-- 会话映射表
+CREATE TABLE session_mapping (
+    thread_id TEXT PRIMARY KEY,
+    session_id TEXT NOT NULL UNIQUE,
+    url_param TEXT NOT NULL UNIQUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 研究会话表
+CREATE TABLE research_sessions (
+    session_id TEXT PRIMARY KEY,
+    query TEXT NOT NULL,
+    status TEXT DEFAULT 'created',
+    research_config JSONB,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 消息历史表
+CREATE TABLE message_history (
+    id SERIAL PRIMARY KEY,
+    session_id TEXT REFERENCES research_sessions(session_id),
+    content TEXT NOT NULL,
+    content_type TEXT CHECK (content_type IN (
+        'text', 'markdown', 'html', 'search_results', 
+        'plan', 'artifact', 'error', 'system', 'json'
+    )),
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+## 🐳 部署
+
+### Docker Compose 部署
+
+```bash
+# 构建并启动所有服务
 docker-compose up -d
 
+# 查看服务状态
+docker-compose ps
+
 # 查看日志
-docker-compose logs -f
+docker-compose logs -f yadra-backend
+docker-compose logs -f yadra-frontend
 
 # 停止服务
 docker-compose down
 ```
 
-### 使用 Dockerfile
+### 生产环境配置
 
-```bash
-# 构建镜像
-docker build -t yadra .
-
-# 运行容器
-docker run -p 8000:8000 -v ./conf.yaml:/app/conf.yaml yadra
+```yaml
+# docker-compose.prod.yml
+version: '3.8'
+services:
+  backend:
+    build: .
+    environment:
+      - APP_ENV=production
+      - DEBUG=False
+    ports:
+      - "8000:8000"
+  
+  frontend:
+    build: ./web
+    environment:
+      - NODE_ENV=production
+    ports:
+      - "3000:3000"
 ```
 
-## 🧪 开发
+## 🧪 开发指南
 
-### 安装开发依赖
+### 前端开发
 
 ```bash
+cd web
+
+# 安装依赖
+pnpm install
+
+# 开发模式
+pnpm dev
+
+# 构建生产版本
+pnpm build
+
+# 启动生产服务器
+pnpm start
+
+# 类型检查
+pnpm type-check
+
+# Lint 检查
+pnpm lint
+```
+
+### 后端开发
+
+```bash
+# 安装开发依赖
 uv sync --extra dev
+
+# 运行测试
+pytest tests/
+
+# 代码格式化
+ruff format src/
+ruff check src/ --fix
+
+# 启动开发服务器
+python server.py --reload --debug
 ```
 
-### 运行测试
+### 调试工具
+
+项目提供了多个调试脚本：
 
 ```bash
-# 运行所有测试
-make test
+# 查询数据库结构
+python scripts/query_database_structure.py
 
-# 运行特定测试文件
-pytest tests/test_workflow.py
+# 查询外键关系
+python scripts/query_foreign_keys.py
 
-# 生成覆盖率报告
-make coverage
-```
-
-### 代码格式化
-
-```bash
-# 运行Lint
-make lint
-
-# 格式化
-make format
-
-# 运行 pre-commit 检查
-pre-commit run --all-files
+# 检查用户数据
+python scripts/check_users.py
 ```
 
 ## 📁 项目结构
 
 ```
 YADRA-YetAnotherDeepResearchAgent/
-├── src/                    # 核心源代码
-│   ├── agents/            # AI 代理实现
-│   ├── config/            # 配置和问题模板
-│   ├── crawler/           # 网络爬虫模块
-│   ├── graph/             # LangGraph 工作流定义
-│   ├── llms/              # 大语言模型接口
-│   ├── prompts/           # 提示词模板
-│   ├── rag/               # 检索增强生成
-│   ├── server/            # Web 服务器实现
-│   ├── tools/             # 工具集合
-│   └── utils/             # 工具函数
-├── docs/                  # 文档
-├── tests/                 # 测试用例
-├── examples/              # 示例代码
-├── web/                   # 前端资源
-├── main.py                # 命令行入口
-├── server.py              # Web 服务入口
-├── conf.yaml.example      # 配置模板
-└── pyproject.toml         # 项目配置
+├── src/                          # 后端源代码
+│   ├── server/                   # FastAPI 服务器
+│   │   ├── repositories/         # 数据访问层
+│   │   ├── research_create_api.py # 研究创建 API
+│   │   └── research_stream_api.py # SSE 流式 API
+│   ├── graph/                    # LangGraph 工作流
+│   ├── agents/                   # AI 代理实现
+│   └── utils/                    # 工具函数
+├── web/                          # 前端源代码
+│   ├── src/
+│   │   ├── app/
+│   │   │   ├── workspace/        # 主工作空间页面
+│   │   │   └── settings/         # 设置页面
+│   │   ├── components/           # 可复用组件
+│   │   │   ├── yadra/           # YADRA 特定组件
+│   │   │   └── ui/              # 基础 UI 组件
+│   │   ├── core/                # 核心功能
+│   │   │   ├── api/             # API 客户端
+│   │   │   ├── sse/             # SSE 处理
+│   │   │   └── store/           # Zustand 状态管理
+│   │   └── lib/                 # 工具库
+├── scripts/                      # 数据库和工具脚本
+├── docs/                        # 项目文档
+├── examples/                    # 研究示例
+├── main.py                      # 命令行入口
+├── server.py                    # Web 服务入口
+└── bootstrap.sh                 # 快速启动脚本
 ```
+
+## 🔄 更新日志
+
+### Phase 2 架构升级 (最新)
+- ✅ **统一数据架构**: 实时页面使用 SSE，历史页面使用数据库
+- ✅ **会话管理优化**: 新的 session_mapping 表和 URL 参数生成
+- ✅ **消息类型扩展**: 支持 9 种消息类型的存储和处理
+- ✅ **前端架构重构**: workspace 根页面替代动态路由
+- ✅ **组件迁移完成**: PodcastPanel 等核心组件迁移到新架构
+- ✅ **配置传递链路**: 从前端设置到后端 LangGraph 的完整配置传递
+
+### 技术债务清理
+- 🗑️ **废弃路由清理**: 移除 `/workspace/[traceId]` 动态路由
+- 🗑️ **脚本目录整理**: 清理临时测试和调试脚本
+- 🔧 **依赖优化**: 更新到最新的 Next.js 15 和相关依赖
 
 ## 🤝 贡献
 
-我们欢迎所有形式的贡献！请查看 [贡献指南](CONTRIBUTING.md) 了解详情。
+我们欢迎所有形式的贡献！请查看以下指南：
 
 ### 开发流程
 
-1. Fork 项目
+1. Fork 项目到你的 GitHub 账户
 2. 创建特性分支 (`git checkout -b feature/amazing-feature`)
-3. 提交更改 (`git commit -m 'Add amazing feature'`)
-4. 推送到分支 (`git push origin feature/amazing-feature`)
-5. 创建 Pull Request
+3. 遵循代码规范进行开发
+4. 运行测试确保功能正常 (`pytest tests/`)
+5. 提交更改 (`git commit -m 'Add amazing feature'`)
+6. 推送到分支 (`git push origin feature/amazing-feature`)
+7. 创建 Pull Request
+
+### 代码规范
+
+- **后端**: 使用 `ruff` 进行代码格式化和 lint 检查
+- **前端**: 使用 `prettier` 和 `eslint` 进行代码格式化
+- **提交信息**: 使用语义化提交信息 (Conventional Commits)
+- **类型安全**: 后端使用 Python 类型提示，前端使用 TypeScript
 
 ## 🙏 致谢
 
 - [LangChain](https://github.com/langchain-ai/langchain) - 为 LLM 应用提供强大框架
-- [LangGraph](https://github.com/langchain-ai/langgraph) - 多代理工作流引擎
-- [FastAPI](https://github.com/tiangolo/fastapi) - 现代化 Web 框架
+- [LangGraph](https://github.com/langchain-ai/langgraph) - 多代理工作流引擎  
+- [Next.js](https://github.com/vercel/next.js) - 现代化 React 框架
+- [FastAPI](https://github.com/tiangolo/fastapi) - 高性能 Web 框架
+- [Supabase](https://github.com/supabase/supabase) - 开源 Firebase 替代方案
+- [Tailwind CSS](https://github.com/tailwindlabs/tailwindcss) - 实用优先的 CSS 框架
 - 所有贡献者和开源社区
 
-## 📞 支持
+## 📞 支持与反馈
 
 - 🐛 [报告问题](https://github.com/your-username/YADRA/issues)
-- 💬 [讨论区](https://github.com/your-username/YADRA/discussions)
-- 📧 邮件支持: support@yadra.ai
+- 💬 [讨论区](https://github.com/your-username/YADRA/discussions)  
+
 
 ---
 
 <div align="center">
-Made with ❤️ by the YADRA Team
+
+**YADRA - 让 AI 研究更智能、更高效** 
+
 </div>    
