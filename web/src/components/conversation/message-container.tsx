@@ -28,6 +28,7 @@ import { Button } from "~/components/ui/button";
 import StatusBadge, { type StatusType } from "./status-badge";
 import LoadingAnimation from "./loading-animation";
 import MarkdownRenderer from "./markdown-renderer";
+import { User, Bot } from "lucide-react";
 
 export interface Message {
   id: string;
@@ -81,7 +82,7 @@ const MessageAvatar: React.FC<{ role: Message["role"] }> = ({ role }) => {
 
   return (
     <div className={cn(
-      "h-8 w-8 shrink-0 rounded-full flex items-center justify-center text-white text-xs font-medium",
+      "h-8 w-8 shrink-0 rounded-full flex items-center justify-center text-white text-xs font-medium bg-gray-700",
       config.bgColor
     )}>
       {config.fallback}
@@ -267,7 +268,13 @@ export const MessageContainer: React.FC<MessageContainerProps> = ({
           animate={{ scale: 1 }}
           transition={{ delay: 0.2 }}
         >
-          <MessageAvatar role={message.role} />
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-800 text-white">
+            {message.role === 'user' ? (
+              <User className="h-4 w-4" />
+            ) : (
+              <Bot className="h-4 w-4" />
+            )}
+          </div>
         </motion.div>
       )}
 
@@ -281,12 +288,12 @@ export const MessageContainer: React.FC<MessageContainerProps> = ({
           "flex items-center gap-2 mb-2",
           isUserMessage ? "justify-end" : "justify-start"
         )}>
-          <span className="text-sm font-medium capitalize">
-            {message.role === "assistant" ? "AI助手" : message.role === "user" ? "用户" : "系统"}
+          <span className="text-sm font-medium text-gray-900">
+            {message.role === 'user' ? '你' : 'YADRA'}
           </span>
 
           {showTimestamp && (
-            <span className="text-xs text-muted-foreground">
+            <span className="text-xs text-gray-500">
               {message.timestamp.toLocaleTimeString()}
             </span>
           )}
@@ -321,13 +328,9 @@ export const MessageContainer: React.FC<MessageContainerProps> = ({
               showText={false}
             />
           ) : (
-            <MarkdownRenderer 
-              content={message.content}
-              variant="compact"
-              className={cn(
-                isUserMessage && "text-primary-foreground [&_*]:text-primary-foreground"
-              )}
-            />
+            <div className="prose prose-sm max-w-none text-gray-700">
+              <MarkdownRenderer content={message.content} />
+            </div>
           )}
 
           {/* 流式指示器 */}

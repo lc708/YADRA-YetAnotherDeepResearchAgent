@@ -11,40 +11,46 @@
  * - 📊 按角色、Agent、来源分类
  * - 📤 导出完整输出流
  * - ⚡ 流式消息状态显示
+ * - 🎯 智能自动滚动：仅在底部时自动滚动
  * 
  * 与"消息历史"的区别：
  * - 历史页面：完全基于数据库查询，用于回顾
  * - 输出流：完全基于SSE实时数据，用于监控当前任务
  */
 
-import { useState, useMemo, useCallback, useRef, useEffect } from "react";
-import { Search, Filter, Download, Activity, User, Bot, Settings, Zap, FileText, AlertCircle } from "lucide-react";
+import { useState, useMemo, useCallback, useRef } from "react";
 import { toast } from "sonner";
+import { Search, Download, Activity, User, Bot, Settings, Zap, FileText, AlertCircle } from "lucide-react";
 
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Badge } from "~/components/ui/badge";
-import { ScrollArea } from "~/components/ui/scroll-area";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
-import { Separator } from "~/components/ui/separator";
 import { Markdown } from "~/components/yadra/markdown";
-import { useMessages, useMessageIds, useCurrentThread, useUnifiedStore } from "~/core/store";
-import type { Message, MessageRole, MessageSource } from "~/core/messages";
+import { ScrollContainer, type ScrollContainerRef } from "~/components/conversation/scroll-container";
 import { cn } from "~/lib/utils";
 
+import type { Message } from "~/core/messages";
+import { 
+  useUnifiedStore, 
+  useCurrentThread, 
+  useThreadMessages, 
+  useCurrentUrlParam 
+} from "~/core/store";
+
 interface OutputStreamProps {
-  traceId: string;
   className?: string;
 }
 
 type FilterType = "all" | "user" | "assistant" | "tool";
 type SourceFilter = "all" | "input" | "button" | "system";
 
-export function OutputStream({ traceId, className }: OutputStreamProps) {
-  const messageIds = useMessageIds(traceId);
-  const messages = useMessages(traceId);
+export function OutputStream({ className }: OutputStreamProps) {
+  // 🔥 使用新的数据架构 - 从 unified-store 获取数据
+  const currentUrlParam = useCurrentUrlParam();
   const threadData = useCurrentThread();
+  const messages = useThreadMessages();
   const responding = useUnifiedStore((state) => state.responding);
   
   const [searchQuery, setSearchQuery] = useState("");
@@ -54,16 +60,8 @@ export function OutputStream({ traceId, className }: OutputStreamProps) {
   const [eventTypeFilter, setEventTypeFilter] = useState<string>("all");
   const [autoScroll, setAutoScroll] = useState(true);
   
-  const scrollAreaRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (autoScroll && scrollAreaRef.current) {
-      const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
-      if (scrollContainer) {
-        scrollContainer.scrollTop = scrollContainer.scrollHeight;
-      }
-    }
-  }, [messageIds, autoScroll]);
+  // 🔥 使用智能滚动容器
+  const scrollContainerRef = useRef<ScrollContainerRef>(null);
 
   const allMessages = useMemo(() => {
     if (!messages || messages.length === 0) {
@@ -71,9 +69,45 @@ export function OutputStream({ traceId, className }: OutputStreamProps) {
     }
     
     return [...messages].sort((a, b) => {
-      const timeA = a.originalInput?.timestamp || a.id;
-      const timeB = b.originalInput?.timestamp || b.id;
-      return timeA.localeCompare(timeB);
+      // 🔥 修复时间排序：使用真实时间戳而非字符串比较
+      const timeA = a.metadata?.timestamp || a.originalInput?.timestamp;
+      const timeB = b.metadata?.timestamp || b.originalInput?.timestamp;
+      
+      // 🔥 尝试解析为Date对象进行真实时间比较
+      let dateA: Date | null = null;
+      let dateB: Date | null = null;
+      
+      if (timeA) {
+        try {
+          dateA = new Date(timeA);
+          if (isNaN(dateA.getTime())) dateA = null;
+        } catch {
+          dateA = null;
+        }
+      }
+      
+      if (timeB) {
+        try {
+          dateB = new Date(timeB);
+          if (isNaN(dateB.getTime())) dateB = null;
+        } catch {
+          dateB = null;
+        }
+      }
+      
+      // 🔥 如果都有有效时间戳，按时间排序
+      if (dateA && dateB) {
+        return dateA.getTime() - dateB.getTime();
+      }
+      
+      // 🔥 如果只有一个有时间戳，有时间戳的排在前面
+      if (dateA && !dateB) return -1;
+      if (!dateA && dateB) return 1;
+      
+      // 🔥 如果都没有时间戳，按ID字符串排序（fallback）
+      const idA = a.id || '';
+      const idB = b.id || '';
+      return idA.localeCompare(idB);
     });
   }, [messages]);
 
@@ -138,26 +172,26 @@ export function OutputStream({ traceId, className }: OutputStreamProps) {
         return false;
       }
       
-             if (eventTypeFilter !== "all") {
-         switch (eventTypeFilter) {
-           case 'tool_calls':
-             return message.toolCalls && message.toolCalls.length > 0;
-           case 'interrupt':
-             return message.finishReason === 'interrupt';
-           case 'reask':
-             return message.finishReason === 'reask';
-           case 'streaming':
-             return message.isStreaming;
-           case 'reasoning':
-             return !!message.reasoningContent;
-           case 'resource':
-             return message.resources && message.resources.length > 0;
-           case 'message':
-             return true; // 所有消息都是message类型
-           default:
-             return true;
-         }
-       }
+      if (eventTypeFilter !== "all") {
+        switch (eventTypeFilter) {
+          case 'tool_calls':
+            return message.toolCalls && message.toolCalls.length > 0;
+          case 'interrupt':
+            return message.finishReason === 'interrupt';
+          case 'reask':
+            return message.finishReason === 'reask';
+          case 'streaming':
+            return message.isStreaming;
+          case 'reasoning':
+            return !!message.reasoningContent;
+          case 'resource':
+            return message.resources && message.resources.length > 0;
+          case 'message':
+            return true; // 所有消息都是message类型
+          default:
+            return true;
+        }
+      }
       
       return true;
     });
@@ -166,7 +200,8 @@ export function OutputStream({ traceId, className }: OutputStreamProps) {
   const handleExport = useCallback(() => {
     try {
       const exportData = {
-        traceId,
+        urlParam: currentUrlParam,
+        threadId: threadData?.id,
         exportTime: new Date().toISOString(),
         totalOutputs: filteredMessages.length,
         threadInfo: {
@@ -193,7 +228,7 @@ export function OutputStream({ traceId, className }: OutputStreamProps) {
       
       const link = document.createElement("a");
       link.href = url;
-      link.download = `output-stream-${traceId}-${new Date().toISOString().split('T')[0]}.json`;
+      link.download = `output-stream-${currentUrlParam || 'unknown'}-${new Date().toISOString().split('T')[0]}.json`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -204,9 +239,26 @@ export function OutputStream({ traceId, className }: OutputStreamProps) {
       console.error("Failed to export output stream:", error);
       toast.error("导出失败");
     }
-  }, [traceId, filteredMessages, threadData, responding, allMessages.length]);
+  }, [currentUrlParam, filteredMessages, threadData, responding, allMessages.length]);
 
   const getEventType = useCallback((message: Message): string => {
+    // 🔥 优先基于 metadata 信息识别真实的 SSE 事件类型
+    if (message.metadata?.nodeEvent) {
+      return message.metadata.nodeType === 'start' ? 'node_start' : 'node_complete';
+    }
+    if (message.metadata?.planEvent) return 'plan_generated';
+    if (message.metadata?.searchEvent) return 'search_results';
+    if (message.metadata?.agentEvent) return 'agent_output';
+    if (message.metadata?.progressEvent) return 'progress';
+    if (message.metadata?.artifactEvent) return 'artifact';
+    if (message.metadata?.completeEvent) return 'complete';
+    if (message.metadata?.errorEvent) return 'error';
+    if (message.metadata?.chunkType) return 'message_chunk';
+    if (message.metadata?.interruptEvent) return 'interrupt';
+    if (message.metadata?.userInput) return 'user_input';
+    if (message.metadata?.userFeedback) return 'user_feedback';
+    
+    // 🔥 Fallback 到原有的推断逻辑
     if (message.toolCalls && message.toolCalls.length > 0) return 'tool_calls';
     if (message.finishReason === 'interrupt') return 'interrupt';
     if (message.finishReason === 'reask') return 'reask';
@@ -221,20 +273,41 @@ export function OutputStream({ traceId, className }: OutputStreamProps) {
     const eventType = getEventType(message);
     
     switch (eventType) {
-      case 'node':
-        return <Settings className="h-4 w-4 text-blue-500" />;
-      case 'plan':
-        return <FileText className="h-4 w-4 text-green-500" />;
-      case 'search':
-        return <Search className="h-4 w-4 text-yellow-500" />;
+      case 'node_start':
+      case 'node_complete':
+        return <Settings className="h-4 w-4 text-blue-600" />;
+      case 'plan_generated':
+        return <FileText className="h-4 w-4 text-green-600" />;
+      case 'search_results':
+        return <Search className="h-4 w-4 text-amber-600" />;
+      case 'agent_output':
+        return <Bot className="h-4 w-4 text-purple-600" />;
       case 'progress':
-        return <Activity className="h-4 w-4 text-orange-500" />;
+        return <Activity className="h-4 w-4 text-orange-600" />;
       case 'artifact':
-        return <FileText className="h-4 w-4 text-purple-500" />;
+        return <FileText className="h-4 w-4 text-purple-600" />;
       case 'complete':
         return <Badge className="h-4 w-4 text-green-600" />;
       case 'error':
         return <AlertCircle className="h-4 w-4 text-red-500" />;
+      case 'message_chunk':
+        return <Zap className="h-4 w-4 animate-pulse text-blue-600" />;
+      case 'interrupt':
+        return <AlertCircle className="h-4 w-4 text-orange-500 animate-pulse" />;
+      case 'user_input':
+        return <User className="h-4 w-4 text-blue-600" />;
+      case 'user_feedback':
+        return <User className="h-4 w-4 text-green-600" />;
+      case 'tool_calls':
+        return <Settings className="h-4 w-4 text-blue-600" />;
+      case 'reask':
+        return <Search className="h-4 w-4 text-amber-600" />;
+      case 'streaming':
+        return <Zap className="h-4 w-4 animate-pulse text-blue-600" />;
+      case 'reasoning':
+        return <FileText className="h-4 w-4 text-purple-600" />;
+      case 'resource':
+        return <FileText className="h-4 w-4 text-green-600" />;
       default:
         return getMessageIcon(message);
     }
@@ -248,7 +321,7 @@ export function OutputStream({ traceId, className }: OutputStreamProps) {
       return <Settings className="h-4 w-4" />;
     }
     if (message.isStreaming) {
-      return <Zap className="h-4 w-4 animate-pulse text-blue-500" />;
+      return <Zap className="h-4 w-4 animate-pulse text-blue-600" />;
     }
     return <Bot className="h-4 w-4" />;
   };
@@ -279,15 +352,24 @@ export function OutputStream({ traceId, className }: OutputStreamProps) {
     
     if (eventType !== 'message') {
       const eventTypeLabels: Record<string, string> = {
-        node: '节点',
-        plan: '计划',
-        search: '搜索',
-        agent_output: '代理',
-        progress: '进度',
-        artifact: '工件',
-        complete: '完成',
+        node_start: '节点开始',
+        node_complete: '节点完成',
+        plan_generated: '计划生成',
+        search_results: '搜索结果',
+        agent_output: '代理输出',
+        progress: '进度更新',
+        message_chunk: '消息流',
+        artifact: '工件生成',
+        complete: '任务完成',
         error: '错误',
-        message_chunk: '流式',
+        interrupt: '等待决策',
+        user_input: '用户输入',
+        user_feedback: '用户反馈',
+        tool_calls: '工具调用',
+        reask: '重问',
+        streaming: '流式',
+        reasoning: '推理',
+        resource: '资源',
       };
       
       badges.push(
@@ -299,7 +381,7 @@ export function OutputStream({ traceId, className }: OutputStreamProps) {
     
     if (message.isStreaming) {
       badges.push(
-        <Badge key="streaming" variant="default" className="animate-pulse bg-blue-500 text-xs">
+        <Badge key="streaming" variant="default" className="animate-pulse bg-blue-600 text-xs">
           实时输出
         </Badge>
       );
@@ -321,7 +403,7 @@ export function OutputStream({ traceId, className }: OutputStreamProps) {
             <h3 className="font-semibold">实时输出流</h3>
             {responding && (
               <div className="flex items-center gap-1">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                <div className="w-2 h-2 bg-green-600 rounded-full animate-pulse"></div>
                 <span className="text-xs text-green-600">实时接收中</span>
               </div>
             )}
@@ -405,14 +487,12 @@ export function OutputStream({ traceId, className }: OutputStreamProps) {
                 {availableOptions.eventTypes.map(eventType => (
                   <SelectItem key={eventType} value={eventType}>
                     {eventType === 'message' ? '普通消息' : 
-                     eventType === 'node' ? '节点事件' :
-                     eventType === 'plan' ? '计划生成' :
-                     eventType === 'search' ? '搜索结果' :
-                     eventType === 'progress' ? '进度更新' :
-                     eventType === 'artifact' ? '工件生成' :
-                     eventType === 'complete' ? '完成事件' :
-                     eventType === 'error' ? '错误事件' :
-                     eventType === 'message_chunk' ? '流式消息' :
+                     eventType === 'tool_calls' ? '工具调用' :
+                     eventType === 'interrupt' ? '中断事件' :
+                     eventType === 'reask' ? '重问事件' :
+                     eventType === 'streaming' ? '流式消息' :
+                     eventType === 'reasoning' ? '推理过程' :
+                     eventType === 'resource' ? '资源加载' :
                      eventType}
                   </SelectItem>
                 ))}
@@ -426,21 +506,31 @@ export function OutputStream({ traceId, className }: OutputStreamProps) {
         </div>
       </div>
 
-      <ScrollArea className="flex-1 h-0" ref={scrollAreaRef}>
+      {/* 🔥 使用智能滚动容器 - 替换原有的ScrollArea */}
+      <ScrollContainer
+        ref={scrollContainerRef}
+        className="flex-1"
+        autoScrollToBottom={autoScroll}
+        showScrollIndicator={true}
+        throttleMs={16}
+        onScrollChange={(position) => {
+          // 可以在这里添加滚动状态监听逻辑
+        }}
+      >
         <div className="p-4 space-y-4">
           {filteredMessages.length === 0 ? (
             <div className="text-center text-muted-foreground py-8">
               <Activity className="mx-auto h-12 w-12 mb-4 opacity-50" />
               <p>没有找到匹配的输出流</p>
               {responding && (
-                <p className="text-xs mt-2 text-blue-500">正在等待新的输出...</p>
+                <p className="text-xs mt-2 text-blue-600">正在等待新的输出...</p>
               )}
             </div>
           ) : (
             filteredMessages.map((message, index) => (
               <Card key={message.id} className={cn(
                 "relative transition-all duration-200",
-                message.isStreaming && "ring-2 ring-blue-500/50 bg-blue-50/20 dark:bg-blue-950/20"
+                message.isStreaming && "ring-2 ring-blue-600/50 bg-blue-50/20 dark:bg-blue-950/20"
               )}>
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
@@ -489,7 +579,7 @@ export function OutputStream({ traceId, className }: OutputStreamProps) {
             ))
           )}
         </div>
-      </ScrollArea>
+      </ScrollContainer>
     </div>
   );
-}
+} 

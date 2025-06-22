@@ -39,56 +39,58 @@ export function GlobalSidebar() {
   ];
 
   return (
-    <div className="flex h-full w-64 flex-col border-r border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
-      {/* LOGO和标题 */}
-      <div className="flex items-center gap-3 border-b border-gray-200 px-6 py-4 dark:border-gray-700">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-purple-600">
+    <div className="flex h-full w-64 flex-col bg-white border-r border-gray-200">
+      {/* Logo 区域 */}
+      <div className="flex items-center gap-3 border-b border-gray-200 px-6 py-4">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-blue-600">
           <Sparkles className="h-5 w-5 text-white" />
         </div>
         <div>
-          <h1 className="text-lg font-bold text-gray-900 dark:text-white">YADRA</h1>
-          <p className="text-xs text-gray-500 dark:text-gray-400">深度研究助手</p>
+          <div className="font-semibold text-gray-900">YADRA</div>
+          <div className="text-xs text-gray-500">深度研究助手</div>
         </div>
       </div>
 
-      {/* 导航菜单 */}
+      {/* 导航区域 */}
       <nav className="flex-1 space-y-1 px-3 py-4">
         {navigationItems.map((item) => {
           const Icon = item.icon;
           return (
-            <Button
+            <Link
               key={item.name}
-              variant={item.current ? "default" : "ghost"}
-              size="sm"
+              href={item.disabled ? "#" : item.href}
               className={cn(
-                "w-full justify-start gap-3 h-10",
-                item.disabled && "opacity-50 cursor-not-allowed"
+                "group flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                item.current
+                  ? "bg-blue-50 text-blue-700 border-blue-200"
+                  : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
+                item.disabled && "cursor-not-allowed opacity-50"
               )}
-              asChild={!item.disabled}
-              disabled={item.disabled}
+              onClick={(e) => {
+                if (item.disabled) {
+                  e.preventDefault();
+                }
+              }}
             >
-              {item.disabled ? (
-                <div>
-                  <Icon className="h-4 w-4" />
-                  <span>{item.name}</span>
-                  <span className="ml-auto text-xs text-gray-400">(即将推出)</span>
-                </div>
-              ) : (
-                <Link href={item.href}>
-                  <Icon className="h-4 w-4" />
-                  <span>{item.name}</span>
-                </Link>
+              <Icon
+                className={cn(
+                  "h-5 w-5 flex-shrink-0",
+                  item.current ? "text-blue-600" : "text-gray-400 group-hover:text-gray-500"
+                )}
+              />
+              <span className="truncate">{item.name}</span>
+              {item.disabled && (
+                <span className="ml-auto text-xs text-gray-400">敬请期待</span>
               )}
-            </Button>
+            </Link>
           );
         })}
       </nav>
 
-      {/* 底部信息 */}
-      <div className="border-t border-gray-200 p-4 dark:border-gray-700">
-        <div className="text-xs text-gray-500 dark:text-gray-400">
-          <p>版本 1.0.0</p>
-          <p className="mt-1">© 2025 YADRA</p>
+      {/* 底部区域 */}
+      <div className="border-t border-gray-200 p-4">
+        <div className="text-center">
+          <div className="text-xs text-gray-400">v1.0.0</div>
         </div>
       </div>
     </div>

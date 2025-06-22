@@ -164,7 +164,7 @@ const PlanStepItem: React.FC<{
         <div className="absolute left-4 -top-4 w-0.5 h-4 bg-gray-300/60" />
       )}
 
-      <div className="flex items-start gap-3 p-3 rounded-lg border border-gray-200/40 bg-white/60 hover:bg-white/80 transition-colors">
+      <div className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 bg-gray-50 hover:bg-gray-100 transition-colors">
         {/* 步骤编号 */}
         <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-500 text-white flex items-center justify-center text-sm font-medium shadow-sm">
           {index + 1}
@@ -190,7 +190,7 @@ const PlanStepItem: React.FC<{
             <div className="flex items-center gap-1">
               {/* 优先级标签 */}
               <span className={cn(
-                "px-2 py-0.5 rounded text-xs font-medium border",
+                "px-2 py-0.5 bg-gray-100 border border-gray-200 rounded text-xs text-gray-600",
                 getPriorityColor(step.priority)
               )}>
                 {step.priority}
@@ -387,11 +387,11 @@ export const PlanCard: React.FC<PlanCardProps> = ({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
       className={cn(
-        "bg-white/95 backdrop-blur-sm border border-gray-200/50 rounded-lg overflow-hidden shadow-lg",
-        "hover:shadow-xl hover:bg-white transition-all duration-300",
-        isApproved && "border-green-300/60 bg-green-50/80",
-        isRejected && "border-red-300/60 bg-red-50/80",
-        isPending && "border-blue-300/60 bg-blue-50/80",
+        "bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm",
+        "hover:shadow-md hover:border-gray-300 transition-all duration-300",
+        isApproved && "border-green-300 bg-green-50",
+        isRejected && "border-red-300 bg-red-50",
+        isPending && "border-blue-300 bg-blue-50",
         className
       )}
     >
@@ -508,7 +508,7 @@ export const PlanCard: React.FC<PlanCardProps> = ({
                         {plan.metadata.keywords.map((keyword, index) => (
                           <span 
                             key={index}
-                            className="px-2 py-0.5 bg-white/80 border border-gray-200 rounded text-xs text-gray-600"
+                            className="px-2 py-0.5 bg-gray-100 border border-gray-200 rounded text-xs text-gray-600"
                           >
                             {keyword}
                           </span>

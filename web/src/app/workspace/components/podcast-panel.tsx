@@ -11,12 +11,11 @@ import { ScrollArea } from "~/components/ui/scroll-area";
 import { Tooltip } from "~/components/yadra/tooltip";
 import { RainbowText } from "~/components/yadra/rainbow-text";
 import { LoadingOutlined } from "@ant-design/icons";
-import { useThreadMessages } from "~/core/store";
+import { useUnifiedStore, useThreadMessages } from "~/core/store/unified-store";
 import { cn } from "~/lib/utils";
 import type { Message } from "~/core/messages";
 
 interface PodcastPanelProps {
-  traceId: string;
   className?: string;
 }
 
@@ -27,11 +26,11 @@ interface PodcastData {
   error?: string;
 }
 
-export function PodcastPanel({ traceId, className }: PodcastPanelProps) {
+export function PodcastPanel({ className }: PodcastPanelProps) {
   const [currentlyPlaying, setCurrentlyPlaying] = useState<string | null>(null);
   const [audioElements, setAudioElements] = useState<Map<string, HTMLAudioElement>>(new Map());
   
-  // 获取当前线程的消息
+  // 使用unified-store获取当前线程的消息
   const messages = useThreadMessages();
   
   // 过滤出播客消息
@@ -140,17 +139,6 @@ export function PodcastPanel({ traceId, className }: PodcastPanelProps) {
   
   return (
     <div className={cn("flex h-full w-full flex-col", className)}>
-      {/* 面板标题栏 */}
-      <div className="flex items-center justify-between border-b bg-background/50 px-4 py-3 backdrop-blur-sm">
-        <div className="flex items-center gap-2">
-          <Headphones className="h-5 w-5" />
-          <h3 className="font-semibold">播客管理</h3>
-          <span className="text-xs text-muted-foreground">
-            ({podcastList.length} 个播客)
-          </span>
-        </div>
-      </div>
-      
       {/* 播客列表 */}
       <ScrollArea className="flex-1">
         <div className="space-y-4 p-4">
@@ -203,52 +191,34 @@ export function PodcastPanel({ traceId, className }: PodcastPanelProps) {
               {/* 播客控制 */}
               {hasAudio && data.audioUrl && (
                 <CardContent className="pt-0">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Tooltip title={currentlyPlaying === id ? "暂停" : "播放"}>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handlePlayPause(id, data.audioUrl!)}
-                          className="h-8 w-8 p-0"
-                        >
-                          {currentlyPlaying === id ? (
-                            <Pause className="h-3 w-3" />
-                          ) : (
-                            <Play className="h-3 w-3" />
-                          )}
-                        </Button>
-                      </Tooltip>
-                      
-                      {currentlyPlaying === id && (
-                        <span className="text-xs text-muted-foreground animate-pulse">
-                          正在播放...
-                        </span>
-                      )}
-                    </div>
+                  <div className="flex items-center gap-2">
+                    <Tooltip title={currentlyPlaying === id ? "暂停播放" : "开始播放"}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handlePlayPause(id, data.audioUrl!)}
+                        className="gap-2"
+                      >
+                        {currentlyPlaying === id ? (
+                          <Pause className="h-3 w-3" />
+                        ) : (
+                          <Play className="h-3 w-3" />
+                        )}
+                        {currentlyPlaying === id ? "暂停" : "播放"}
+                      </Button>
+                    </Tooltip>
                     
                     <Tooltip title="下载播客">
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => handleDownload(data.title || "podcast", data.audioUrl!)}
-                        className="h-8 w-8 p-0"
+                        className="gap-2"
                       >
                         <Download className="h-3 w-3" />
+                        下载
                       </Button>
                     </Tooltip>
-                  </div>
-                  
-                  {/* 音频播放器 */}
-                  <div className="mt-3">
-                    <audio
-                      className="w-full"
-                      src={data.audioUrl}
-                      controls
-                      onPlay={() => setCurrentlyPlaying(id)}
-                      onPause={() => setCurrentlyPlaying(null)}
-                      onEnded={() => setCurrentlyPlaying(null)}
-                    />
                   </div>
                 </CardContent>
               )}

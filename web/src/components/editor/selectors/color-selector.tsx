@@ -17,35 +17,35 @@ const TEXT_COLORS: BubbleColorMenuItem[] = [
   },
   {
     name: "Purple",
-    color: "#9333EA",
+    color: "#8b5693",
   },
   {
     name: "Red",
-    color: "#E00000",
+    color: "#b22222",
   },
   {
     name: "Yellow",
-    color: "#EAB308",
+    color: "#b8860b",
   },
   {
     name: "Blue",
-    color: "#2563EB",
+    color: "#4682b4",
   },
   {
     name: "Green",
-    color: "#008A00",
+    color: "#6b8e23",
   },
   {
     name: "Orange",
-    color: "#FFA500",
+    color: "#d2691e",
   },
   {
     name: "Pink",
-    color: "#BA4081",
+    color: "#b8576b",
   },
   {
     name: "Gray",
-    color: "#A8A29E",
+    color: "#6b5d4f",
   },
 ];
 

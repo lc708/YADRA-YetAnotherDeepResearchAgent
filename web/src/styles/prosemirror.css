@@ -84,9 +84,10 @@
 }
 
 .ProseMirror pre {
-  background: #0d0d0d;
+  background: #f5f0e8;
   border-radius: 0.5rem;
-  color: #fff;
+  border: 1px solid #e6ddd1;
+  color: #2c2319;
   font-family: "JetBrainsMono", monospace;
   padding: 0.75rem 1rem;
 
@@ -99,7 +100,7 @@
 
   .hljs-comment,
   .hljs-quote {
-    color: #616161;
+    color: #8b5d4f;
   }
 
   .hljs-variable,
@@ -112,7 +113,7 @@
   .hljs-name,
   .hljs-selector-id,
   .hljs-selector-class {
-    color: #f98181;
+    color: #b22222;
   }
 
   .hljs-number,
@@ -122,23 +123,23 @@
   .hljs-literal,
   .hljs-type,
   .hljs-params {
-    color: #fbbc88;
+    color: #d2691e;
   }
 
   .hljs-string,
   .hljs-symbol,
   .hljs-bullet {
-    color: #b9f18d;
+    color: #6b8e23;
   }
 
   .hljs-title,
   .hljs-section {
-    color: #faf594;
+    color: #b8860b;
   }
 
   .hljs-keyword,
   .hljs-selector-tag {
-    color: #70cff8;
+    color: #4682b4;
   }
 
   .hljs-emphasis {
