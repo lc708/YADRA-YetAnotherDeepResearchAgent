@@ -11,23 +11,24 @@
  * - 📊 按角色、Agent、来源分类
  * - 📤 导出完整输出流
  * - ⚡ 流式消息状态显示
+ * - 🎯 智能自动滚动：仅在底部时自动滚动
  * 
  * 与"消息历史"的区别：
  * - 历史页面：完全基于数据库查询，用于回顾
  * - 输出流：完全基于SSE实时数据，用于监控当前任务
  */
 
-import { useState, useMemo, useCallback, useRef, useEffect } from "react";
+import { useState, useMemo, useCallback, useRef } from "react";
 import { toast } from "sonner";
 import { Search, Download, Activity, User, Bot, Settings, Zap, FileText, AlertCircle } from "lucide-react";
 
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Badge } from "~/components/ui/badge";
-import { ScrollArea } from "~/components/ui/scroll-area";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
 import { Markdown } from "~/components/yadra/markdown";
+import { ScrollContainer, type ScrollContainerRef } from "~/components/conversation/scroll-container";
 import { cn } from "~/lib/utils";
 
 import type { Message } from "~/core/messages";
@@ -59,22 +60,8 @@ export function OutputStream({ className }: OutputStreamProps) {
   const [eventTypeFilter, setEventTypeFilter] = useState<string>("all");
   const [autoScroll, setAutoScroll] = useState(true);
   
-  const scrollAreaRef = useRef<HTMLDivElement>(null);
-
-  // 🔥 修复滚动逻辑：使用消息长度而非消息数组避免重复触发
-  const messagesLength = messages?.length || 0;
-  
-  useEffect(() => {
-    if (autoScroll && scrollAreaRef.current && messagesLength > 0) {
-      const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
-      if (scrollContainer) {
-        // 🔥 使用requestAnimationFrame确保DOM更新后再滚动
-        requestAnimationFrame(() => {
-          scrollContainer.scrollTop = scrollContainer.scrollHeight;
-        });
-      }
-    }
-  }, [messagesLength, autoScroll]);
+  // 🔥 使用智能滚动容器
+  const scrollContainerRef = useRef<ScrollContainerRef>(null);
 
   const allMessages = useMemo(() => {
     if (!messages || messages.length === 0) {
@@ -288,23 +275,23 @@ export function OutputStream({ className }: OutputStreamProps) {
     switch (eventType) {
       case 'node_start':
       case 'node_complete':
-        return <Settings className="h-4 w-4 text-blue-500" />;
+        return <Settings className="h-4 w-4 text-blue-600" />;
       case 'plan_generated':
-        return <FileText className="h-4 w-4 text-green-500" />;
+        return <FileText className="h-4 w-4 text-green-600" />;
       case 'search_results':
-        return <Search className="h-4 w-4 text-yellow-500" />;
+        return <Search className="h-4 w-4 text-amber-600" />;
       case 'agent_output':
-        return <Bot className="h-4 w-4 text-purple-500" />;
+        return <Bot className="h-4 w-4 text-purple-600" />;
       case 'progress':
-        return <Activity className="h-4 w-4 text-orange-500" />;
+        return <Activity className="h-4 w-4 text-orange-600" />;
       case 'artifact':
-        return <FileText className="h-4 w-4 text-purple-500" />;
+        return <FileText className="h-4 w-4 text-purple-600" />;
       case 'complete':
         return <Badge className="h-4 w-4 text-green-600" />;
       case 'error':
         return <AlertCircle className="h-4 w-4 text-red-500" />;
       case 'message_chunk':
-        return <Zap className="h-4 w-4 animate-pulse text-blue-500" />;
+        return <Zap className="h-4 w-4 animate-pulse text-blue-600" />;
       case 'interrupt':
         return <AlertCircle className="h-4 w-4 text-orange-500 animate-pulse" />;
       case 'user_input':
@@ -312,15 +299,15 @@ export function OutputStream({ className }: OutputStreamProps) {
       case 'user_feedback':
         return <User className="h-4 w-4 text-green-600" />;
       case 'tool_calls':
-        return <Settings className="h-4 w-4 text-blue-500" />;
+        return <Settings className="h-4 w-4 text-blue-600" />;
       case 'reask':
-        return <Search className="h-4 w-4 text-yellow-500" />;
+        return <Search className="h-4 w-4 text-amber-600" />;
       case 'streaming':
-        return <Zap className="h-4 w-4 animate-pulse text-blue-500" />;
+        return <Zap className="h-4 w-4 animate-pulse text-blue-600" />;
       case 'reasoning':
-        return <FileText className="h-4 w-4 text-purple-500" />;
+        return <FileText className="h-4 w-4 text-purple-600" />;
       case 'resource':
-        return <FileText className="h-4 w-4 text-green-500" />;
+        return <FileText className="h-4 w-4 text-green-600" />;
       default:
         return getMessageIcon(message);
     }
@@ -334,7 +321,7 @@ export function OutputStream({ className }: OutputStreamProps) {
       return <Settings className="h-4 w-4" />;
     }
     if (message.isStreaming) {
-      return <Zap className="h-4 w-4 animate-pulse text-blue-500" />;
+      return <Zap className="h-4 w-4 animate-pulse text-blue-600" />;
     }
     return <Bot className="h-4 w-4" />;
   };
@@ -394,7 +381,7 @@ export function OutputStream({ className }: OutputStreamProps) {
     
     if (message.isStreaming) {
       badges.push(
-        <Badge key="streaming" variant="default" className="animate-pulse bg-blue-500 text-xs">
+        <Badge key="streaming" variant="default" className="animate-pulse bg-blue-600 text-xs">
           实时输出
         </Badge>
       );
@@ -416,7 +403,7 @@ export function OutputStream({ className }: OutputStreamProps) {
             <h3 className="font-semibold">实时输出流</h3>
             {responding && (
               <div className="flex items-center gap-1">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                <div className="w-2 h-2 bg-green-600 rounded-full animate-pulse"></div>
                 <span className="text-xs text-green-600">实时接收中</span>
               </div>
             )}
@@ -519,21 +506,31 @@ export function OutputStream({ className }: OutputStreamProps) {
         </div>
       </div>
 
-      <ScrollArea className="flex-1 h-0" ref={scrollAreaRef}>
+      {/* 🔥 使用智能滚动容器 - 替换原有的ScrollArea */}
+      <ScrollContainer
+        ref={scrollContainerRef}
+        className="flex-1"
+        autoScrollToBottom={autoScroll}
+        showScrollIndicator={true}
+        throttleMs={16}
+        onScrollChange={(position) => {
+          // 可以在这里添加滚动状态监听逻辑
+        }}
+      >
         <div className="p-4 space-y-4">
           {filteredMessages.length === 0 ? (
             <div className="text-center text-muted-foreground py-8">
               <Activity className="mx-auto h-12 w-12 mb-4 opacity-50" />
               <p>没有找到匹配的输出流</p>
               {responding && (
-                <p className="text-xs mt-2 text-blue-500">正在等待新的输出...</p>
+                <p className="text-xs mt-2 text-blue-600">正在等待新的输出...</p>
               )}
             </div>
           ) : (
             filteredMessages.map((message, index) => (
               <Card key={message.id} className={cn(
                 "relative transition-all duration-200",
-                message.isStreaming && "ring-2 ring-blue-500/50 bg-blue-50/20 dark:bg-blue-950/20"
+                message.isStreaming && "ring-2 ring-blue-600/50 bg-blue-50/20 dark:bg-blue-950/20"
               )}>
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
@@ -582,7 +579,7 @@ export function OutputStream({ className }: OutputStreamProps) {
             ))
           )}
         </div>
-      </ScrollArea>
+      </ScrollContainer>
     </div>
   );
 } 

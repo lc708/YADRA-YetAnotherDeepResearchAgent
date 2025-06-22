@@ -99,7 +99,8 @@ export function HeroInput({
     if (!styleButtonRef.current) return;
     
     const rect = styleButtonRef.current.getBoundingClientRect();
-    const newTop = rect.top - 8;
+    const dropdownHeight = 280; // 大概的下拉框高度
+    const newTop = rect.top - dropdownHeight - 8; // 在按钮上方显示
     const newLeft = rect.left;
     
     // 只有位置真正变化时才更新状态
@@ -254,209 +255,189 @@ export function HeroInput({
   return (
     <div className={cn("mx-auto w-full max-w-4xl", className)}>
       <div className="relative">
-        <div className="relative overflow-hidden rounded-xl border border-white/20 bg-white/5 backdrop-blur-sm transition-all duration-200 focus-within:border-white/30 focus-within:bg-white/10">
-          <AnimatePresence>
-            {isEnhanceAnimating && (
-              <motion.div
-                className="pointer-events-none absolute inset-0 z-20"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.3 }}
-              >
-                <div className="relative h-full w-full">
-                  <motion.div
-                    className="absolute inset-0 rounded-xl bg-gradient-to-r from-blue-500/10 via-purple-500/10 to-blue-500/10"
-                    animate={{
-                      background: [
-                        "linear-gradient(45deg, rgba(59, 130, 246, 0.1), rgba(147, 51, 234, 0.1), rgba(59, 130, 246, 0.1))",
-                        "linear-gradient(225deg, rgba(147, 51, 234, 0.1), rgba(59, 130, 246, 0.1), rgba(147, 51, 234, 0.1))",
-                        "linear-gradient(45deg, rgba(59, 130, 246, 0.1), rgba(147, 51, 234, 0.1), rgba(59, 130, 246, 0.1))",
-                      ],
-                    }}
-                    transition={{ duration: 2, repeat: Infinity }}
-                  />
-                  {[...Array(6)].map((_, i) => (
-                    <motion.div
-                      key={i}
-                      className="absolute h-2 w-2 rounded-full bg-blue-400"
-                      style={{
-                        left: `${20 + i * 12}%`,
-                        top: `${30 + (i % 2) * 40}%`,
-                      }}
-                      animate={{
-                        y: [-10, -20, -10],
-                        opacity: [0, 1, 0],
-                        scale: [0.5, 1, 0.5],
-                      }}
-                      transition={{
-                        duration: 1.5,
-                        repeat: Infinity,
-                        delay: i * 0.2,
-                      }}
-                    />
-                  ))}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-          
-          <MessageInput
-            ref={inputRef}
-            className="min-h-[80px] px-4 py-4 sm:px-6 sm:py-6"
-            placeholder={customPlaceholder || PLACEHOLDER_TEXTS[currentPlaceholder]}
-            onChange={setCurrentPrompt}
-            onEnter={() => handleSubmit()}
-          />
-          
-          <div className="flex items-center justify-between px-4 py-3 sm:px-6">
-            <div className="flex items-center gap-2">
-              {/* 风格选择按钮 - 统一交互区域 */}
-              <div className="relative">
-                <button
-                  ref={styleButtonRef}
-                  type="button"
-                                      onClick={(e) => {
-                      e.stopPropagation();
-                      if (!showStyleDropdown) {
-                        calculateDropdownPosition();
-                        setShowStyleDropdown(true);
-                      } else {
-                        setShowStyleDropdown(false);
-                      }
-                    }}
-                  className={cn(
-                    "group relative overflow-hidden rounded-lg h-9 px-3 text-xs font-medium transition-all duration-300",
-                    "backdrop-blur-sm flex items-center gap-2",
-                    showStyleDropdown
-                      ? "bg-blue-500/20 text-blue-300"
-                      : "bg-white/5 text-gray-300 hover:bg-white/10 hover:text-white"
-                  )}
-                >
-                  <CurrentStyleIcon className={cn(
-                    "h-4 w-4 transition-colors duration-300",
-                    showStyleDropdown ? "text-blue-300" : currentStyleConfig.color
-                  )} />
-                  <span className="hidden sm:inline">写作风格</span>
-                  <span className="sm:hidden">风格</span>
-                  <ChevronDown className={cn(
-                    "h-3 w-3 transition-transform duration-200 rotate-180",
-                    showStyleDropdown && "rotate-0"
-                  )} />
-                  
-                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100"></div>
-                </button>
-              </div>
-
-              {/* 推理模式 Toggle 按钮 */}
-              <Tooltip
-                delayDuration={300}
-                side="bottom"
-                sideOffset={8}
-                className="max-w-xs border border-white/20 bg-black/90 backdrop-blur-sm text-white shadow-xl"
-                title={
-                  <div className="p-2">
-                    <p className="mb-2 font-medium text-blue-300">
-                      {enableDeepThinking ? "推理模式" : "常规模式"}
-                    </p>
-                    <p className="text-xs text-gray-300 leading-relaxed">
-                      {enableDeepThinking 
-                        ? "AI将进行深度思考和推理，生成更加深思熟虑的研究计划"
-                        : "AI将以常规模式处理您的问题，快速生成研究计划"
-                      }
-                    </p>
-                  </div>
-                }
-              >
-                <button
-                  type="button"
-                  onClick={() => setEnableDeepThinking(!enableDeepThinking)}
-                  className="group relative overflow-hidden rounded-lg h-9 px-1 transition-all duration-300 backdrop-blur-sm flex items-center hover:bg-white/5"
-                >
-                  <div className="relative w-12 h-6 rounded-full bg-white/10">
-                    <motion.div
-                      className={cn(
-                        "absolute top-1/2 -translate-y-1/2 w-5 h-5 rounded-full transition-all duration-300 flex items-center justify-center",
-                        enableDeepThinking 
-                          ? "left-[26px] bg-gradient-to-r from-purple-500 to-pink-500 shadow-[0_0_15px_rgba(168,85,247,0.6)]" 
-                          : "left-[2px] bg-blue-400"
-                      )}
-                      layout
-                    >
-                      {enableDeepThinking ? (
-                        <Brain className="h-4 w-4 text-white" />
-                      ) : (
-                        <User className="h-4 w-4 text-white" />
-                      )}
-                    </motion.div>
-                  </div>
-                  
-                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100"></div>
-                </button>
-              </Tooltip>
+        <div className="relative w-full">
+          <div className="relative w-full overflow-hidden rounded-xl border border-gray-200 bg-white/90 backdrop-blur-sm shadow-sm transition-all duration-300 focus-within:border-blue-300 focus-within:shadow-md">
+            {/* 文字输入区域 */}
+            <div className="p-4">
+              <textarea
+                value={currentPrompt}
+                onChange={(e) => setCurrentPrompt(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSubmit();
+                  }
+                }}
+                placeholder={customPlaceholder || PLACEHOLDER_TEXTS[currentPlaceholder]}
+                className="w-full resize-none bg-transparent text-sm text-gray-900 placeholder-gray-500 outline-none border-none"
+                rows={2}
+                style={{ 
+                  minHeight: '56px', // 2行的最小高度
+                  maxHeight: '168px', // 7行的最大高度 (24px * 7)
+                  lineHeight: '24px',
+                  overflowY: currentPrompt.split('\n').length > 7 || currentPrompt.length > 280 ? 'auto' : 'hidden'
+                }}
+                onInput={(e) => {
+                  const target = e.target as HTMLTextAreaElement;
+                  target.style.height = 'auto';
+                  target.style.height = Math.min(target.scrollHeight, 168) + 'px';
+                }}
+              />
             </div>
             
-            <div className="flex items-center gap-2">
-              {/* 提示词优化按钮 */}
-              <Tooltip 
-                delayDuration={300}
-                side="bottom"
-                sideOffset={8}
-                className="border border-white/20 bg-black/90 backdrop-blur-sm text-white shadow-xl"
-                title="AI增强提示 - 让AI优化您的问题描述"
-              >
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className={cn(
-                    "h-9 w-9 p-0 border transition-all duration-300",
-                    canOperate
-                      ? "border-blue-500/50 bg-blue-600/80 hover:bg-blue-600 hover:shadow-[0_0_20px_rgba(59,130,246,0.4)]"
-                      : "border-gray-400/20 bg-gray-500/20 cursor-not-allowed",
-                    isEnhancing && "animate-pulse border-blue-400/50 bg-blue-500/20"
-                  )}
-                  onClick={handleEnhancePrompt}
-                  disabled={!canOperate || isEnhancing}
-                >
-                  {isEnhancing ? (
-                    <div className="h-3 w-3 animate-bounce rounded-full bg-white shadow-[0_0_10px_rgba(255,255,255,0.8)]" />
-                  ) : (
-                    <MagicWandIcon className={cn(
-                      "h-4 w-4 transition-colors",
-                      canOperate ? "text-white" : "text-gray-500"
+            {/* 控制按钮行 - 始终在底部 */}
+            <div className="flex items-center justify-between px-4 pb-4 border-t border-gray-100">
+              {/* 左侧控制组 */}
+              <div className="flex items-center gap-2">
+                {/* 写作风格选择器 */}
+                <div className="relative">
+                  <button
+                    ref={styleButtonRef}
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (showStyleDropdown) {
+                        setShowStyleDropdown(false);
+                      } else {
+                        calculateDropdownPosition();
+                        setShowStyleDropdown(true);
+                      }
+                    }}
+                    className={cn(
+                      "group relative overflow-hidden rounded-lg h-9 px-3 text-xs font-medium transition-all duration-300",
+                      "backdrop-blur-sm flex items-center gap-2",
+                      showStyleDropdown
+                        ? "bg-blue-50 text-blue-700"
+                        : "bg-gray-50 text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+                    )}
+                  >
+                    <CurrentStyleIcon className={cn(
+                      "h-4 w-4 transition-colors duration-300",
+                      showStyleDropdown ? "text-blue-600" : currentStyleConfig.color
                     )} />
-                  )}
-                </Button>
-              </Tooltip>
+                    <span className="hidden sm:inline">写作风格</span>
+                    <span className="sm:hidden">风格</span>
+                    <ChevronDown className={cn(
+                      "h-3 w-3 transition-transform duration-200 rotate-180",
+                      showStyleDropdown && "rotate-0"
+                    )} />
+                    
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-gray-200/20 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100"></div>
+                  </button>
+                </div>
+
+                {/* 推理模式 Toggle 按钮 */}
+                <Tooltip
+                  delayDuration={300}
+                  side="top"
+                  sideOffset={8}
+                  className="max-w-xs border border-gray-200 bg-white backdrop-blur-sm text-gray-900 shadow-xl"
+                  title={
+                    <div className="p-2">
+                      <p className="mb-2 font-medium text-gray-900">
+                        {enableDeepThinking ? "推理模式" : "常规模式"}
+                      </p>
+                      <p className="text-xs text-gray-600 leading-relaxed">
+                        {enableDeepThinking 
+                          ? "AI将进行深度思考和推理，生成更加深思熟虑的研究计划"
+                          : "AI将以常规模式处理您的问题，快速生成研究计划"
+                        }
+                      </p>
+                    </div>
+                  }
+                >
+                  <button
+                    type="button"
+                    onClick={() => setEnableDeepThinking(!enableDeepThinking)}
+                    className="group relative overflow-hidden rounded-lg h-9 px-1 transition-all duration-300 backdrop-blur-sm flex items-center hover:bg-gray-50"
+                  >
+                    <div className="relative w-12 h-6 rounded-full bg-gray-200">
+                      <motion.div
+                        className={cn(
+                          "absolute top-1/2 -translate-y-1/2 w-5 h-5 rounded-full transition-all duration-300 flex items-center justify-center",
+                          enableDeepThinking 
+                            ? "left-[26px] bg-gradient-to-r from-purple-500 to-pink-500 shadow-[0_0_15px_rgba(168,85,247,0.6)]" 
+                            : "left-[2px] bg-blue-500"
+                        )}
+                        layout
+                      >
+                        {enableDeepThinking ? (
+                          <Brain className="h-4 w-4 text-white" />
+                        ) : (
+                          <User className="h-4 w-4 text-white" />
+                        )}
+                      </motion.div>
+                    </div>
+                    
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-gray-200/20 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100"></div>
+                  </button>
+                </Tooltip>
+              </div>
               
-              {/* 发送/停止按钮 */}
-              <Tooltip
-                delayDuration={300}
-                side="bottom"
-                sideOffset={8}
-                className="border border-white/20 bg-black/90 backdrop-blur-sm text-white shadow-xl"
-                title={responding ? "停止生成" : (canOperate ? "发送消息" : "请输入消息")}
-              >
-                <Button
-                  onClick={responding ? () => {} : () => handleSubmit()}
-                  disabled={!canOperate}
-                  className={cn(
-                    "h-9 w-9 p-0 rounded-lg border transition-all duration-300",
-                    canOperate
-                      ? "border-blue-500/50 bg-blue-600/80 hover:bg-blue-600 hover:shadow-[0_0_20px_rgba(59,130,246,0.4)]"
-                      : "border-gray-400/20 bg-gray-500/20 cursor-not-allowed"
-                  )}
+              {/* 右侧操作组 */}
+              <div className="flex items-center gap-2">
+                {/* 提示词优化按钮 */}
+                <Tooltip 
+                  delayDuration={300}
+                  side="top"
+                  sideOffset={8}
+                  className="border border-gray-200 bg-white backdrop-blur-sm text-gray-900 shadow-xl"
+                  title="AI增强提示 - 让AI优化您的问题描述"
                 >
-                  {responding ? (
-                    <StopCircle className="h-4 w-4" />
-                  ) : (
-                    <Send className={cn(
-                      "h-4 w-4 transition-colors",
-                      canOperate ? "text-white" : "text-gray-500"
-                    )} />
-                  )}
-                </Button>
-              </Tooltip>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className={cn(
+                      "h-9 w-9 p-0 border transition-all duration-300",
+                      canOperate
+                        ? "border-blue-300 bg-blue-500 hover:bg-blue-600 hover:shadow-md"
+                        : "border-gray-200 bg-gray-100 cursor-not-allowed",
+                      isEnhancing && "animate-pulse border-blue-400 bg-blue-400"
+                    )}
+                    onClick={handleEnhancePrompt}
+                    disabled={!canOperate || isEnhancing}
+                  >
+                    {isEnhancing ? (
+                      <div className="h-3 w-3 animate-bounce rounded-full bg-white shadow-sm" />
+                    ) : (
+                      <MagicWandIcon className={cn(
+                        "h-4 w-4 transition-colors",
+                        canOperate ? "text-white" : "text-gray-400"
+                      )} />
+                    )}
+                  </Button>
+                </Tooltip>
+                
+                {/* 发送/停止按钮 */}
+                <Tooltip
+                  delayDuration={300}
+                  side="top"
+                  sideOffset={8}
+                  className="border border-gray-200 bg-white backdrop-blur-sm text-gray-900 shadow-xl"
+                  title={responding ? "停止生成" : (canOperate ? "发送消息" : "请输入消息")}
+                >
+                  <Button
+                    onClick={responding ? () => {} : () => handleSubmit()}
+                    disabled={!canOperate}
+                    className={cn(
+                      "h-9 w-9 p-0 rounded-lg border transition-all duration-300",
+                      canOperate
+                        ? "border-blue-300 bg-blue-500 hover:bg-blue-600 hover:shadow-md"
+                        : "border-gray-200 bg-gray-100 cursor-not-allowed"
+                    )}
+                  >
+                    {responding ? (
+                      <StopCircle className="h-4 w-4 text-white" />
+                    ) : (
+                      <Send className={cn(
+                        "h-4 w-4 transition-colors",
+                        canOperate ? "text-white" : "text-gray-400"
+                      )} />
+                    )}
+                  </Button>
+                </Tooltip>
+              </div>
             </div>
           </div>
         </div>
@@ -467,10 +448,10 @@ export function HeroInput({
         <motion.div
           ref={dropdownRef}
           initial={{ opacity: 0, scale: 0.95, y: 10 }}
-          animate={{ opacity: 1, scale: 1, y: '-100%' }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 10 }}
           transition={{ duration: 0.15 }}
-          className="w-56 border border-white/20 bg-white/5 backdrop-blur-xl rounded-xl shadow-2xl overflow-hidden"
+          className="w-56 border border-gray-200 bg-white backdrop-blur-xl rounded-xl shadow-xl overflow-hidden"
           style={{ 
             position: 'fixed',
             top: dropdownPosition.top,
@@ -487,7 +468,7 @@ export function HeroInput({
               return (
                 <button
                   key={style.value}
-                                      onClick={(e) => {
+                  onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
                       setReportStyle(style.value);
@@ -496,26 +477,26 @@ export function HeroInput({
                   className={cn(
                     "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-all duration-200",
                     isSelected
-                      ? "bg-blue-500/20 text-blue-300"
-                      : "text-gray-300 hover:bg-white/10 hover:text-white"
+                      ? "bg-blue-50 text-blue-900"
+                      : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
                   )}
                 >
                   <StyleIcon className={cn(
                     "h-4 w-4 transition-colors",
-                    isSelected ? "text-blue-300" : style.color
+                    isSelected ? "text-blue-600" : style.color
                   )} />
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-sm">{style.label}</div>
                     <div className="text-xs opacity-70 line-clamp-2">{style.description}</div>
                   </div>
                   {isSelected && (
-                    <div className="h-2 w-2 rounded-full bg-blue-400 shadow-[0_0_8px_rgba(59,130,246,0.6)]" />
+                    <div className="h-2 w-2 rounded-full bg-blue-500 shadow-sm" />
                   )}
                 </button>
               );
             })}
           </div>
-                            </motion.div>,
+        </motion.div>,
         document.body
       )}
     </div>

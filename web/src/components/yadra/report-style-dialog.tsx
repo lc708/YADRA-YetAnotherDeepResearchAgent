@@ -73,14 +73,14 @@ export function ReportStyleDialog() {
     <Dialog open={open} onOpenChange={setOpen}>
       <Tooltip
         delayDuration={300}
-        className="max-w-xs border border-white/20 bg-black/90 backdrop-blur-sm text-white shadow-xl"
+        className="max-w-xs border border-gray-200 bg-white backdrop-blur-sm text-gray-900 shadow-xl"
         title={
           <div className="p-2">
-            <p className="mb-2 font-medium text-blue-300">报告风格</p>
-            <p className="text-xs text-gray-300 leading-relaxed">
+            <p className="mb-2 font-medium text-gray-800">报告风格</p>
+            <p className="text-xs text-gray-600 leading-relaxed">
               当前：{currentStyleConfig.label}
             </p>
-            <p className="text-xs text-gray-400 mt-1">
+            <p className="text-xs text-gray-500 mt-1">
               {currentStyleConfig.description}
             </p>
           </div>
@@ -91,7 +91,7 @@ export function ReportStyleDialog() {
             className={cn(
               "group relative overflow-hidden rounded-lg border px-3 py-1.5 text-xs font-medium transition-all duration-300",
               "backdrop-blur-sm flex items-center gap-1.5",
-              "border-white/20 bg-white/5 text-gray-300 hover:border-white/30 hover:bg-white/10 hover:text-white"
+              "border-gray-200 bg-white/80 text-gray-700 hover:border-gray-300 hover:bg-white hover:text-gray-900"
             )}
           >
             <CurrentIcon className={cn("h-3 w-3", currentStyleConfig.iconColor)} />
@@ -99,20 +99,20 @@ export function ReportStyleDialog() {
             <span className="sm:hidden">风格</span>
             
             {/* hover 光效 */}
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100"></div>
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-gray-200/20 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100"></div>
           </button>
         </DialogTrigger>
       </Tooltip>
       
-      <DialogContent className="sm:max-w-md border border-white/20 bg-black/95 backdrop-blur-xl text-white shadow-2xl">
+      <DialogContent className="sm:max-w-md border border-gray-200 bg-white backdrop-blur-xl text-gray-900 shadow-2xl">
         <DialogHeader className="text-center pb-2">
-          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-blue-400/30">
-            <Sparkles className="h-6 w-6 text-blue-400" />
+          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-blue-500/20 to-blue-600/20 border border-blue-300/40">
+            <Sparkles className="h-6 w-6 text-blue-600" />
           </div>
-          <DialogTitle className="text-xl font-semibold text-white">
+          <DialogTitle className="text-xl font-semibold text-gray-900">
             选择报告风格
           </DialogTitle>
-          <DialogDescription className="text-gray-400 text-sm">
+          <DialogDescription className="text-gray-600 text-sm">
             为您的研究报告选择最适合的写作风格
           </DialogDescription>
         </DialogHeader>
@@ -133,8 +133,8 @@ export function ReportStyleDialog() {
                     "group relative overflow-hidden rounded-xl border p-4 text-left transition-all duration-300",
                     "backdrop-blur-sm flex items-start gap-3",
                     isSelected 
-                      ? "border-blue-400/50 bg-blue-500/20 shadow-[0_0_20px_rgba(59,130,246,0.2)]" 
-                      : "border-white/10 bg-white/5 hover:border-white/20 hover:bg-white/10 hover:scale-[1.02]"
+                      ? "border-blue-300 bg-blue-50 shadow-md" 
+                      : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50 hover:scale-[1.02]"
                   )}
                   onClick={() => handleStyleChange(style.value)}
                 >
@@ -142,20 +142,20 @@ export function ReportStyleDialog() {
                   <div className={cn(
                     "absolute inset-0 bg-gradient-to-br opacity-0 transition-opacity duration-300",
                     style.gradient,
-                    "group-hover:opacity-50",
-                    isSelected && "opacity-30"
+                    "group-hover:opacity-20",
+                    isSelected && "opacity-10"
                   )} />
                   
                   {/* 图标 */}
                   <div className={cn(
                     "relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border backdrop-blur-sm transition-all duration-300",
                     isSelected 
-                      ? "border-blue-400/50 bg-blue-500/20" 
-                      : "border-white/20 bg-white/10 group-hover:border-white/30"
+                      ? "border-blue-300 bg-blue-100" 
+                      : "border-gray-200 bg-gray-50 group-hover:border-gray-300"
                   )}>
                     <Icon className={cn(
                       "h-5 w-5 transition-colors duration-300",
-                      isSelected ? "text-blue-300" : style.iconColor
+                      isSelected ? "text-blue-600" : style.iconColor
                     )} />
                   </div>
                   
@@ -164,7 +164,7 @@ export function ReportStyleDialog() {
                     <div className="flex items-center gap-2">
                       <h4 className={cn(
                         "font-medium transition-colors duration-300",
-                        isSelected ? "text-blue-200" : "text-white"
+                        isSelected ? "text-blue-700" : "text-gray-900"
                       )}>
                         {style.label}
                       </h4>
@@ -176,21 +176,21 @@ export function ReportStyleDialog() {
                             exit={{ scale: 0, opacity: 0 }}
                             transition={{ duration: 0.2 }}
                           >
-                            <Check className="h-4 w-4 text-blue-300" />
+                            <Check className="h-4 w-4 text-blue-600" />
                           </motion.div>
                         )}
                       </AnimatePresence>
                     </div>
                     <p className={cn(
                       "text-sm leading-relaxed transition-colors duration-300",
-                      isSelected ? "text-gray-300" : "text-gray-400"
+                      isSelected ? "text-blue-600" : "text-gray-600"
                     )}>
                       {style.description}
                     </p>
                   </div>
                   
                   {/* hover 光效 */}
-                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100"></div>
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-gray-200/20 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100"></div>
                 </motion.button>
               );
             })}

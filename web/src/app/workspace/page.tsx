@@ -7,7 +7,7 @@ import { motion } from "framer-motion";
 import { cn } from "~/lib/utils";
 
 import { Button } from "~/components/ui/button";
-import { ScrollArea } from "~/components/ui/scroll-area";
+import { ScrollContainer, type ScrollContainerRef } from "~/components/conversation/scroll-container";
 import { HeroInput } from "~/components/yadra/hero-input";
 import { useUnifiedStore, sendAskMessage } from "~/core/store/unified-store";
 import type { MessageRole } from "~/core/messages/types";
@@ -510,7 +510,7 @@ export default function WorkspacePage() {
     <div className="flex flex-1 items-center justify-center">
       <div className="text-center max-w-2xl mx-auto px-4">
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-white mb-4">
+          <h1 className="text-4xl font-bold text-gray-900 mb-4">
             你好，我能帮你什么？
           </h1>
           <p className="text-xl text-gray-300">
@@ -549,21 +549,11 @@ export default function WorkspacePage() {
     </div>
   );
 
-  // 🚀 对话面板组件 - 使用OutputStream组件
+  // 🚀 对话面板组件 - 使用智能滚动容器
   const ConversationPanel = () => {
     const messages = storeMessages; // 使用已定义的storeMessages
     const responding = useUnifiedStore((state) => state.responding);
-    const scrollAreaRef = useRef<HTMLDivElement>(null);
-
-    // 自动滚动到底部
-    useEffect(() => {
-      if (scrollAreaRef.current) {
-        const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
-        if (scrollContainer) {
-          scrollContainer.scrollTop = scrollContainer.scrollHeight;
-        }
-      }
-    }, [messages]);
+    const scrollContainerRef = useRef<ScrollContainerRef>(null);
 
     // 过滤和转换消息，只显示对话相关的内容
     const conversationMessages = useMemo(() => {
@@ -598,7 +588,7 @@ export default function WorkspacePage() {
     return (
       <div className="flex flex-col h-full">
         {/* 消息列表 */}
-        <ScrollArea ref={scrollAreaRef} className="flex-1 px-2">
+        <ScrollContainer ref={scrollContainerRef} className="flex-1 px-2" autoScrollToBottom={true}>
           <div className="space-y-4 py-4">
             {conversationMessages.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-center py-12">
@@ -650,17 +640,28 @@ export default function WorkspacePage() {
               </motion.div>
             )}
           </div>
-        </ScrollArea>
+        </ScrollContainer>
       </div>
     );
   };
 
   // 🚀 工件面板组件
   const ArtifactsPanel = () => {
+    // 🔥 添加本地状态控制按钮显示
+    const [planActionInProgress, setPlanActionInProgress] = useState<string | null>(null);
+
     const currentInterrupt = useUnifiedStore(state =>
       currentThreadId ? state.getCurrentInterrupt(currentThreadId) : null
     );
     
+    // 🔥 监听plan变化，当有新plan生成时重新显示按钮
+    useEffect(() => {
+      // 如果当前是modify状态，且有新的interrupt（说明重新生成了plan），则重新显示按钮
+      if (planActionInProgress === 'modify' && currentInterrupt !== null) {
+        setPlanActionInProgress(null);
+      }
+    }, [currentInterrupt, planActionInProgress]);
+
     // 🔥 获取真实的计划数据 - 不依赖interrupt状态
     const getPlanFromMessages = (): any | null => {
       if (!currentThreadId) return null;
@@ -724,7 +725,7 @@ export default function WorkspacePage() {
         id: `step-${index + 1}`,
         title: step.title || `步骤 ${index + 1}`,
         description: step.description || '无描述',
-        priority: step.step_type === 'research' ? 'high' as const : 'medium' as const,
+        priority: step.execution_res ? 'high' as const : 'medium' as const,
         status: step.execution_res ? 'completed' as const : 'pending' as const,
         estimatedTime: 15 // 默认估算时间
       }));
@@ -756,30 +757,23 @@ export default function WorkspacePage() {
     
     // 🔥 检查是否需要显示反馈按钮
     const shouldShowActions = (): boolean => {
-      return currentInterrupt !== null;
+      return currentInterrupt !== null && planActionInProgress === null;
     };
 
     // 处理PlanCard回调函数
     const handlePlanApprove = async (planId: string) => {
       if (!currentThreadId || !urlParam) return;
       
+      // 🔥 立即隐藏按钮
+      setPlanActionInProgress('approve');
+      
       // 获取session_id
       const sessionState = useUnifiedStore.getState().sessionState;
       const sessionId = sessionState?.sessionMetadata?.session_id;
       
-      // 🔍 详细调试信息
-      console.log('🔍 [handlePlanApprove] Debug sessionState:', {
-        sessionState: sessionState,
-        sessionMetadata: sessionState?.sessionMetadata,
-        session_id: sessionId,
-        session_id_type: typeof sessionId,
-        currentThreadId: currentThreadId,
-        urlParam: urlParam
-      });
-      
       if (!sessionId) {
         console.error('❌ [handlePlanApprove] Session ID not found for followup request');
-        console.error('❌ sessionState详细状态:', sessionState);
+        setPlanActionInProgress(null); // 🔥 出错时恢复按钮
         return;
       }
       
@@ -787,101 +781,86 @@ export default function WorkspacePage() {
       await sendAskMessage({
         question: "",
         askType: "followup",
-        config: {} as any, // 🔥 修复：HITL场景下不传递config，后端会使用原始配置
+        config: {} as any,
         context: {
           sessionId: sessionId,
           threadId: currentThreadId,
           urlParam: urlParam
         },
-        interrupt_feedback: "accepted" // 🔥 正确位置：顶级字段
+        interrupt_feedback: "accepted" // ✅ 格式正确，后端会自然继续执行
       });
       
-      useUnifiedStore.getState().clearCurrentInterrupt(currentThreadId);
+      // 🔥 不需要清除planActionInProgress，因为用户操作已完成，按钮应该保持隐藏
     };
 
     const handlePlanModify = async (planId: string, modifications: string) => {
       if (!currentThreadId || !urlParam) return;
       
+      // 🔥 编辑计划：等用户提交修改建议后才隐藏按钮，这里不设置状态
+      
       // 获取session_id
       const sessionState = useUnifiedStore.getState().sessionState;
       const sessionId = sessionState?.sessionMetadata?.session_id;
       
-      // 🔍 详细调试信息
-      console.log('🔍 [handlePlanModify] Debug sessionState:', {
-        sessionState: sessionState,
-        sessionMetadata: sessionState?.sessionMetadata,
-        session_id: sessionId,
-        session_id_type: typeof sessionId,
-        currentThreadId: currentThreadId,
-        urlParam: urlParam,
-        modifications: modifications
-      });
-      
       if (!sessionId) {
         console.error('❌ [handlePlanModify] Session ID not found for followup request');
-        console.error('❌ sessionState详细状态:', sessionState);
         return;
       }
       
-      // 🔥 HITL场景：不传递config，使用原始研究配置
+      // 🔥 用户提交修改建议后，立即隐藏按钮
+      setPlanActionInProgress('modify');
+      
+      // 🔥 HITL场景：发送修改建议给后端重新规划
       await sendAskMessage({
-        question: modifications,
+        question: `[EDIT_PLAN] ${modifications}`, // 🔥 修复：使用后端期望的格式
         askType: "followup",
-        config: {} as any, // 🔥 修复：HITL场景下不传递config，后端会使用原始配置
+        config: {} as any,
         context: {
           sessionId: sessionId,
           threadId: currentThreadId,
           urlParam: urlParam
         },
-        interrupt_feedback: "edit_plan" // 🔥 正确位置：顶级字段
+        interrupt_feedback: "edit_plan" // 🔥 这会被question中的[EDIT_PLAN]格式覆盖
       });
-      
-      useUnifiedStore.getState().clearCurrentInterrupt(currentThreadId);
     };
 
     const handlePlanSkipToReport = async (planId: string) => {
       if (!currentThreadId || !urlParam) return;
       
+      // 🔥 立即隐藏按钮
+      setPlanActionInProgress('skip_to_report');
+      
       // 获取session_id
       const sessionState = useUnifiedStore.getState().sessionState;
       const sessionId = sessionState?.sessionMetadata?.session_id;
       
-      // 🔍 详细调试信息
-      console.log('🔍 [handlePlanSkipToReport] Debug sessionState:', {
-        sessionState: sessionState,
-        sessionMetadata: sessionState?.sessionMetadata,
-        session_id: sessionId,
-        session_id_type: typeof sessionId,
-        currentThreadId: currentThreadId,
-        urlParam: urlParam
-      });
-      
       if (!sessionId) {
         console.error('❌ [handlePlanSkipToReport] Session ID not found for followup request');
-        console.error('❌ sessionState详细状态:', sessionState);
+        setPlanActionInProgress(null); // 🔥 出错时恢复按钮
         return;
       }
       
-      // 🔥 HITL场景：不传递config，使用原始研究配置
+      // 🔥 HITL场景：使用后端期望的格式
       await sendAskMessage({
         question: "",
         askType: "followup",
-        config: {} as any, // 🔥 修复：HITL场景下不传递config，后端会使用原始配置
+        config: {} as any,
         context: {
           sessionId: sessionId,
           threadId: currentThreadId,
           urlParam: urlParam
         },
-        interrupt_feedback: "goto_reporter" // 🔥 正确位置：顶级字段
+        interrupt_feedback: "skip_research" // 🔥 修复：使用后端期望的格式
       });
-      
-      useUnifiedStore.getState().clearCurrentInterrupt(currentThreadId);
     };
 
     const handlePlanReask = (planId: string) => {
       if (!currentThreadId) return;
       
-      // 🔥 过渡方案：重置当前研究状态，回到workspace初始根界面
+      // 🔥 立即隐藏按钮
+      setPlanActionInProgress('reask');
+      
+      // 🔥 重新提问是纯前端操作，立即清除状态
       const store = useUnifiedStore.getState();
       
       // 1. 清除当前interrupt状态
@@ -962,12 +941,12 @@ export default function WorkspacePage() {
   );
 
   return (
-    <div className="h-full w-full flex flex-col bg-gradient-to-br from-slate-900 via-slate-800 to-black relative">
+          <div className="h-full w-full flex flex-col bg-gradient-to-br from-gray-50 via-white to-gray-50 relative">
       {/* 顶部导航栏 - 仅在有消息时显示 */}
       {hasMessages && (
         <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 bg-transparent">
           <div className="flex items-center gap-2">
-            <h1 className="text-lg font-semibold text-white">当前研究</h1>
+            <h1 className="text-lg font-semibold text-gray-900">当前研究</h1>
           </div>
 
           {/* 面板控制按钮 */}
@@ -976,7 +955,7 @@ export default function WorkspacePage() {
               variant={conversationVisible ? "default" : "outline"}
               size="sm"
               onClick={toggleConversationPanel}
-              className="gap-1 bg-transparent border-white/20 text-white hover:bg-white/10"
+              className="gap-1 bg-transparent border-gray-200 text-gray-700 hover:bg-gray-50"
             >
               <MessageSquare className="h-4 w-4" />
               <span className="hidden lg:inline">对话</span>
@@ -987,7 +966,7 @@ export default function WorkspacePage() {
               variant={artifactVisible ? "default" : "outline"}
               size="sm"
               onClick={toggleArtifactsPanel}
-              className="gap-1 bg-transparent border-white/20 text-white hover:bg-white/10"
+              className="gap-1 bg-transparent border-gray-200 text-gray-700 hover:bg-gray-50"
             >
               <FileText className="h-4 w-4" />
               <span className="hidden lg:inline">工件</span>
@@ -998,7 +977,7 @@ export default function WorkspacePage() {
               variant={historyVisible ? "default" : "outline"}
               size="sm"
               onClick={toggleHistoryPanel}
-              className="gap-1 bg-transparent border-white/20 text-white hover:bg-white/10"
+              className="gap-1 bg-transparent border-gray-200 text-gray-700 hover:bg-gray-50"
             >
               <Activity className="h-4 w-4" />
               <span className="hidden lg:inline">输出流</span>
@@ -1009,7 +988,7 @@ export default function WorkspacePage() {
               variant={podcastVisible ? "default" : "outline"}
               size="sm"
               onClick={togglePodcastPanel}
-              className="gap-1 bg-transparent border-white/20 text-white hover:bg-white/10"
+              className="gap-1 bg-transparent border-gray-200 text-gray-700 hover:bg-gray-50"
             >
               <Headphones className="h-4 w-4" />
               <span className="hidden lg:inline">播客</span>
@@ -1030,7 +1009,7 @@ export default function WorkspacePage() {
             {/* 对话面板 */}
             {conversationVisible && (
               <div className={cn("flex flex-col h-full relative", panelWidthClass, {
-                "border-r border-white/10": visiblePanels.length > 1
+                "border-r border-gray-200": visiblePanels.length > 1
               })}>
                 <ConversationPanel />
                 {/* 在多面板模式下，输入框属于对话面板 */}
@@ -1041,18 +1020,18 @@ export default function WorkspacePage() {
             {/* 工件面板 */}
             {artifactVisible && (
               <div className={cn("flex flex-col h-full", panelWidthClass, {
-                "border-r border-white/10": historyVisible || podcastVisible
+                "border-r border-gray-200": historyVisible || podcastVisible
               })}>
-                <div className="flex-shrink-0 px-4 py-3 border-b border-white/10">
+                <div className="flex-shrink-0 px-4 py-3 border-b border-gray-200">
                   <div className="flex items-center justify-between">
-                    <h2 className="text-lg font-semibold text-white">
+                    <h2 className="text-lg font-semibold text-gray-900">
                       研究工件
                     </h2>
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={toggleArtifactsPanel}
-                      className="h-8 w-8 p-0 text-white hover:bg-white/10"
+                      className="h-8 w-8 p-0 text-gray-600 hover:bg-gray-100"
                     >
                       <Minimize2 className="h-4 w-4" />
                     </Button>
@@ -1065,18 +1044,18 @@ export default function WorkspacePage() {
             {/* 输出流面板 */}
             {historyVisible && (
               <div className={cn("flex flex-col h-full", panelWidthClass, {
-                "border-r border-white/10": podcastVisible
+                "border-r border-gray-200": podcastVisible
               })}>
-                <div className="flex-shrink-0 px-4 py-3 border-b border-white/10">
+                <div className="flex-shrink-0 px-4 py-3 border-b border-gray-200">
                   <div className="flex items-center justify-between">
-                    <h2 className="text-lg font-semibold text-white">
+                    <h2 className="text-lg font-semibold text-gray-900">
                       实时输出流
                     </h2>
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={toggleHistoryPanel}
-                      className="h-8 w-8 p-0 text-white hover:bg-white/10"
+                      className="h-8 w-8 p-0 text-gray-600 hover:bg-gray-100"
                     >
                       <Minimize2 className="h-4 w-4" />
                     </Button>
@@ -1089,16 +1068,16 @@ export default function WorkspacePage() {
             {/* 播客面板 */}
             {podcastVisible && (
               <div className={cn("flex flex-col h-full", panelWidthClass)}>
-                <div className="flex-shrink-0 px-4 py-3 border-b border-white/10">
+                <div className="flex-shrink-0 px-4 py-3 border-b border-gray-200">
                   <div className="flex items-center justify-between">
-                    <h2 className="text-lg font-semibold text-white">
+                    <h2 className="text-lg font-semibold text-gray-900">
                       播客内容
                     </h2>
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={togglePodcastPanel}
-                      className="h-8 w-8 p-0 text-white hover:bg-white/10"
+                      className="h-8 w-8 p-0 text-gray-600 hover:bg-gray-100"
                     >
                       <Minimize2 className="h-4 w-4" />
                     </Button>
@@ -1113,10 +1092,10 @@ export default function WorkspacePage() {
               <div className="flex flex-1 items-center justify-center">
                 <div className="text-center">
                   <MessageSquare className="mx-auto h-12 w-12 text-gray-400" />
-                  <h3 className="mt-4 text-lg font-medium text-white">
+                  <h3 className="mt-4 text-lg font-medium text-gray-900">
                     选择要查看的面板
                   </h3>
-                  <p className="mt-2 text-sm text-gray-400">
+                  <p className="mt-2 text-sm text-gray-500">
                     使用右上角的按钮开启对话、工件或其他面板
                   </p>
                 </div>
