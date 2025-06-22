@@ -24,6 +24,7 @@ import type {
   ArtifactEvent,
   CompleteEvent,
   ErrorEvent,
+  InterruptEvent,
 } from "./research-stream-types";
 
 /**
@@ -139,6 +140,10 @@ export function isCompleteEvent(event: SSEEvent): event is SSEEvent & { data: Co
 
 export function isErrorEvent(event: SSEEvent): event is SSEEvent & { data: ErrorEvent } {
   return event.type === 'error';
+}
+
+export function isInterruptEvent(event: SSEEvent): event is SSEEvent & { data: InterruptEvent } {
+  return event.type === 'interrupt';
 }
 
 /**

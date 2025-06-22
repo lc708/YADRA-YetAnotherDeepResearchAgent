@@ -108,8 +108,8 @@ class MetadataEvent:
     model_info: Dict[str, str]
     estimated_duration: int
     start_time: str
-    execution_type: str = "continue"  # 🔥 添加execution_type字段：continue/feedback/monitor
     timestamp: str
+    execution_type: str = "continue"  # 🔥 添加execution_type字段：continue/feedback/monitor
 
 
 @dataclass

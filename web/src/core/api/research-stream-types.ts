@@ -88,6 +88,7 @@ export type SSEEventType =
   | 'message_chunk'
   | 'artifact'
   | 'progress'
+  | 'interrupt'
   | 'complete'
   | 'error';
 
@@ -204,7 +205,21 @@ export interface ArtifactEvent {
   timestamp: string;
 }
 
-// 执行完成
+// 🔥 添加interrupt事件类型
+export interface InterruptEvent {
+  interrupt_id: string;
+  message: string;
+  options: Array<{
+    text: string;
+    value: string;
+  }>;
+  thread_id: string;
+  execution_id: string;
+  node_name: string;
+  timestamp: string;
+}
+
+// 完成事件
 export interface CompleteEvent {
   execution_id: string;
   thread_id: string;
@@ -243,6 +258,7 @@ export type SSEEventData =
   | MessageChunkEvent
   | ArtifactEvent
   | ProgressEvent
+  | InterruptEvent
   | CompleteEvent
   | ErrorEvent;
 
