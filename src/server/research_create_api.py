@@ -59,7 +59,7 @@ class ResearchAskRequest(BaseModel):
         description="HITL interrupt反馈：accepted, edit_plan, skip_research, reask等",
     )
 
-    @model_validator(mode='after')
+    @model_validator(mode="after")
     def validate_question_for_hitl(self):
         """条件验证：HITL场景允许question为空，否则要求有内容"""
         # 如果有interrupt_feedback，允许question为空
@@ -480,39 +480,39 @@ class ResearchAskService:
         """解析配置参数 - 支持嵌套和扁平结构"""
         research_config = {
             "auto_accepted_plan": (
-                config.get("research", {}).get("auto_accepted_plan") or
-                config.get("auto_accepted_plan") or
-                False
+                config.get("research", {}).get("auto_accepted_plan")
+                or config.get("auto_accepted_plan")
+                or False
             ),
             "enable_background_investigation": (
-                config.get("research", {}).get("enable_background_investigation") or
-                config.get("enable_background_investigation") or
-                True
+                config.get("research", {}).get("enable_background_investigation")
+                or config.get("enable_background_investigation")
+                or True
             ),
             "report_style": (
-                config.get("research", {}).get("report_style") or
-                config.get("report_style") or
-                "academic"
+                config.get("research", {}).get("report_style")
+                or config.get("report_style")
+                or "academic"
             ),
             "enable_deep_thinking": (
-                config.get("research", {}).get("enable_deep_thinking") or
-                config.get("enable_deep_thinking") or
-                False
+                config.get("research", {}).get("enable_deep_thinking")
+                or config.get("enable_deep_thinking")
+                or False
             ),
             "max_plan_iterations": (
-                config.get("research", {}).get("max_research_depth") or
-                config.get("max_plan_iterations") or
-                3
+                config.get("research", {}).get("max_research_depth")
+                or config.get("max_plan_iterations")
+                or 3
             ),
             "max_step_num": (
-                config.get("research", {}).get("max_step_num") or
-                config.get("max_step_num") or
-                5
+                config.get("research", {}).get("max_step_num")
+                or config.get("max_step_num")
+                or 5
             ),
             "max_search_results": (
-                config.get("research", {}).get("max_search_results") or
-                config.get("max_search_results") or
-                5
+                config.get("research", {}).get("max_search_results")
+                or config.get("max_search_results")
+                or 5
             ),
         }
 

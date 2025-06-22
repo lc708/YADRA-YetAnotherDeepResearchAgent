@@ -5,7 +5,7 @@
  * 
  * 🔄 替换目标：
  * - ~/components/yadra/feedback-system（旧版本）
- * - ~/app/workspace/[traceId]/components/feedback-system（旧版本）
+ * - 已移除workspace/[traceId]/components/feedback-system
  * 
  * 📍 使用位置：
  * - conversation-panel.tsx - 消息反馈

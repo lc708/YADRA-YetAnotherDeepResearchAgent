@@ -109,7 +109,9 @@ class MetadataEvent:
     estimated_duration: int
     start_time: str
     timestamp: str
-    execution_type: str = "continue"  # 🔥 添加execution_type字段：continue/feedback/monitor
+    execution_type: str = (
+        "continue"  # 🔥 添加execution_type字段：continue/feedback/monitor
+    )
 
 
 @dataclass
@@ -1058,7 +1060,12 @@ class ResearchStreamService:
 
             # 处理LangGraph流式执行 - 直接执行，无需预创建checkpoint
             async for event in self._process_langgraph_stream(
-                graph, initial_state, thread_id, execution_id, request, execution_type="create"
+                graph,
+                initial_state,
+                thread_id,
+                execution_id,
+                request,
+                execution_type="create",
             ):
                 yield event
 
@@ -1128,7 +1135,12 @@ class ResearchStreamService:
 
                 # 使用_process_langgraph_stream处理流式执行
                 async for event in self._process_langgraph_stream(
-                    graph, inputs, thread_id, execution_id, request, execution_type="feedback"
+                    graph,
+                    inputs,
+                    thread_id,
+                    execution_id,
+                    request,
+                    execution_type="feedback",
                 ):
                     yield event
                 return
@@ -1149,7 +1161,12 @@ class ResearchStreamService:
 
                 # 使用_process_langgraph_stream处理流式执行
                 async for event in self._process_langgraph_stream(
-                    graph, inputs, thread_id, execution_id, request, execution_type="continue"
+                    graph,
+                    inputs,
+                    thread_id,
+                    execution_id,
+                    request,
+                    execution_type="continue",
                 ):
                     yield event
             else:

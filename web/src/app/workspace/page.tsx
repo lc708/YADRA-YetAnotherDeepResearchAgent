@@ -19,6 +19,7 @@ import { PlanCard } from "~/components/research/plan-card";
 import type { ResearchPlan } from "~/components/research/plan-card";
 import type { PlanStep } from "~/components/research/plan-card";
 import { OutputStream } from "./components/output-stream";
+import { PodcastPanel } from "./components/podcast-panel";
 import { ArtifactFeed } from "~/components/yadra/artifact-feed";
 import { MessageContainer } from "~/components/conversation/message-container";
 import { LoadingAnimation } from "~/components/conversation/loading-animation";
@@ -928,16 +929,9 @@ export default function WorkspacePage() {
     </div>
   );
 
-  // 🚀 播客面板组件
-  const PodcastPanel = () => (
-    <div className="flex flex-col h-full p-4">
-      <div className="flex-1 overflow-y-auto">
-        <div className="text-center text-gray-400 mt-8">
-          <Headphones className="mx-auto h-12 w-12 mb-4" />
-          <p>播客内容将在这里显示</p>
-        </div>
-      </div>
-    </div>
+  // 🚀 播客面板组件 - 导入迁移后的组件
+  const PodcastPanelWrapper = () => (
+    <PodcastPanel className="flex-1" />
   );
 
   return (
@@ -1083,7 +1077,7 @@ export default function WorkspacePage() {
                     </Button>
                   </div>
                 </div>
-                <PodcastPanel />
+                <PodcastPanelWrapper />
               </div>
             )}
 
