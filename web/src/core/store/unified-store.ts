@@ -54,22 +54,8 @@ export interface AskAPIConfig {
   [key: string]: any;
 }
 
-// 🚀 ASK API事件处理器类型
-export type AskAPIEventHandler = {
-  onNavigation?: (data: any) => void | Promise<void>;
-  onMetadata?: (data: any) => void | Promise<void>;
-  onNodeStart?: (data: any) => void | Promise<void>;
-  onNodeComplete?: (data: any) => void | Promise<void>;
-  onPlanGenerated?: (data: any) => void | Promise<void>;
-  onSearchResults?: (data: any) => void | Promise<void>;
-  onAgentOutput?: (data: any) => void | Promise<void>;
-  onMessageChunk?: (data: any) => void | Promise<void>;
-  onArtifact?: (data: any) => void | Promise<void>;
-  onProgress?: (data: any) => void | Promise<void>;
-  onInterrupt?: (data: any) => void | Promise<void>;
-  onComplete?: (data: any) => void | Promise<void>;
-  onError?: (data: any) => void | Promise<void>;
-};
+// 🚀 废弃：AskAPIEventHandler已删除 - Store层不再处理业务事件
+// 组件层应直接处理LangGraph原生事件，在组件末端做业务识别
 
 // 线程状态
 interface ThreadState {
@@ -147,18 +133,7 @@ type UnifiedStore = {
   addMessage: (threadId: string, message: Message) => void;
   updateMessage: (threadId: string, messageId: string, update: Partial<Message>) => void;
   
-  // 🔥 新增：消息块合并方法
-  mergeMessageChunk: (threadId: string, chunkData: {
-    execution_id: string;
-    agent_name: string;
-    chunk_type: string;
-    chunk_id: string;
-    content: string;
-    sequence: number;
-    is_final: boolean;
-    metadata: any;
-    timestamp: string;
-  }) => void;
+  // 🔥 废弃：mergeMessageChunk已删除 - 使用LangGraph原生事件和mergeMessage替代
   
   // 研究操作
   setOngoingResearch: (threadId: string, researchId: string | null) => void;
@@ -329,162 +304,7 @@ export const useUnifiedStore = create<UnifiedStore>()(
          });
        },
       
-             // 🔥 新增：消息块合并方法 - 实现事件数据合并逻辑
-       mergeMessageChunk: (threadId: string, chunkData: {
-         execution_id: string;
-         agent_name: string;
-         chunk_type: string;
-         chunk_id: string;
-         content: string;
-         sequence: number;
-         is_final: boolean;
-         metadata: any;
-         timestamp: string;
-       }) => {
-         set((state) => {
-           const thread = state.threads.get(threadId);
-           if (!thread) return;
-           
-           // 🔥 生成分组键：execution_id + agent_name + chunk_type
-           const messageId = `${chunkData.execution_id}-${chunkData.agent_name}-${chunkData.chunk_type}`;
-           
-           // 查找现有消息
-           let existingMessage = thread.messages.find(m => m.id === messageId);
-           
-           if (existingMessage) {
-             // 🔥 合并到现有消息 - 类似merge-message.ts的事件合并逻辑
-             
-             // 1. 合并content chunks
-             existingMessage.contentChunks.push(chunkData.content);
-             
-             // 2. 更新chunks数组并排序
-             const allChunks = existingMessage.metadata?.chunks || [];
-             allChunks.push({
-               chunk_id: chunkData.chunk_id,
-               content: chunkData.content,
-               sequence: chunkData.sequence,
-               timestamp: chunkData.timestamp,
-               metadata: chunkData.metadata,
-             });
-             allChunks.sort((a: any, b: any) => a.sequence - b.sequence);
-             
-             // 3. 重新生成完整content
-             existingMessage.content = allChunks.map((chunk: any) => chunk.content).join('');
-             
-             // 4. 🔥 合并事件数据 - URLs, Images, Token info
-             const mergedUrls = new Set<string>();
-             const mergedImages = new Set<string>();
-             let totalTokens = { input: 0, output: 0 };
-             let totalCost = 0;
-             
-             allChunks.forEach((chunk: any) => {
-               const meta = chunk.metadata || {};
-               // 合并URLs
-               if (meta.urls && Array.isArray(meta.urls)) {
-                 meta.urls.forEach((url: string) => mergedUrls.add(url));
-               }
-               // 合并Images  
-               if (meta.images && Array.isArray(meta.images)) {
-                 meta.images.forEach((img: string) => mergedImages.add(img));
-               }
-               // 累积Token信息
-               if (meta.token_info) {
-                 totalTokens.input += meta.token_info.input_tokens || 0;
-                 totalTokens.output += meta.token_info.output_tokens || 0;
-                 totalCost += meta.token_info.total_cost || 0;
-               }
-             });
-             
-             // 5. 🔥 更新Message.resources基于合并后的URLs
-             existingMessage.resources = Array.from(mergedUrls).map(url => ({
-               uri: url,
-               title: url, // 简化处理，实际可能需要从chunk中提取title
-             }));
-             
-             // 6. 更新metadata
-             existingMessage.isStreaming = !chunkData.is_final;
-             existingMessage.metadata = {
-               ...existingMessage.metadata,
-               messageChunkGroup: true,
-               executionId: chunkData.execution_id,
-               chunkType: chunkData.chunk_type,
-               chunks: allChunks,
-               lastChunkTimestamp: chunkData.timestamp,
-               totalChunks: allChunks.length,
-               // 🔥 合并后的聚合数据
-               mergedData: {
-                 urls: Array.from(mergedUrls),
-                 images: Array.from(mergedImages),
-                 tokenInfo: {
-                   input_tokens: totalTokens.input,
-                   output_tokens: totalTokens.output,
-                   total_cost: totalCost,
-                 },
-               },
-             };
-             
-           } else {
-             // 🔥 创建新消息
-             const validAgents = ["generalmanager", "projectmanager", "researcher", "coder", "reporter", "podcast"] as const;
-             const agentName = validAgents.includes(chunkData.agent_name as any) 
-               ? chunkData.agent_name as typeof validAgents[number]
-               : "researcher";
-             
-             // 🔥 初始化事件数据
-             const initialUrls = chunkData.metadata?.urls || [];
-             const initialImages = chunkData.metadata?.images || [];
-             const initialTokenInfo = chunkData.metadata?.token_info || {};
-             
-             const newMessage: Message = {
-               id: messageId,
-               content: chunkData.content,
-               contentChunks: [chunkData.content],
-               role: "assistant" as const,
-               threadId: threadId,
-               isStreaming: !chunkData.is_final,
-               agent: agentName,
-               // 🔥 基于URLs生成resources
-               resources: initialUrls.map((url: string) => ({
-                 uri: url,
-                 title: url,
-               })),
-               metadata: {
-                 messageChunkGroup: true,
-                 executionId: chunkData.execution_id,
-                 chunkType: chunkData.chunk_type,
-                 chunks: [{
-                   chunk_id: chunkData.chunk_id,
-                   content: chunkData.content,
-                   sequence: chunkData.sequence,
-                   timestamp: chunkData.timestamp,
-                   metadata: chunkData.metadata,
-                 }],
-                 lastChunkTimestamp: chunkData.timestamp,
-                 totalChunks: 1,
-                 // 🔥 初始化聚合数据
-                 mergedData: {
-                   urls: initialUrls,
-                   images: initialImages,
-                   tokenInfo: {
-                     input_tokens: initialTokenInfo.input_tokens || 0,
-                     output_tokens: initialTokenInfo.output_tokens || 0,
-                     total_cost: initialTokenInfo.total_cost || 0,
-                   },
-                 },
-               },
-               originalInput: {
-                 text: '',
-                 locale: 'zh-CN',
-                 settings: {},
-                 resources: [],
-                 timestamp: chunkData.timestamp,
-               },
-             };
-             
-             thread.messages.push(newMessage);
-           }
-         });
-       },
+             // 🔥 废弃：mergeMessageChunk方法已删除
       
       // 研究操作
       setOngoingResearch: (threadId: string, researchId: string | null) => {
@@ -845,7 +665,6 @@ export const useWorkspaceActions = () => {
 // 🚀 新架构：使用ASK API发送研究请求
 export const sendAskMessage = async (
   request: ResearchRequest,
-  eventHandler?: AskAPIEventHandler,
   config?: {
     abortSignal?: AbortSignal;
     onNavigate?: (url: string) => void | Promise<void>;
@@ -861,6 +680,7 @@ export const sendAskMessage = async (
   const { fetchStream } = await import("~/core/sse");
   const { resolveServiceURL } = await import("~/core/api/resolve-service-url");
   const { generateInitialQuestionIDs, getVisitorId } = await import("~/core/utils");
+  const { mergeMessage } = await import("~/core/messages");
   
   try {
     // 🔥 设置响应状态
@@ -935,7 +755,7 @@ export const sendAskMessage = async (
     let currentThreadId: string | null = null;
     let assistantMessage: Message | null = null;
     
-    // 🔥 处理SSE事件流
+    // 🔥 处理SSE事件流 - 重构为LangGraph原生事件处理
     for await (const event of sseStream) {
       // 检查是否被中止
       if (config?.abortSignal?.aborted) {
@@ -948,7 +768,7 @@ export const sendAskMessage = async (
       try {
         const eventData = JSON.parse(event.data);
         
-        // 🚀 统一事件处理逻辑
+        // 🚀 重构：LangGraph原生事件处理逻辑
         switch (event.event) {
           case 'navigation':
             // 🔥 处理导航事件 - 这是ASK API的核心事件
@@ -959,330 +779,176 @@ export const sendAskMessage = async (
                 workspaceUrl: eventData.workspace_url
               };
               
-                             // 更新store状态
-               state.setCurrentUrlParam(eventData.url_param);
-               state.setUrlParamMapping(eventData.url_param, eventData.thread_id);
-               state.setCurrentThread(eventData.thread_id);
-               currentThreadId = eventData.thread_id;
-               
-               // 🔥 保存session_id到sessionState（如果提供）
-               if (eventData.session_id) {
-                 const currentSessionState = state.sessionState || {
-                   sessionMetadata: null,
-                   executionHistory: [],
-                   currentConfig: null,
-                   permissions: null,
-                 };
-                 
-                 const newSessionState = {
-                   ...currentSessionState,
-                   sessionMetadata: {
-                     ...currentSessionState.sessionMetadata,
-                     session_id: eventData.session_id,
-                     thread_id: eventData.thread_id,
-                     url_param: eventData.url_param,
-                   }
-                 };
-                 
-                 console.log('🔍 [Navigation Event] Saving session_id:', {
-                   eventData_session_id: eventData.session_id,
-                   eventData_thread_id: eventData.thread_id,
-                   eventData_url_param: eventData.url_param,
-                   currentSessionState: currentSessionState,
-                   newSessionState: newSessionState
-                 });
-                 
-                 state.setSessionState(newSessionState);
-                 
-                 // 🔍 验证sessionState是否正确保存 - 修复：使用实时获取
-                 const currentStoreState = useUnifiedStore.getState();
-                 console.log('🔍 [Navigation Event] After setSessionState, store sessionState:', currentStoreState.sessionState);
-               } else {
-                 console.log('⚠️ [Navigation Event] No session_id in eventData:', eventData);
-               }
-               
-               // 创建用户消息（只在initial时创建）
-               if (request.askType === 'initial' && currentThreadId) {
-                 const userMessage: Message = {
-                   id: nanoid(),
-                   content: request.question,
-                   contentChunks: [request.question],
-                   role: "user",
-                   threadId: currentThreadId,
-                   isStreaming: false,
-                 };
-                 state.addMessage(currentThreadId, userMessage);
-                
-                // 创建助手消息用于接收流式内容
-                assistantMessage = {
-                  id: nanoid(),
-                  content: "",
-                  contentChunks: [],
-                  role: "assistant",
-                  threadId: currentThreadId,
-                  isStreaming: true,
-                  agent: "researcher",
+              // 更新store状态
+              state.setCurrentUrlParam(eventData.url_param);
+              state.setUrlParamMapping(eventData.url_param, eventData.thread_id);
+              state.setCurrentThread(eventData.thread_id);
+              currentThreadId = eventData.thread_id;
+              
+              // 🔥 保存session_id到sessionState（如果提供）
+              if (eventData.session_id) {
+                const currentSessionState = state.sessionState || {
+                  sessionMetadata: null,
+                  executionHistory: [],
+                  currentConfig: null,
+                  permissions: null,
                 };
-                state.addMessage(currentThreadId, assistantMessage);
+                
+                const newSessionState = {
+                  ...currentSessionState,
+                  sessionMetadata: {
+                    ...currentSessionState.sessionMetadata,
+                    session_id: eventData.session_id,
+                    thread_id: eventData.thread_id,
+                    url_param: eventData.url_param,
+                  }
+                };
+                
+                console.log('🔍 [Navigation Event] Saving session_id:', {
+                  eventData_session_id: eventData.session_id,
+                  eventData_thread_id: eventData.thread_id,
+                  eventData_url_param: eventData.url_param,
+                  currentSessionState: currentSessionState,
+                  newSessionState: newSessionState
+                });
+                
+                state.setSessionState(newSessionState);
+                
+                // 🔍 验证sessionState是否正确保存 - 修复：使用实时获取
+                const currentStoreState = useUnifiedStore.getState();
+                console.log('🔍 [Navigation Event] After setSessionState, store sessionState:', currentStoreState.sessionState);
+              } else {
+                console.log('⚠️ [Navigation Event] No session_id in eventData:', eventData);
               }
               
-              // 调用导航回调
+              // 创建用户消息（只在initial时创建）
+              if (request.askType === 'initial' && currentThreadId) {
+                const userMessage: Message = {
+                  id: nanoid(),
+                  content: request.question,
+                  contentChunks: [request.question],
+                  role: "user",
+                  threadId: currentThreadId,
+                  isStreaming: false,
+                };
+                state.addMessage(currentThreadId, userMessage);
+               
+               // 创建助手消息用于接收流式内容
+               assistantMessage = {
+                 id: nanoid(),
+                 content: "",
+                 contentChunks: [],
+                 role: "assistant",
+                 threadId: currentThreadId,
+                 isStreaming: true,
+                 agent: "researcher",
+               };
+               state.addMessage(currentThreadId, assistantMessage);
+             }
+             
+                           // 调用导航回调
               if (config?.onNavigate) {
                 await config.onNavigate(eventData.workspace_url);
               }
-              
-              // 调用事件处理器
-              if (eventHandler?.onNavigation) {
-                await eventHandler.onNavigation(eventData);
-              }
-            }
-            break;
-            
-          case 'metadata':
-            // 🔥 处理元数据事件
-            console.log('Execution metadata:', eventData);
-            
-            // 🔥 修复：合并保存sessionState，避免覆盖session_id等关键信息 - 使用实时获取
-            const currentStoreState = useUnifiedStore.getState();
-            console.log('🔍 [Metadata Event] Current store sessionState:', currentStoreState.sessionState);
-            const currentSessionState = currentStoreState.sessionState || {
-              sessionMetadata: null,
-              executionHistory: [],
-              currentConfig: null,
-              permissions: null,
-            };
-            console.log('🔍 [Metadata Event] Using currentSessionState:', currentSessionState);
-            
-            // 合并sessionMetadata：保留现有字段，新字段覆盖同名字段
-            const mergedSessionMetadata = {
-              ...currentSessionState.sessionMetadata,  // 保留现有数据（包括session_id）
-              ...eventData,  // 新数据覆盖同名字段
-            };
-            
-            const newSessionState = {
-              ...currentSessionState,  // 保留现有sessionState结构
-              sessionMetadata: mergedSessionMetadata,  // 合并后的metadata
-              currentConfig: request.config,  // 更新当前配置
-              executionHistory: currentSessionState.executionHistory || [],  // 保留执行历史
-            };
-            
-            console.log('🔍 [Metadata Event] Merging sessionState:', {
-              currentSessionState: currentSessionState,
-              eventData: eventData,
-              mergedSessionMetadata: mergedSessionMetadata,
-              newSessionState: newSessionState,
-              session_id_before: currentSessionState.sessionMetadata?.session_id,
-              session_id_after: mergedSessionMetadata.session_id,
-              session_id_in_eventData: eventData.session_id  // 🔥 恢复：现在metadata事件包含session_id
-            });
-            
-            state.setSessionState(newSessionState);
-            
-            if (eventHandler?.onMetadata) {
-              await eventHandler.onMetadata(eventData);
-            }
-            break;
-            
-          case 'node_start':
-            console.log('Node started:', eventData);
-            if (eventHandler?.onNodeStart) {
-              await eventHandler.onNodeStart(eventData);
-            }
-            break;
-            
-          case 'node_complete':
-            console.log('Node completed:', eventData);
-            if (eventHandler?.onNodeComplete) {
-              await eventHandler.onNodeComplete(eventData);
-            }
-            break;
-            
-          case 'plan_generated':
-            // 🔥 处理计划生成事件
-            console.log('Plan generated:', eventData);
-            if (currentThreadId && 'plan_data' in eventData && eventData.plan_data) {
-              const planContent = typeof eventData.plan_data === 'string' 
-                ? eventData.plan_data 
-                : JSON.stringify(eventData.plan_data, null, 2);
-                
-              const planMessage: Message = {
-                id: nanoid(),
-                content: planContent,
-                contentChunks: [planContent],
-                role: "assistant",
-                threadId: currentThreadId,
-                isStreaming: false,
-                agent: "projectmanager",
-              };
-              state.addMessage(currentThreadId, planMessage);
-            }
-            
-            if (eventHandler?.onPlanGenerated) {
-              await eventHandler.onPlanGenerated(eventData);
-            }
-            break;
-            
-          case 'search_results':
-            // 🔥 处理搜索结果事件
-            console.log('Search results:', eventData);
-            if (eventHandler?.onSearchResults) {
-              await eventHandler.onSearchResults(eventData);
-            }
-            break;
-            
-          case 'agent_output':
-            // 🔥 处理智能体输出事件
-            console.log('Agent output:', eventData);
-            if (currentThreadId && 'content' in eventData && 'agent_name' in eventData &&
-                typeof eventData.content === 'string' && typeof eventData.agent_name === 'string') {
-              
-              // 确保agent_name是有效的agent类型
-              const validAgents = ["generalmanager", "projectmanager", "researcher", "coder", "reporter", "podcast"] as const;
-              const agentName = validAgents.includes(eventData.agent_name as any)
-                ? eventData.agent_name as typeof validAgents[number]
-                : "researcher";
-              
-              const agentMessage: Message = {
-                id: nanoid(),
-                content: eventData.content,
-                contentChunks: [eventData.content],
-                role: "assistant",
-                threadId: currentThreadId,
-                isStreaming: false,
-                agent: agentName,
-              };
-              state.addMessage(currentThreadId, agentMessage);
-            }
-            
-            if (eventHandler?.onAgentOutput) {
-              await eventHandler.onAgentOutput(eventData);
-            }
-            break;
-            
-          case 'message_chunk':
-            // 🔥 处理消息块事件
-            if (currentThreadId && assistantMessage && 'content' in eventData) {
-              const currentContent = state.getMessageById(currentThreadId, assistantMessage.id)?.content || '';
-              state.updateMessage(currentThreadId, assistantMessage.id, {
-                content: currentContent + eventData.content,
-              });
-            }
-            
-            if (eventHandler?.onMessageChunk) {
-              await eventHandler.onMessageChunk(eventData);
-            }
-            break;
-            
-          case 'artifact':
-            // 🔥 处理工件事件
-            console.log('Artifact generated:', eventData);
-            if (currentThreadId && 'content' in eventData && typeof eventData.content === 'string') {
-              const artifactMessage: Message = {
-                id: nanoid(),
-                content: eventData.content,
-                contentChunks: [eventData.content],
-                role: "assistant",
-                threadId: currentThreadId,
-                isStreaming: false,
-                agent: "reporter",
-              };
-              state.addMessage(currentThreadId, artifactMessage);
-            }
-            
-            if (eventHandler?.onArtifact) {
-              await eventHandler.onArtifact(eventData);
-            }
-            break;
-            
-          case 'progress':
-            // 🔥 处理进度事件
-            console.log('Progress update:', eventData);
-            if (eventHandler?.onProgress) {
-              await eventHandler.onProgress(eventData);
-            }
-            break;
-            
-          case 'interrupt':
-            // 🔥 处理中断事件
-            console.log('Interrupt event:', eventData);
-            if (currentThreadId && assistantMessage) {
-              // 标记需要用户交互
-              state.setInterruptMessage(currentThreadId, assistantMessage.id);
-              
-              // 🔥 保存完整的interrupt数据 - 修正字段名匹配
-              if ('id' in eventData && 'content' in eventData && 'options' in eventData) {
-                const interruptData = {
-                  interruptId: eventData.id as string,  // 🔥 修正：id -> interruptId
-                  message: eventData.content as string,  // 🔥 修正：content -> message
-                  options: eventData.options as Array<{text: string; value: string}>,
-                  threadId: eventData.thread_id as string,
-                  executionId: eventData.execution_id || '', // 可能不存在
-                  nodeName: eventData.node_name || 'human_feedback', // 可能不存在
-                  timestamp: eventData.timestamp || new Date().toISOString(), // 可能不存在
-                  messageId: assistantMessage.id,
-                };
-                state.setCurrentInterrupt(currentThreadId, interruptData);
-                console.log('🔔 Interrupt data saved to store:', interruptData);
-              } else {
-                console.warn('⚠️ Interrupt event missing required fields:', eventData);
-              }
-            }
-            
-            if (eventHandler?.onInterrupt) {
-              await eventHandler.onInterrupt(eventData);
-            }
-            break;
-            
-          case 'complete':
-            // 🔥 处理完成事件
-            console.log('Execution completed:', eventData);
-            if (currentThreadId && assistantMessage) {
-              state.updateMessage(currentThreadId, assistantMessage.id, {
-                isStreaming: false,
-              });
-            }
-            
-            if (eventHandler?.onComplete) {
-              await eventHandler.onComplete(eventData);
-            }
-            break;
-            
-          case 'error':
-            // 🔥 处理错误事件
-            console.error('Stream error:', eventData);
-            if (currentThreadId && assistantMessage && 'error_message' in eventData) {
-              state.updateMessage(currentThreadId, assistantMessage.id, {
-                content: `Error: ${eventData.error_message}`,
-                isStreaming: false,
-              });
-            }
-            
-            if (eventHandler?.onError) {
-              await eventHandler.onError(eventData);
-            }
-            break;
-            
-          default:
-            console.log(`[sendAskMessage] Unknown event type: ${event.event}`, eventData);
-            break;
-        }
-        
-      } catch (parseError) {
-        console.error("[sendAskMessage] Failed to parse SSE event data:", parseError);
-      }
-    }
-    
-    // 🔥 返回导航结果
-    if (!navigationResult) {
-      throw new Error("No navigation event received from ASK API");
-    }
-    
-    return navigationResult;
-    
-  } catch (error) {
-    console.error('[sendAskMessage] ASK API SSE stream failed:', error);
-    throw error;
-  } finally {
-    state.setResponding(false);
-  }
+           }
+           break;
+           
+         case 'metadata':
+           // 🔥 处理元数据事件
+           console.log('Execution metadata:', eventData);
+           
+           // 🔥 修复：合并保存sessionState，避免覆盖session_id等关键信息 - 使用实时获取
+           const currentStoreState = useUnifiedStore.getState();
+           console.log('🔍 [Metadata Event] Current store sessionState:', currentStoreState.sessionState);
+           const currentSessionState = currentStoreState.sessionState || {
+             sessionMetadata: null,
+             executionHistory: [],
+             currentConfig: null,
+             permissions: null,
+           };
+           console.log('🔍 [Metadata Event] Using currentSessionState:', currentSessionState);
+           
+           // 合并sessionMetadata：保留现有字段，新字段覆盖同名字段
+           const mergedSessionMetadata = {
+             ...currentSessionState.sessionMetadata,  // 保留现有数据（包括session_id）
+             ...eventData,  // 新数据覆盖同名字段
+           };
+           
+           const newSessionState = {
+             ...currentSessionState,  // 保留现有sessionState结构
+             sessionMetadata: mergedSessionMetadata,  // 合并后的metadata
+             currentConfig: request.config,  // 更新当前配置
+             executionHistory: currentSessionState.executionHistory || [],  // 保留执行历史
+           };
+           
+           console.log('🔍 [Metadata Event] Merging sessionState:', {
+             currentSessionState: currentSessionState,
+             eventData: eventData,
+             mergedSessionMetadata: mergedSessionMetadata,
+             newSessionState: newSessionState,
+             session_id_before: currentSessionState.sessionMetadata?.session_id,
+             session_id_after: mergedSessionMetadata.session_id,
+             session_id_in_eventData: eventData.session_id  // 🔥 恢复：现在metadata事件包含session_id
+           });
+           
+                      state.setSessionState(newSessionState);
+           break;
+           
+         // 🚀 LangGraph原生事件处理 - 纯Store层逻辑，不调用业务事件处理器
+         case 'message_chunk':
+         case 'tool_calls':
+         case 'tool_call_chunks':
+         case 'tool_call_result':
+         case 'interrupt':
+         case 'reask':
+         case 'complete':
+         case 'error':
+           // 🔥 统一使用mergeMessage处理所有LangGraph原生事件
+           if (currentThreadId && assistantMessage) {
+             // 获取当前消息
+             let currentMessage = state.getMessageById(currentThreadId, assistantMessage.id);
+             
+             if (currentMessage) {
+               // 使用mergeMessage合并事件
+               const mergedMessage = mergeMessage(currentMessage, {
+                 event: event.event,
+                 data: eventData
+               });
+               
+               // 更新消息
+               state.updateMessage(currentThreadId, assistantMessage.id, mergedMessage);
+               
+               // 特殊处理：complete事件时停止流式状态
+               if (event.event === 'complete') {
+                 state.updateMessage(currentThreadId, assistantMessage.id, {
+                   isStreaming: false,
+                 });
+               }
+             }
+           }
+           break;
+             
+           default:
+             console.log(`[sendAskMessage] Unknown event type: ${event.event}`, eventData);
+             break;
+         }
+         
+       } catch (parseError) {
+         console.error("[sendAskMessage] Failed to parse SSE event data:", parseError);
+       }
+     }
+     
+     // 🔥 返回导航结果
+     if (!navigationResult) {
+       throw new Error("No navigation event received from ASK API");
+     }
+     
+     return navigationResult;
+     
+   } catch (error) {
+     console.error('[sendAskMessage] ASK API SSE stream failed:', error);
+     throw error;
+   } finally {
+     state.setResponding(false);
+   }
 };
