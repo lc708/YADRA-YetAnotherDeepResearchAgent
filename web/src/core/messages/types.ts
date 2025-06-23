@@ -21,6 +21,7 @@ export interface Message {
   reasoningContent?: string;
   reasoningContentChunks?: string[];
   toolCalls?: ToolCallRuntime[];
+  toolCallChunks?: ToolCallChunk[];
   options?: Option[];
   finishReason?: "stop" | "interrupt" | "tool_calls" | "reask";
   interruptFeedback?: string;
@@ -34,6 +35,18 @@ export interface Message {
     timestamp: string;
   };
   metadata?: Record<string, any>;
+  langGraphMetadata?: {
+    execution_id?: string;
+    agent?: string;
+    timestamp?: string;
+    additional_kwargs?: Record<string, any>;
+    response_metadata?: Record<string, any>;
+  };
+  toolCallId?: string;
+  isToolCallsMessage?: boolean;
+  isInterruptMessage?: boolean;
+  isReaskMessage?: boolean;
+  isErrorMessage?: boolean;
 }
 
 export interface Option {
@@ -52,4 +65,11 @@ export interface ToolCallRuntime {
 export interface Resource {
   uri: string;
   title: string;
+}
+
+export interface ToolCallChunk {
+  index: number;
+  id: string;
+  name: string;
+  args: string;
 }

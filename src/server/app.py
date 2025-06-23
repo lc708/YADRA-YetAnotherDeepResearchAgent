@@ -631,9 +631,4 @@ async def shutdown_event():
     # Cleanup async resources
     await cleanup_async_resources()
 
-    # Cleanup sync resources
-    from src.graph.builder import cleanup_postgres_resources
-
-    cleanup_postgres_resources()
-
     logger.info("Server shutdown complete")

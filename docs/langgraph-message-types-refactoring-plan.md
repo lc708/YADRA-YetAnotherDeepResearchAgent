@@ -235,6 +235,38 @@ function mergeLangGraphTextMessage(message: Message, event: LangGraphEvent) {
 - 移除updates事件中的重复消息处理逻辑
 - **✅ 删除废弃的_determine_chunk_type()硬编码映射函数**
 
+**1.3 ✅ 修复后端架构不一致问题（2025-06-23新增）**
+- **✅ 新增`_create_tool_call_chunks_event()`方法**：处理单独的tool_call_chunks事件
+- **✅ 完全对齐app.py的消息处理逻辑**：添加`elif message_chunk.tool_call_chunks`分支
+- **✅ 统一reasoning_content字段处理**：在所有消息事件中添加reasoning_content支持
+- **✅ 统一finish_reason字段处理**：完全对齐app.py的finish_reason逻辑
+- **✅ 统一metadata字段处理**：添加additional_kwargs和response_metadata
+- **✅ 删除废弃的SSEEventType枚举**：完全未使用的废弃代码（15行代码清理）
+- **✅ 验证语法正确性**：使用uv编译验证修复后代码无语法错误
+
+**修复详情**：
+```python
+# ❌ 修复前：不完整的消息处理
+elif isinstance(message_chunk, AIMessageChunk):
+    if message_chunk.tool_calls:
+        yield self._create_tool_calls_event(...)
+    else:
+        yield self._create_message_chunk_event(...)
+    # 缺失：tool_call_chunks单独处理
+
+# ✅ 修复后：完全对齐app.py的消息处理
+elif isinstance(message_chunk, AIMessageChunk):
+    if message_chunk.tool_calls:
+        # AI Message - Tool Call
+        yield self._create_tool_calls_event(...)
+    elif message_chunk.tool_call_chunks:
+        # AI Message - Tool Call Chunks
+        yield self._create_tool_call_chunks_event(...)
+    else:
+        # AI Message - Raw message tokens
+        yield self._create_message_chunk_event(...)
+```
+
 ### ✅ 阶段2：前端类型系统重构（100%完成）
 
 **2.1 ✅ 删除错误的类型定义**
@@ -255,6 +287,40 @@ function mergeLangGraphTextMessage(message: Message, event: LangGraphEvent) {
   - 添加LangGraph原生工具调用处理
   - 移除不存在的`reasoning_content`字段处理
 - **✅ 修复chat.ts事件构造**：使用`event`字段而非`type`字段
+
+**2.4 ✅ 完整重构merge-message合并逻辑（2025-06-23新增）**
+- **✅ 扩展Message类型定义**：
+  - 新增`toolCallChunks`字段支持LangGraph原生tool_call_chunks
+  - 新增`langGraphMetadata`字段存储LangGraph原生元数据
+  - 新增`toolCallId`字段支持tool_call_result关联
+  - 新增`ToolCallChunk`接口匹配后端格式
+- **✅ 完全重构合并函数**：
+  - 分离`tool_calls`和`tool_call_chunks`处理逻辑
+  - 新增`tool_call_result`专门处理函数
+  - 新增`reasoning_content`字段处理
+  - 新增`metadata`和`complete`事件处理
+  - 统一`saveLangGraphMetadata`函数
+- **✅ 完善工具调用处理**：
+  - tool_calls事件：保存完整工具调用信息，初始化argsChunks
+  - tool_call_chunks事件：累积chunks到对应的toolCall.argsChunks
+  - tool_call_result事件：将结果关联到对应的toolCall.result
+  - finish_reason时：自动拼接argsChunks为完整args参数
+- **✅ 验证TypeScript编译**：无编译错误，类型定义完全正确
+
+**重构详情**：
+```typescript
+// ❌ 重构前：混合处理tool_calls和tool_call_chunks
+} else if (eventType === "tool_calls" || eventType === "tool_call_chunks") {
+  mergeToolCallMessage(clonedMessage, event);
+
+// ✅ 重构后：分离处理不同事件类型
+} else if (eventType === "tool_calls") {
+  mergeToolCallsMessage(clonedMessage, event);
+} else if (eventType === "tool_call_chunks") {
+  mergeToolCallChunksMessage(clonedMessage, event);
+} else if (eventType === "tool_call_result") {
+  mergeToolCallResultMessage(clonedMessage, event);
+```
 
 ### ✅ 阶段3：废弃代码清理（100%完成）
 
@@ -421,3 +487,24 @@ function mergeLangGraphTextMessage(message: Message, event: LangGraphEvent) {
 **创建时间**: 2025-06-23  
 **完成时间**: 2025-06-23  
 **最后更新**: 2025-06-23 
+
+--- 
+附录（用户笔记）
+
+后端现在输出的完整事件类型：
+"message_chunk" - LangGraph原生AIMessageChunk（包含reasoning_content、finish_reason、metadata）
+"tool_calls" - LangGraph原生AIMessageChunk.tool_calls（包含tool_call_chunks）
+"tool_call_chunks" - LangGraph原生AIMessageChunk.tool_call_chunks（新增）
+"tool_call_result" - LangGraph原生ToolMessage
+"interrupt" - LangGraph原生interrupt事件
+"reask" - 特殊的interrupt子类型
+"metadata" - 研究开始元数据
+"complete" - 研究完成事件
+"error" - 错误事件
+
+message_chunk事件：content, reasoning_content, finish_reason, metadata
+tool_calls事件：tool_calls, tool_call_chunks, content, reasoning_content, finish_reason
+tool_call_chunks事件：tool_call_chunks, content, reasoning_content, finish_reason
+tool_call_result事件：content, tool_call_id, finish_reason
+interrupt事件：content, options, finish_reason
+reask事件：content, original_input, finish_reason

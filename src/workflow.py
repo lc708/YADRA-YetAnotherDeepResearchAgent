@@ -2,7 +2,7 @@
 
 import asyncio
 import logging
-from src.graph import build_graph
+from src.graph import build_graph, create_graph
 
 # Configure logging
 logging.basicConfig(
@@ -18,8 +18,18 @@ def enable_debug_logging():
 
 logger = logging.getLogger(__name__)
 
-# Create the graph
+# Create the graph (无memory版本，供模块导入和命令行工具使用)
 graph = build_graph()
+
+# 异步图管理
+_async_graph = None
+
+async def get_async_graph():
+    """获取或创建异步图实例"""
+    global _async_graph
+    if _async_graph is None:
+        _async_graph = await create_graph()
+    return _async_graph
 
 
 async def run_agent_workflow_async(
@@ -48,6 +58,10 @@ async def run_agent_workflow_async(
         enable_debug_logging()
 
     logger.info(f"Starting async workflow with user input: {user_input}")
+    
+    # 获取异步图（带checkpointer）
+    async_graph = await get_async_graph()
+    
     initial_state = {
         # Runtime Variables
         "messages": [{"role": "user", "content": user_input}],
@@ -74,7 +88,7 @@ async def run_agent_workflow_async(
         "recursion_limit": 100,
     }
     last_message_cnt = 0
-    async for s in graph.astream(
+    async for s in async_graph.astream(
         input=initial_state, config=config, stream_mode="values"
     ):
         try:

@@ -2,97 +2,70 @@
 
 import type { Option } from "../messages";
 
-// Tool Calls
+// Tool Calls - 保留原生LangGraph工具调用结构
 
 export interface ToolCall {
-  type: "tool_call";
   id: string;
   name: string;
   args: Record<string, unknown>;
 }
 
 export interface ToolCallChunk {
-  type: "tool_call_chunk";
   index: number;
   id: string;
   name: string;
   args: string;
 }
 
-// Events
-
-interface GenericEvent<T extends string, D extends object> {
-  type: T;
+// ✅ 完全抽象的LangGraph原生事件 - 不预定义业务事件类型
+export interface LangGraphNativeEvent {
+  event: string;  // 原生事件类型：message_chunk, tool_calls, tool_call_result, interrupt, error等
   data: {
+    // 🔥 LangGraph原生必需字段
     id: string;
     thread_id: string;
-    agent: "generalmanager" | "projectmanager" | "researcher" | "coder" | "reporter";
+    agent: string;        // 节点名称：projectmanager, researcher, coder, reporter等
     role: "user" | "assistant" | "tool";
+    execution_id: string;
+    timestamp: string;
+    
+    // 🔥 LangGraph原生可选字段
     finish_reason?: "stop" | "tool_calls" | "interrupt";
-  } & D;
+    content?: string;
+    
+    // 🔥 工具调用相关（当event为tool_calls或tool_call_result时）
+    tool_calls?: ToolCall[];
+    tool_call_chunks?: ToolCallChunk[];
+    tool_call_id?: string;
+    
+    // 🔥 中断相关（当event为interrupt时）
+    options?: Option[];
+    
+    // 🔥 重问相关（当event为reask时）
+    original_input?: {
+      text: string;
+      locale: string;
+      settings: Record<string, any>;
+      resources: any[];
+      timestamp: string;
+    };
+    
+    // 🔥 错误相关（当event为error时）
+    error_code?: string;
+    error_message?: string;
+    error_details?: Record<string, any>;
+    suggestions?: string[];
+    
+    // 🔥 LangGraph原生元数据
+    metadata?: {
+      additional_kwargs?: Record<string, any>;
+      response_metadata?: Record<string, any>;
+    };
+    
+    // 💡 完全灵活：支持任意LangGraph原生字段和未来扩展
+    [key: string]: any;
+  };
 }
 
-export interface MessageChunkEvent
-  extends GenericEvent<
-    "message_chunk",
-    {
-      content?: string;
-      reasoning_content?: string;
-    }
-  > {}
-
-export interface ToolCallsEvent
-  extends GenericEvent<
-    "tool_calls",
-    {
-      tool_calls: ToolCall[];
-      tool_call_chunks: ToolCallChunk[];
-    }
-  > {}
-
-export interface ToolCallChunksEvent
-  extends GenericEvent<
-    "tool_call_chunks",
-    {
-      tool_call_chunks: ToolCallChunk[];
-    }
-  > {}
-
-export interface ToolCallResultEvent
-  extends GenericEvent<
-    "tool_call_result",
-    {
-      tool_call_id: string;
-      content?: string;
-    }
-  > {}
-
-export interface InterruptEvent
-  extends GenericEvent<
-    "interrupt",
-    {
-      options: Option[];
-    }
-  > {}
-
-export interface ReaskEvent
-  extends GenericEvent<
-    "reask",
-    {
-      original_input: {
-        text: string;
-        locale: string;
-        settings: Record<string, any>;
-        resources: any[];
-        timestamp: string;
-      };
-    }
-  > {}
-
-export type ChatEvent =
-  | MessageChunkEvent
-  | ToolCallsEvent
-  | ToolCallChunksEvent
-  | ToolCallResultEvent
-  | InterruptEvent
-  | ReaskEvent;
+// ✅ 统一事件类型 - 不再硬编码预定义事件
+export type ChatEvent = LangGraphNativeEvent;

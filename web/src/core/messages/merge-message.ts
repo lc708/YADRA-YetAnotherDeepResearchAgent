@@ -2,108 +2,234 @@
 
 import type {
   ChatEvent,
-  InterruptEvent,
-  MessageChunkEvent,
-  ToolCallChunksEvent,
-  ToolCallResultEvent,
-  ToolCallsEvent,
-  ReaskEvent,
+  LangGraphNativeEvent,
+  ToolCall,
 } from "../api";
 import { deepClone } from "../utils/deep-clone";
 
-import type { Message } from "./types";
+import type { Message, ToolCallChunk } from "./types";
 
-export function mergeMessage(message: Message, event: ChatEvent) {
+export function mergeMessage(message: Message, event: ChatEvent): Message {
   const clonedMessage = deepClone(message);
   
-  if (event.type === "message_chunk") {
-    mergeTextMessage(clonedMessage, event);
-  } else if (event.type === "tool_calls" || event.type === "tool_call_chunks") {
-    mergeToolCallMessage(clonedMessage, event);
-  } else if (event.type === "tool_call_result") {
+  // 🔥 统一事件处理：支持"type"和"event"两种格式
+  const eventType = event.event;
+  
+  if (eventType === "message_chunk") {
+    mergeLangGraphTextMessage(clonedMessage, event);
+  } else if (eventType === "tool_calls") {
+    mergeToolCallsMessage(clonedMessage, event);
+  } else if (eventType === "tool_call_chunks") {
+    mergeToolCallChunksMessage(clonedMessage, event);
+  } else if (eventType === "tool_call_result") {
     mergeToolCallResultMessage(clonedMessage, event);
-  } else if (event.type === "interrupt") {
+  } else if (eventType === "interrupt") {
     mergeInterruptMessage(clonedMessage, event);
-  } else if (event.type === "reask") {
+  } else if (eventType === "reask") {
     mergeReaskMessage(clonedMessage, event);
+  } else if (eventType === "error") {
+    mergeErrorMessage(clonedMessage, event);
+  } else if (eventType === "metadata") {
+    mergeMetadataMessage(clonedMessage, event);
+  } else if (eventType === "complete") {
+    mergeCompleteMessage(clonedMessage, event);
   }
+  
+  // 🔥 统一处理finish_reason和流式状态
   if (event.data.finish_reason) {
     clonedMessage.finishReason = event.data.finish_reason;
     clonedMessage.isStreaming = false;
+    
+    // 🔥 完成时处理tool call参数拼接
     if (clonedMessage.toolCalls) {
       clonedMessage.toolCalls.forEach((toolCall) => {
         if (toolCall.argsChunks?.length) {
-          toolCall.args = JSON.parse(toolCall.argsChunks.join(""));
-          delete toolCall.argsChunks;
+          try {
+            toolCall.args = JSON.parse(toolCall.argsChunks.join(""));
+            delete toolCall.argsChunks;
+          } catch (e) {
+            console.warn("Failed to parse tool call args:", e);
+          }
         }
       });
     }
   }
+  
   return clonedMessage;
 }
 
-function mergeTextMessage(message: Message, event: MessageChunkEvent) {
+// 🔥 处理message_chunk事件：文本内容拼接
+function mergeLangGraphTextMessage(message: Message, event: LangGraphNativeEvent) {
+  // 处理主要内容
   if (event.data.content) {
     message.content = (message.content || "") + event.data.content;
     message.contentChunks = [...(message.contentChunks || []), event.data.content];
   }
+  
+  // 🔥 处理reasoning_content
   if (event.data.reasoning_content) {
-    message.reasoningContent = (message.reasoningContent ?? "") + event.data.reasoning_content;
-    message.reasoningContentChunks = [...(message.reasoningContentChunks ?? []), event.data.reasoning_content];
+    message.reasoningContent = (message.reasoningContent || "") + event.data.reasoning_content;
+    message.reasoningContentChunks = [...(message.reasoningContentChunks || []), event.data.reasoning_content];
   }
+  
+  // 🔥 保存LangGraph原生元数据
+  saveLangGraphMetadata(message, event);
 }
 
-function mergeToolCallMessage(
-  message: Message,
-  event: ToolCallsEvent | ToolCallChunksEvent,
-) {
-  if (event.type === "tool_calls" && event.data.tool_calls[0]?.name) {
-    message.toolCalls = event.data.tool_calls.map((raw) => ({
+// 🔥 处理tool_calls事件：完整的工具调用
+function mergeToolCallsMessage(message: Message, event: LangGraphNativeEvent) {
+  if (event.data.tool_calls?.[0]?.name) {
+    message.toolCalls = event.data.tool_calls.map((raw: any) => ({
       id: raw.id,
       name: raw.name,
       args: raw.args,
-      result: undefined,
+      argsChunks: [], // 初始化为空，等待后续chunks
     }));
+    message.isToolCallsMessage = true;
   }
+  
+  // 🔥 同时处理tool_call_chunks（如果存在）
+  if (event.data.tool_call_chunks?.length) {
+    message.toolCallChunks = [...(message.toolCallChunks || []), ...event.data.tool_call_chunks];
+  }
+  
+  // 处理内容和reasoning_content
+  if (event.data.content) {
+    message.content = (message.content || "") + event.data.content;
+    message.contentChunks = [...(message.contentChunks || []), event.data.content];
+  }
+  
+  if (event.data.reasoning_content) {
+    message.reasoningContent = (message.reasoningContent || "") + event.data.reasoning_content;
+    message.reasoningContentChunks = [...(message.reasoningContentChunks || []), event.data.reasoning_content];
+  }
+  
+  saveLangGraphMetadata(message, event);
+}
 
-  message.toolCalls ??= [];
-  for (const chunk of event.data.tool_call_chunks) {
-    if (chunk.id) {
-      const toolCall = message.toolCalls.find(
-        (toolCall) => toolCall.id === chunk.id,
-      );
-      if (toolCall) {
-        toolCall.argsChunks = [chunk.args];
-      }
-    } else {
-      const streamingToolCall = message.toolCalls.find(
-        (toolCall) => toolCall.argsChunks?.length,
-      );
-      if (streamingToolCall) {
-        streamingToolCall.argsChunks!.push(chunk.args);
+// 🔥 处理tool_call_chunks事件：工具调用片段累积
+function mergeToolCallChunksMessage(message: Message, event: LangGraphNativeEvent) {
+  if (event.data.tool_call_chunks?.length) {
+    message.toolCallChunks = [...(message.toolCallChunks || []), ...event.data.tool_call_chunks];
+    
+    // 🔥 尝试将chunks累积到对应的toolCalls中
+    if (message.toolCalls) {
+      event.data.tool_call_chunks.forEach((chunk: ToolCallChunk) => {
+        const toolCall = message.toolCalls?.find(tc => tc.id === chunk.id);
+        if (toolCall && toolCall.argsChunks) {
+          toolCall.argsChunks.push(chunk.args);
+        }
+      });
+    }
+  }
+  
+  // 处理内容和reasoning_content
+  if (event.data.content) {
+    message.content = (message.content || "") + event.data.content;
+    message.contentChunks = [...(message.contentChunks || []), event.data.content];
+  }
+  
+  if (event.data.reasoning_content) {
+    message.reasoningContent = (message.reasoningContent || "") + event.data.reasoning_content;
+    message.reasoningContentChunks = [...(message.reasoningContentChunks || []), event.data.reasoning_content];
+  }
+  
+  saveLangGraphMetadata(message, event);
+}
+
+// 🔥 处理tool_call_result事件：工具调用结果
+function mergeToolCallResultMessage(message: Message, event: LangGraphNativeEvent) {
+  // 保存tool_call_id用于关联
+  if (event.data.tool_call_id) {
+    message.toolCallId = event.data.tool_call_id;
+    
+    // 🔥 尝试将结果关联到对应的toolCall
+    if (message.toolCalls) {
+      const toolCall = message.toolCalls.find(tc => tc.id === event.data.tool_call_id);
+      if (toolCall && event.data.content) {
+        toolCall.result = (toolCall.result || "") + event.data.content;
       }
     }
   }
-}
-
-function mergeToolCallResultMessage(
-  message: Message,
-  event: ToolCallResultEvent,
-) {
-  const toolCall = message.toolCalls?.find(
-    (toolCall) => toolCall.id === event.data.tool_call_id,
-  );
-  if (toolCall) {
-    toolCall.result = event.data.content;
+  
+  // 处理内容
+  if (event.data.content) {
+    message.content = (message.content || "") + event.data.content;
+    message.contentChunks = [...(message.contentChunks || []), event.data.content];
   }
+  
+  saveLangGraphMetadata(message, event);
 }
 
-function mergeInterruptMessage(message: Message, event: InterruptEvent) {
-  message.isStreaming = false;
-  message.options = event.data.options;
+// 🔥 处理interrupt事件：中断和选项
+function mergeInterruptMessage(message: Message, event: LangGraphNativeEvent) {
+  if (event.data.options) {
+    message.options = event.data.options;
+    message.isInterruptMessage = true;
+  }
+  
+  if (event.data.content) {
+    message.content = (message.content || "") + event.data.content;
+    message.contentChunks = [...(message.contentChunks || []), event.data.content];
+  }
+  
+  saveLangGraphMetadata(message, event);
 }
 
-function mergeReaskMessage(message: Message, event: ReaskEvent) {
+// 🔥 处理reask事件：重新提问
+function mergeReaskMessage(message: Message, event: LangGraphNativeEvent) {
+  if (event.data.original_input) {
+    message.originalInput = event.data.original_input;
+    message.isReaskMessage = true;
+  }
+  
+  if (event.data.content) {
+    message.content = (message.content || "") + event.data.content;
+    message.contentChunks = [...(message.contentChunks || []), event.data.content];
+  }
+  
+  saveLangGraphMetadata(message, event);
+}
+
+// 🔥 处理error事件：错误信息
+function mergeErrorMessage(message: Message, event: LangGraphNativeEvent) {
+  if (event.data.error_message) {
+    const errorContent = `[错误] ${event.data.error_message}`;
+    message.content = (message.content || "") + errorContent;
+    message.contentChunks = [...(message.contentChunks || []), errorContent];
+    message.isErrorMessage = true;
+  }
+  
+  saveLangGraphMetadata(message, event);
+}
+
+// 🔥 处理metadata事件：研究开始元数据
+function mergeMetadataMessage(message: Message, event: LangGraphNativeEvent) {
+  // metadata事件通常不包含content，主要是保存元数据
+  saveLangGraphMetadata(message, event);
+}
+
+// 🔥 处理complete事件：研究完成
+function mergeCompleteMessage(message: Message, event: LangGraphNativeEvent) {
+  // complete事件标记研究结束
   message.isStreaming = false;
-  message.originalInput = event.data.original_input;
+  if (event.data.final_status) {
+    message.finishReason = "stop";
+  }
+  
+  saveLangGraphMetadata(message, event);
+}
+
+// 🔥 统一保存LangGraph原生元数据
+function saveLangGraphMetadata(message: Message, event: LangGraphNativeEvent) {
+  if (event.data.execution_id || event.data.agent || event.data.timestamp || event.data.metadata) {
+    message.langGraphMetadata = {
+      ...message.langGraphMetadata,
+      execution_id: event.data.execution_id,
+      agent: event.data.agent,
+      timestamp: event.data.timestamp,
+      additional_kwargs: event.data.metadata?.additional_kwargs,
+      response_metadata: event.data.metadata?.response_metadata,
+    };
+  }
 }

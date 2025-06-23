@@ -43,23 +43,6 @@ def safe_json_dumps(obj):
 router = APIRouter(prefix="/api/research", tags=["research"])
 
 
-# SSE事件类型定义
-class SSEEventType(Enum):
-    NAVIGATION = "navigation"
-    METADATA = "metadata"
-    NODE_START = "node_start"
-    NODE_COMPLETE = "node_complete"
-    PLAN_GENERATED = "plan_generated"
-    SEARCH_RESULTS = "search_results"
-    AGENT_OUTPUT = "agent_output"
-    MESSAGE_CHUNK = "message_chunk"
-    ARTIFACT = "artifact"
-    PROGRESS = "progress"
-    INTERRUPT = "interrupt"  # 🔥 添加interrupt事件类型
-    COMPLETE = "complete"
-    ERROR = "error"
-
-
 # 请求模型
 class ActionType(Enum):
     CREATE = "create"
@@ -113,25 +96,35 @@ class ResearchStreamService:
 
     def _create_message_chunk_event(self, message: AIMessageChunk, agent: str, thread_id: str, execution_id: str):
         """基于LangGraph原生AIMessageChunk创建消息事件"""
-        return self._make_research_event("message_chunk", {
+        data = {
             "thread_id": thread_id,
             "agent": agent.split(":")[0],  # 提取节点名
             "id": message.id,
             "role": "assistant", 
             "content": message.content,
-            "finish_reason": message.response_metadata.get("finish_reason"),
-            "tool_calls": message.tool_calls,
-            "metadata": {
-                "additional_kwargs": message.additional_kwargs,
-                "response_metadata": message.response_metadata,
-            },
             "execution_id": execution_id,
             "timestamp": self._get_current_timestamp(),
-        })
+        }
+        
+        # 🔥 完全对齐app.py：添加reasoning_content处理
+        if message.additional_kwargs.get("reasoning_content"):
+            data["reasoning_content"] = message.additional_kwargs["reasoning_content"]
+        
+        # 🔥 完全对齐app.py：添加finish_reason处理
+        if message.response_metadata.get("finish_reason"):
+            data["finish_reason"] = message.response_metadata.get("finish_reason")
+        
+        # 🔥 完全对齐app.py：添加metadata处理
+        data["metadata"] = {
+            "additional_kwargs": message.additional_kwargs,
+            "response_metadata": message.response_metadata,
+        }
+        
+        return self._make_research_event("message_chunk", data)
 
     def _create_tool_calls_event(self, message: AIMessageChunk, agent: str, thread_id: str, execution_id: str):
         """创建工具调用事件"""
-        return self._make_research_event("tool_calls", {
+        data = {
             "thread_id": thread_id,
             "agent": agent.split(":")[0],
             "id": message.id,
@@ -141,11 +134,44 @@ class ResearchStreamService:
             "tool_call_chunks": getattr(message, "tool_call_chunks", []),
             "execution_id": execution_id,
             "timestamp": self._get_current_timestamp(),
-        })
+        }
+        
+        # 🔥 完全对齐app.py：添加reasoning_content处理
+        if message.additional_kwargs.get("reasoning_content"):
+            data["reasoning_content"] = message.additional_kwargs["reasoning_content"]
+        
+        # 🔥 完全对齐app.py：添加finish_reason处理
+        if message.response_metadata.get("finish_reason"):
+            data["finish_reason"] = message.response_metadata.get("finish_reason")
+        
+        return self._make_research_event("tool_calls", data)
+
+    def _create_tool_call_chunks_event(self, message: AIMessageChunk, agent: str, thread_id: str, execution_id: str):
+        """创建工具调用片段事件 - 新增：完全对齐app.py"""
+        data = {
+            "thread_id": thread_id,
+            "agent": agent.split(":")[0],
+            "id": message.id,
+            "role": "assistant",
+            "content": message.content,
+            "tool_call_chunks": getattr(message, "tool_call_chunks", []),
+            "execution_id": execution_id,
+            "timestamp": self._get_current_timestamp(),
+        }
+        
+        # 🔥 完全对齐app.py：添加reasoning_content处理
+        if message.additional_kwargs.get("reasoning_content"):
+            data["reasoning_content"] = message.additional_kwargs["reasoning_content"]
+        
+        # 🔥 完全对齐app.py：添加finish_reason处理
+        if message.response_metadata.get("finish_reason"):
+            data["finish_reason"] = message.response_metadata.get("finish_reason")
+        
+        return self._make_research_event("tool_call_chunks", data)
 
     def _create_tool_message_event(self, message: ToolMessage, agent: str, thread_id: str, execution_id: str):
         """创建工具结果事件"""
-        return self._make_research_event("tool_call_result", {
+        data = {
             "thread_id": thread_id,
             "agent": agent.split(":")[0],
             "id": message.id,
@@ -154,7 +180,13 @@ class ResearchStreamService:
             "tool_call_id": message.tool_call_id,
             "execution_id": execution_id,
             "timestamp": self._get_current_timestamp(),
-        })
+        }
+        
+        # 🔥 完全对齐app.py：添加finish_reason处理（虽然ToolMessage通常没有response_metadata，但保持一致性）
+        if hasattr(message, 'response_metadata') and message.response_metadata.get("finish_reason"):
+            data["finish_reason"] = message.response_metadata.get("finish_reason")
+        
+        return self._make_research_event("tool_call_result", data)
 
     async def _process_langgraph_stream(
         self,
@@ -213,17 +245,24 @@ class ResearchStreamService:
                 stream_mode=["messages", "updates"],
                 subgraphs=True,
             ):
-                # 处理LangGraph原生消息事件
+                # 处理LangGraph原生消息事件 - 完全对齐app.py逻辑
                 if not isinstance(event_data, dict):
                     message_chunk, message_metadata = cast(tuple[BaseMessage, dict], event_data)
                     
-                    # 使用LangGraph原生类型判断
+                    # 🔥 完全对齐app.py：使用LangGraph原生类型判断
                     if isinstance(message_chunk, ToolMessage):
+                        # Tool Message - Return the result of the tool call
                         yield self._create_tool_message_event(message_chunk, agent, thread_id, execution_id)
                     elif isinstance(message_chunk, AIMessageChunk):
+                        # AI Message - Raw message tokens
                         if message_chunk.tool_calls:
+                            # AI Message - Tool Call
                             yield self._create_tool_calls_event(message_chunk, agent, thread_id, execution_id)
+                        elif message_chunk.tool_call_chunks:
+                            # AI Message - Tool Call Chunks
+                            yield self._create_tool_call_chunks_event(message_chunk, agent, thread_id, execution_id)
                         else:
+                            # AI Message - Raw message tokens
                             yield self._create_message_chunk_event(message_chunk, agent, thread_id, execution_id)
                     continue
                 

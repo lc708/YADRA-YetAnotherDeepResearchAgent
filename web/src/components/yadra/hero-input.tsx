@@ -62,15 +62,13 @@ const REPORT_STYLES = [
 interface HeroInputProps {
   className?: string;
   placeholder?: string;
-  onSendMessage?: (message: string) => void;
-  // 🚀 新增：ASK API研究请求回调
+  // 🚀 ASK API研究请求回调
   onSubmitResearch?: (request: import("~/core/store/unified-store").ResearchRequest) => Promise<void>;
 }
 
 export function HeroInput({ 
   className, 
   placeholder: customPlaceholder, 
-  onSendMessage,
   onSubmitResearch
 }: HeroInputProps) {
   const router = useRouter();
@@ -174,19 +172,8 @@ export function HeroInput({
     if (e) e.preventDefault();
     if (!currentPrompt.trim() || !canOperate || responding) return;
 
-    if (onSendMessage) {
-      // 🔥 传统消息发送回调（用于followup场景）
-      try {
-        await onSendMessage(currentPrompt);
-        setCurrentPrompt("");
-        if (inputRef.current) {
-          inputRef.current.setContent("");
-        }
-      } catch (error) {
-        console.error("Failed to send message:", error);
-      }
-    } else if (onSubmitResearch) {
-      // 🚀 新架构：ASK API研究请求回调
+    if (onSubmitResearch) {
+      // 🚀 ASK API研究请求回调
       try {
         const researchRequest = {
           question: currentPrompt,
@@ -211,10 +198,10 @@ export function HeroInput({
         console.error("[HeroInput] Research request failed:", error);
       }
     } else {
-      // 🔥 兜底：如果没有任何回调，显示提示
+      // 🔥 如果没有回调，显示提示
       console.warn("[HeroInput] No callback provided for message submission");
     }
-  }, [currentPrompt, canOperate, responding, onSendMessage, onSubmitResearch, buildResearchConfig]);
+  }, [currentPrompt, canOperate, responding, onSubmitResearch, buildResearchConfig]);
 
   const handleEnhancePrompt = useCallback(async () => {
     if (currentPrompt.trim() === "" || isEnhancing) {
