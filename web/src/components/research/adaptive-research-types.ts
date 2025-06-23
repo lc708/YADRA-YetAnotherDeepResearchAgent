@@ -12,9 +12,9 @@
  * 不再硬编码具体节点类型，而是基于功能分类
  */
 export type NodeCategory = 
-  | "coordination"    // 协调类：coordinator
+  | "coordination"    // 协调类：generalmanager
   | "investigation"   // 调研类：background_investigator  
-  | "planning"        // 规划类：planner
+  | "planning"        // 规划类：projectmanager
   | "execution"       // 执行类：researcher, coder
   | "reporting"       // 报告类：reporter
   | "interaction"     // 交互类：human_feedback, reask
@@ -25,7 +25,7 @@ export type NodeCategory =
  */
 export interface DynamicNodeInfo {
   id: string;                    // 节点唯一标识
-  name: string;                  // 后端实际节点名称 (coordinator, planner等)
+  name: string;                  // 后端实际节点名称 (generalmanager, projectmanager等)
   category: NodeCategory;        // 推断的功能分类
   displayName: string;           // 前端显示名称
   description?: string;          // 节点描述

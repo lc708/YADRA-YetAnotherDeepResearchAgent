@@ -425,7 +425,7 @@ export const useUnifiedStore = create<UnifiedStore>()(
              
            } else {
              // 🔥 创建新消息
-             const validAgents = ["coordinator", "planner", "researcher", "coder", "reporter", "podcast"] as const;
+             const validAgents = ["generalmanager", "projectmanager", "researcher", "coder", "reporter", "podcast"] as const;
              const agentName = validAgents.includes(chunkData.agent_name as any) 
                ? chunkData.agent_name as typeof validAgents[number]
                : "researcher";
@@ -988,7 +988,7 @@ export const sendMessageWithNewAPI = async (
                role: "assistant",
                threadId: currentThreadId,
                isStreaming: false,
-               agent: "planner",
+               agent: "projectmanager",
              };
              state.addMessage(currentThreadId, planMessage);
            }
@@ -1005,7 +1005,7 @@ export const sendMessageWithNewAPI = async (
            if ('content' in event.data && 'agent_name' in event.data && 
                typeof event.data.content === 'string' && typeof event.data.agent_name === 'string') {
              // 确保agent_name是有效的agent类型
-             const validAgents = ["coordinator", "planner", "researcher", "coder", "reporter", "podcast"] as const;
+             const validAgents = ["generalmanager", "projectmanager", "researcher", "coder", "reporter", "podcast"] as const;
              const agentName = validAgents.includes(event.data.agent_name as any) 
                ? event.data.agent_name as typeof validAgents[number]
                : "researcher";
@@ -1353,7 +1353,7 @@ export const sendAskMessage = async (
                 role: "assistant",
                 threadId: currentThreadId,
                 isStreaming: false,
-                agent: "planner",
+                agent: "projectmanager",
               };
               state.addMessage(currentThreadId, planMessage);
             }
@@ -1378,7 +1378,7 @@ export const sendAskMessage = async (
                 typeof eventData.content === 'string' && typeof eventData.agent_name === 'string') {
               
               // 确保agent_name是有效的agent类型
-              const validAgents = ["coordinator", "planner", "researcher", "coder", "reporter", "podcast"] as const;
+              const validAgents = ["generalmanager", "projectmanager", "researcher", "coder", "reporter", "podcast"] as const;
               const agentName = validAgents.includes(eventData.agent_name as any)
                 ? eventData.agent_name as typeof validAgents[number]
                 : "researcher";

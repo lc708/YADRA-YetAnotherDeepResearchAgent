@@ -165,7 +165,7 @@ export default function WorkspacePage() {
                 role: "assistant" as const,
                 threadId: currentThreadId,
                 isStreaming: false,
-                agent: "planner" as const,
+                agent: "projectmanager" as const,
                 resources: [],
                 metadata: {
                   planEvent: true,
@@ -566,7 +566,7 @@ export default function WorkspacePage() {
         .filter((msg: any) => {
           // 只显示用户消息和主要的AI回复，过滤掉技术性的输出流内容
           if (msg.role === 'user') return true;
-          if (msg.role === 'assistant' && msg.agent === 'coordinator') return true;
+          if (msg.role === 'assistant' && msg.agent === 'generalmanager') return true;
           if (msg.role === 'assistant' && msg.agent === 'reporter') return true;
           return false;
         })
@@ -670,13 +670,13 @@ export default function WorkspacePage() {
       const thread = useUnifiedStore.getState().threads.get(currentThreadId);
       if (!thread) return null;
       
-      // 🔥 修复：查找包含计划数据的planner消息
-      const plannerMessages = thread.messages.filter(msg => 
-        msg.agent === 'planner' && msg.metadata?.planEvent === true
-      );
-      if (plannerMessages.length === 0) return null;
-      
-      const latestPlanMessage = plannerMessages[plannerMessages.length - 1];
+          // 🔥 修复：查找包含计划数据的projectmanager消息
+    const projectmanagerMessages = thread.messages.filter(msg =>
+      msg.agent === 'projectmanager' && msg.metadata?.planEvent === true
+    );
+    if (projectmanagerMessages.length === 0) return null;
+    
+    const latestPlanMessage = projectmanagerMessages[projectmanagerMessages.length - 1];
       if (!latestPlanMessage?.metadata?.planData) return null;
       
       try {
@@ -885,7 +885,7 @@ export default function WorkspacePage() {
     const hasPlanMessage = currentThreadId ? (() => {
       const thread = useUnifiedStore.getState().threads.get(currentThreadId);
       return thread?.messages?.some(msg => 
-        msg.agent === 'planner' && msg.metadata?.planEvent === true
+        msg.agent === 'projectmanager' && msg.metadata?.planEvent === true
       ) || false;
     })() : false;
     

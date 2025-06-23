@@ -731,7 +731,7 @@ interface Message {
    - **这会导致TypeScript编译错误或运行时数据丢失**
 
 2. **agent字段类型限制**：
-   - Message接口限制：`"coordinator" | "planner" | "researcher" | "coder" | "reporter" | "podcast"`
+   - Message接口限制：`"generalmanager" | "projectmanager" | "researcher" | "coder" | "reporter" | "podcast"`
    - 但`agent_output`事件可能包含其他agent名称
    - 代码中有类型转换：`event.data.agent_name as any`
 
@@ -1229,7 +1229,7 @@ SSE事件 → 第4层处理 → store.addMessage() → 第5层存储
    - **这会导致TypeScript编译错误或运行时数据丢失**
 
 2. **agent字段类型限制**：
-   - Message接口限制：`"coordinator" | "planner" | "researcher" | "coder" | "reporter" | "podcast"`
+   - Message接口限制：`"generalmanager" | "projectmanager" | "researcher" | "coder" | "reporter" | "podcast"`
    - 但`agent_output`事件可能包含其他agent名称
    - 代码中有类型转换：`event.data.agent_name as any`
 

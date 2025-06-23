@@ -24,7 +24,7 @@ from src.tools import (
 from src.config.agents import AGENT_LLM_MAP
 from src.config.configuration import Configuration
 from src.llms.llm import get_llm_by_type
-from src.prompts.planner_model import Plan
+from src.prompts.projectmanager_model import Plan
 from src.prompts.template import apply_prompt_template
 from src.utils.json_utils import repair_json_output
 
@@ -35,13 +35,13 @@ logger = logging.getLogger(__name__)
 
 
 @tool
-def handoff_to_planner(
+def handoff_to_projectmanager(
     research_topic: Annotated[str, "The topic of the research task to be handed off."],
     locale: Annotated[str, "The user's detected language locale (e.g., en-US, zh-CN)."],
 ):
-    """Handoff to planner agent to do plan."""
+    """Handoff to projectmanager agent to do plan."""
     # This tool is not returning anything: we're just using it
-    # as a way for LLM to signal that it needs to hand off to planner agent
+    # as a way for LLM to signal that it needs to hand off to projectmanager agent
     return
 
 
@@ -113,14 +113,14 @@ def background_investigation_node(state: State, config: RunnableConfig):
     return {"background_investigation_results": json.dumps(None)}
 
 
-def planner_node(
+def projectmanager_node(
     state: State, config: RunnableConfig
 ) -> Command[Literal["human_feedback", "reporter"]]:
-    """Planner node that generate the full plan."""
-    logger.info("Planner generating full plan")
+    """Projectmanager node that generate the full plan."""
+    logger.info("Projectmanager generating full plan")
     configurable = Configuration.from_runnable_config(config)
     plan_iterations = state["plan_iterations"] if state.get("plan_iterations", 0) else 0
-    messages = apply_prompt_template("planner", state, configurable)
+    messages = apply_prompt_template("projectmanager", state, configurable)
 
     if state.get("enable_background_investigation") and state.get(
         "background_investigation_results"
@@ -138,20 +138,20 @@ def planner_node(
 
     if configurable.enable_deep_thinking:
         llm = get_llm_by_type("reasoning")
-    elif AGENT_LLM_MAP["planner"] == "basic":
+    elif AGENT_LLM_MAP["projectmanager"] == "basic":
         llm = get_llm_by_type("basic").with_structured_output(
             Plan,
             method="json_mode",
         )
     else:
-        llm = get_llm_by_type(AGENT_LLM_MAP["planner"])
+        llm = get_llm_by_type(AGENT_LLM_MAP["projectmanager"])
 
     # if the plan iterations is greater than the max plan iterations, return the reporter node
     if plan_iterations >= configurable.max_plan_iterations:
         return Command(goto="reporter")
 
     full_response = ""
-    if AGENT_LLM_MAP["planner"] == "basic" and not configurable.enable_deep_thinking:
+    if AGENT_LLM_MAP["projectmanager"] == "basic" and not configurable.enable_deep_thinking:
         response = llm.invoke(messages)
         full_response = response.model_dump_json(indent=4, exclude_none=True)
     else:
@@ -159,29 +159,29 @@ def planner_node(
         for chunk in response:
             full_response += chunk.content
     logger.debug(f"Current state messages: {state['messages']}")
-    logger.info(f"Planner response: {full_response}")
+    logger.info(f"Projectmanager response: {full_response}")
 
     try:
         curr_plan = json.loads(repair_json_output(full_response))
     except json.JSONDecodeError:
-        logger.warning("Planner response is not a valid JSON")
+        logger.warning("Projectmanager response is not a valid JSON")
         if plan_iterations > 0:
             return Command(goto="reporter")
         else:
             return Command(goto="__end__")
     if curr_plan.get("has_enough_context"):
-        logger.info("Planner response has enough context.")
+        logger.info("Projectmanager response has enough context.")
         new_plan = Plan.model_validate(curr_plan)
         return Command(
             update={
-                "messages": [AIMessage(content=full_response, name="planner")],
+                "messages": [AIMessage(content=full_response, name="projectmanager")],
                 "current_plan": new_plan,
             },
             goto="reporter",
         )
     return Command(
         update={
-            "messages": [AIMessage(content=full_response, name="planner")],
+            "messages": [AIMessage(content=full_response, name="projectmanager")],
             "current_plan": full_response,
         },
         goto="human_feedback",
@@ -190,7 +190,7 @@ def planner_node(
 
 def human_feedback_node(
     state,
-) -> Command[Literal["planner", "research_team", "reporter", "__end__", "reask"]]:
+) -> Command[Literal["projectmanager", "research_team", "reporter", "__end__", "reask"]]:
     current_plan = state.get("current_plan", "")
     # check if the plan is auto accepted
     auto_accepted_plan = state.get("auto_accepted_plan", False)
@@ -208,7 +208,7 @@ def human_feedback_node(
             value={"message": "Please Review the Plan.", "options": options}
         )
 
-        # if the feedback is not accepted, return the planner node
+        # if the feedback is not accepted, return the projectmanager node
         if feedback and str(feedback).upper().startswith("[EDIT_PLAN]"):
             return Command(
                 update={
@@ -216,7 +216,7 @@ def human_feedback_node(
                         HumanMessage(content=feedback, name="feedback"),
                     ],
                 },
-                goto="planner",
+                goto="projectmanager",
             )
         elif feedback and str(feedback).upper().startswith("[ACCEPTED]"):
             logger.info("Plan is accepted by user.")
@@ -246,7 +246,7 @@ def human_feedback_node(
                     goto="reporter",
                 )
             except json.JSONDecodeError:
-                logger.warning("Planner response is not a valid JSON")
+                logger.warning("Projectmanager response is not a valid JSON")
                 return Command(update={"skipped_research": True}, goto="reporter")
         elif feedback and (
             str(feedback).upper().startswith("[CANCEL]")
@@ -285,7 +285,7 @@ def human_feedback_node(
         if new_plan["has_enough_context"]:
             goto = "reporter"
     except json.JSONDecodeError:
-        logger.warning("Planner response is not a valid JSON")
+        logger.warning("Projectmanager response is not a valid JSON")
         if plan_iterations > 0:
             return Command(goto="reporter")
         else:
@@ -301,26 +301,26 @@ def human_feedback_node(
     )
 
 
-def coordinator_node(
+def generalmanager_node(
     state: State, config: RunnableConfig
-) -> Command[Literal["planner", "background_investigator", "__end__"]]:
-    """Coordinator node that communicate with customers."""
-    logger.info("Coordinator talking.")
+) -> Command[Literal["projectmanager", "background_investigator", "__end__"]]:
+    """Generalmanager node that communicate with customers."""
+    logger.info("Generalmanager talking.")
     configurable = Configuration.from_runnable_config(config)
-    messages = apply_prompt_template("coordinator", state)
+    messages = apply_prompt_template("generalmanager", state)
     response = (
-        get_llm_by_type(AGENT_LLM_MAP["coordinator"])
-        .bind_tools([handoff_to_planner])
+        get_llm_by_type(AGENT_LLM_MAP["generalmanager"])
+        .bind_tools([handoff_to_projectmanager])
         .invoke(messages)
     )
     logger.debug(f"Current state messages: {state['messages']}")
 
     # 添加详细的调试日志
-    logger.info(f"Coordinator LLM response type: {type(response)}")
-    logger.info(f"Coordinator LLM response content: {response.content}")
-    logger.info(f"Coordinator LLM response tool_calls: {response.tool_calls}")
+    logger.info(f"Generalmanager LLM response type: {type(response)}")
+    logger.info(f"Generalmanager LLM response content: {response.content}")
+    logger.info(f"Generalmanager LLM response tool_calls: {response.tool_calls}")
     logger.info(
-        f"Coordinator LLM response tool_calls length: {len(response.tool_calls)}"
+        f"Generalmanager LLM response tool_calls length: {len(response.tool_calls)}"
     )
     logger.info(
         f"Enable background investigation: {state.get('enable_background_investigation')}"
@@ -331,17 +331,17 @@ def coordinator_node(
     research_topic = state.get("research_topic", "")
 
     if len(response.tool_calls) > 0:
-        goto = "planner"
-        logger.info("Tool calls detected, setting goto to planner")
+        goto = "projectmanager"
+        logger.info("Tool calls detected, setting goto to projectmanager")
         if state.get("enable_background_investigation"):
-            # if the search_before_planning is True, add the web search tool to the planner agent
+            # if the search_before_planning is True, add the web search tool to the projectmanager agent
             goto = "background_investigator"
             logger.info(
                 "Background investigation enabled, changing goto to background_investigator"
             )
         try:
             for tool_call in response.tool_calls:
-                if tool_call.get("name", "") != "handoff_to_planner":
+                if tool_call.get("name", "") != "handoff_to_projectmanager":
                     continue
                 if tool_call.get("args", {}).get("locale") and tool_call.get(
                     "args", {}
@@ -353,9 +353,9 @@ def coordinator_node(
             logger.error(f"Error processing tool calls: {e}")
     else:
         logger.warning(
-            "Coordinator response contains no tool calls. Terminating workflow execution."
+            "Generalmanager response contains no tool calls. Terminating workflow execution."
         )
-        logger.debug(f"Coordinator response: {response}")
+        logger.debug(f"Generalmanager response: {response}")
 
     logger.info(f"Final goto decision: {goto}")
     return Command(

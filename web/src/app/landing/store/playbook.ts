@@ -4,36 +4,36 @@ export const playbook = {
   steps: [
     {
       description:
-        "The Coordinator is responsible for engaging with the user to understand their problem and requirements.",
-      activeNodes: ["Start", "Coordinator"],
-      activeEdges: ["Start->Coordinator"],
+        "The Generalmanager is responsible for engaging with the user to understand their problem and requirements.",
+      activeNodes: ["Start", "Generalmanager"],
+      activeEdges: ["Start->Generalmanager"],
       tooltipPosition: "right",
     },
     {
       description:
-        "If the user's problem is clearly defined, the Coordinator will hand it over to the Planner.",
-      activeNodes: ["Coordinator", "Planner"],
-      activeEdges: ["Coordinator->Planner"],
+        "If the user's problem is clearly defined, the Generalmanager will hand it over to the Projectmanager.",
+      activeNodes: ["Generalmanager", "Projectmanager"],
+      activeEdges: ["Generalmanager->Projectmanager"],
       tooltipPosition: "left",
     },
     {
       description: "Awaiting human feedback to refine the plan.",
-      activeNodes: ["Planner", "HumanFeedback"],
-      activeEdges: ["Planner->HumanFeedback"],
+      activeNodes: ["Projectmanager", "HumanFeedback"],
+      activeEdges: ["Projectmanager->HumanFeedback"],
       tooltipPosition: "left",
     },
     {
       description: "Updating the plan based on human feedback.",
-      activeNodes: ["HumanFeedback", "Planner"],
-      activeEdges: ["HumanFeedback->Planner"],
+      activeNodes: ["HumanFeedback", "Projectmanager"],
+      activeEdges: ["HumanFeedback->Projectmanager"],
       tooltipPosition: "left",
     },
     {
       description:
         "The Research Team is responsible for conducting the core research tasks.",
-      activeNodes: ["Planner", "HumanFeedback", "ResearchTeam"],
+      activeNodes: ["Projectmanager", "HumanFeedback", "ResearchTeam"],
       activeEdges: [
-        "Planner->HumanFeedback",
+        "Projectmanager->HumanFeedback",
         "HumanFeedback->ResearchTeam",
         "ResearchTeam->HumanFeedback",
       ],
@@ -55,16 +55,16 @@ export const playbook = {
     },
     {
       description:
-        "Once the research tasks are completed, the Researcher will hand over to the Planner.",
-      activeNodes: ["ResearchTeam", "Planner"],
-      activeEdges: ["ResearchTeam->Planner"],
+        "Once the research tasks are completed, the Researcher will hand over to the Projectmanager.",
+      activeNodes: ["ResearchTeam", "Projectmanager"],
+      activeEdges: ["ResearchTeam->Projectmanager"],
       tooltipPosition: "left",
     },
     {
       description:
-        "If no additional information is required, the Planner will handoff to the Reporter.",
-      activeNodes: ["Reporter", "Planner"],
-      activeEdges: ["Planner->Reporter"],
+        "If no additional information is required, the Projectmanager will handoff to the Reporter.",
+      activeNodes: ["Reporter", "Projectmanager"],
+      activeEdges: ["Projectmanager->Reporter"],
       tooltipPosition: "right",
     },
     {

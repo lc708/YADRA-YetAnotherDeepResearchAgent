@@ -8,8 +8,8 @@ export interface Message {
   id: string;
   threadId: string;
   agent?:
-    | "coordinator"
-    | "planner"
+    | "generalmanager"
+    | "projectmanager"
     | "researcher"
     | "coder"
     | "reporter"

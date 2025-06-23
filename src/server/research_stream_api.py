@@ -295,8 +295,8 @@ class ResearchStreamService:
     def _determine_chunk_type(self, node_name: str, content: str) -> str:
         """根据节点名称和内容确定块类型"""
         node_type_map = {
-            "coordinator": "planning",
-            "planner": "planning",
+            "generalmanager": "planning",
+            "projectmanager": "planning",
             "background_investigator": "research",
             "researcher": "research",
             "coder": "analysis",
@@ -335,9 +335,9 @@ class ResearchStreamService:
     ) -> List[str]:
         """获取剩余节点列表"""
         all_nodes = [
-            "coordinator",
+            "generalmanager",
             "background_investigator",
-            "planner",
+            "projectmanager",
             "researcher",
             "reporter",
         ]
@@ -355,9 +355,9 @@ class ResearchStreamService:
     def _get_node_description(self, node_name: str) -> str:
         """获取节点描述"""
         descriptions = {
-            "coordinator": "正在协调研究任务...",
+            "generalmanager": "正在协调研究任务...",
             "background_investigator": "正在进行背景调研...",
-            "planner": "正在制定研究计划...",
+            "projectmanager": "正在制定研究计划...",
             "researcher": "正在执行深度研究...",
             "coder": "正在处理数据分析...",
             "reporter": "正在生成最终报告...",
@@ -507,7 +507,7 @@ class ResearchStreamService:
                             # 发送节点开始事件
                             if node_name != current_node:
                                 # 如果之前有节点在执行，发送完成事件
-                                if current_node and current_node != "coordinator":
+                                if current_node and current_node != "generalmanager":
                                     completed_nodes.append(current_node)
                                     node_complete_event = NodeEvent(
                                         node_name=current_node,

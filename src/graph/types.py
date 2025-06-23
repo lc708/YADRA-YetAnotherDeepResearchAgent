@@ -4,7 +4,7 @@
 from langgraph.graph import MessagesState
 from typing import Optional, Dict, Any
 
-from src.prompts.planner_model import Plan
+from src.prompts.projectmanager_model import Plan
 from src.rag import Resource
 
 

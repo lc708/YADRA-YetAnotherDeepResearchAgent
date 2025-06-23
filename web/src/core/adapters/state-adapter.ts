@@ -23,8 +23,8 @@ const DEFAULT_USER_ID = "workspace-user";
  */
 const AGENT_TO_ARTIFACT_TYPE: Record<string, ArtifactType> = {
   // 过程类型 - 表示研究和处理过程
-  coordinator: "process",
-  planner: "process", 
+  generalmanager: "process",
+  projectmanager: "process", 
   researcher: "process",
   coder: "process",
   
@@ -37,8 +37,8 @@ const AGENT_TO_ARTIFACT_TYPE: Record<string, ArtifactType> = {
  * Agent类型到Node名称的映射
  */
 const AGENT_TO_NODE_NAME: Record<string, string> = {
-  coordinator: "研究协调",
-  planner: "研究规划",
+  generalmanager: "研究协调",
+  projectmanager: "研究规划",
   researcher: "信息研究", 
   coder: "代码分析",
   reporter: "研究报告",
@@ -160,9 +160,9 @@ function shouldConvertToArtifact(message: Message): boolean {
   
   // 🔥 新增：只有特定的agent输出才应该成为artifact
   if (message.agent) {
-    const artifactAgents = ['planner', 'reporter', 'podcast'];
+    const artifactAgents = ['projectmanager', 'reporter', 'podcast'];
     if (!artifactAgents.includes(message.agent)) {
-      // coordinator和researcher的普通消息不应该成为artifact
+      // generalmanager和researcher的普通消息不应该成为artifact
       // 除非它们包含特定的内容（如研究计划、研究报告等）
       if (!message.metadata?.planEvent && !message.metadata?.artifactEvent) {
         return false;

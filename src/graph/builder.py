@@ -4,7 +4,7 @@ import os
 import logging
 from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.postgres import PostgresSaver
-from src.prompts.planner_model import StepType
+from src.prompts.projectmanager_model import StepType
 import psycopg
 from psycopg.rows import dict_row
 import psycopg_pool
@@ -14,8 +14,8 @@ logger = logging.getLogger(__name__)
 
 from .types import State
 from .nodes import (
-    coordinator_node,
-    planner_node,
+    generalmanager_node,
+    projectmanager_node,
     reporter_node,
     research_team_node,
     researcher_node,
@@ -29,10 +29,10 @@ from .nodes import (
 def continue_to_running_research_team(state: State):
     current_plan = state.get("current_plan")
     if not current_plan or not current_plan.steps:
-        return "planner"
+        return "projectmanager"
 
     if all(step.execution_res for step in current_plan.steps):
-        return "planner"
+        return "projectmanager"
 
     for step in current_plan.steps:
         if not step.execution_res:
@@ -41,27 +41,27 @@ def continue_to_running_research_team(state: State):
         return "researcher"
     if step.step_type and step.step_type == StepType.PROCESSING:
         return "coder"
-    return "planner"
+    return "projectmanager"
 
 
 def _build_base_graph():
     """Build and return the base state graph with all nodes and edges."""
     builder = StateGraph(State)
-    builder.add_edge(START, "coordinator")
-    builder.add_node("coordinator", coordinator_node)
+    builder.add_edge(START, "generalmanager")
+    builder.add_node("generalmanager", generalmanager_node)
     builder.add_node("background_investigator", background_investigation_node)
-    builder.add_node("planner", planner_node)
+    builder.add_node("projectmanager", projectmanager_node)
     builder.add_node("reporter", reporter_node)
     builder.add_node("research_team", research_team_node)
     builder.add_node("researcher", researcher_node)
     builder.add_node("coder", coder_node)
     builder.add_node("human_feedback", human_feedback_node)
     builder.add_node("reask", reask_node)
-    builder.add_edge("background_investigator", "planner")
+    builder.add_edge("background_investigator", "projectmanager")
     builder.add_conditional_edges(
         "research_team",
         continue_to_running_research_team,
-        ["planner", "researcher", "coder"],
+        ["projectmanager", "researcher", "coder"],
     )
     builder.add_edge("reporter", END)
     builder.add_edge("reask", END)
