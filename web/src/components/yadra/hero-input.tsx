@@ -256,7 +256,7 @@ export function HeroInput({
     <div className={cn("mx-auto w-full max-w-4xl", className)}>
       <div className="relative">
         <div className="relative w-full">
-          <div className="relative w-full overflow-hidden rounded-xl border border-gray-200 bg-white/90 backdrop-blur-sm shadow-sm transition-all duration-300 focus-within:border-blue-300 focus-within:shadow-md">
+          <div className="relative w-full overflow-hidden rounded-xl border border-border bg-background/90 backdrop-blur-sm shadow-sm transition-all duration-300 focus-within:border-primary focus-within:shadow-md">
             {/* 文字输入区域 */}
             <div className="p-4">
               <textarea
@@ -269,7 +269,7 @@ export function HeroInput({
                   }
                 }}
                 placeholder={customPlaceholder || PLACEHOLDER_TEXTS[currentPlaceholder]}
-                className="w-full resize-none bg-transparent text-sm text-gray-900 placeholder-gray-500 outline-none border-none"
+                                  className="w-full resize-none bg-transparent text-sm text-foreground placeholder-muted-foreground outline-none border-none"
                 rows={2}
                 style={{ 
                   minHeight: '56px', // 2行的最小高度
@@ -286,7 +286,7 @@ export function HeroInput({
             </div>
             
             {/* 控制按钮行 - 始终在底部 */}
-            <div className="flex items-center justify-between px-4 pb-4 border-t border-gray-100">
+                          <div className="flex items-center justify-between px-4 pb-4 border-t border-border/40">
               {/* 左侧控制组 */}
               <div className="flex items-center gap-2">
                 {/* 写作风格选择器 */}
@@ -309,7 +309,7 @@ export function HeroInput({
                       "backdrop-blur-sm flex items-center gap-2",
                       showStyleDropdown
                         ? "bg-blue-50 text-blue-700"
-                        : "bg-gray-50 text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+                        : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
                     )}
                   >
                     <CurrentStyleIcon className={cn(

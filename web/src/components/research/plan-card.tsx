@@ -77,15 +77,15 @@ interface PlanCardProps {
 const getPriorityColor = (priority: PlanStep["priority"]) => {
   switch (priority) {
     case "critical":
-      return "bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800";
+      return "bg-red-50 text-red-700 border-red-200";
     case "high":
-      return "bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800";
+      return "bg-orange-50 text-orange-700 border-orange-200";
     case "medium":
-      return "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800";
+      return "bg-blue-50 text-blue-700 border-blue-200";
     case "low":
-      return "bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-900/30 dark:text-gray-400 dark:border-gray-800";
+      return "bg-muted text-muted-foreground border-border";
     default:
-      return "bg-muted text-muted-foreground border-muted";
+      return "bg-muted text-muted-foreground border-border";
   }
 };
 
@@ -164,9 +164,9 @@ const PlanStepItem: React.FC<{
         <div className="absolute left-4 -top-4 w-0.5 h-4 bg-gray-300/60" />
       )}
 
-      <div className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 bg-gray-50 hover:bg-gray-100 transition-colors">
+      <div className="flex items-start gap-3 p-3 rounded-lg border border-border bg-muted hover:bg-muted/80 transition-colors">
         {/* 步骤编号 */}
-        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-500 text-white flex items-center justify-center text-sm font-medium shadow-sm">
+        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center text-sm font-medium shadow-sm">
           {index + 1}
         </div>
 
@@ -179,18 +179,18 @@ const PlanStepItem: React.FC<{
                   type="text"
                   value={editedTitle}
                   onChange={(e) => setEditedTitle(e.target.value)}
-                  className="w-full p-1 text-sm font-medium bg-white border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full p-1 text-sm font-medium bg-background border border-input rounded focus:ring-2 focus:ring-ring focus:border-transparent"
                   autoFocus
                 />
               ) : (
-                <h4 className="font-medium text-sm text-gray-800">{step.title}</h4>
+                <h4 className="font-medium text-sm text-foreground">{step.title}</h4>
               )}
             </div>
 
             <div className="flex items-center gap-1">
               {/* 优先级标签 */}
               <span className={cn(
-                "px-2 py-0.5 bg-gray-100 border border-gray-200 rounded text-xs text-gray-600",
+                "px-2 py-0.5 rounded text-xs",
                 getPriorityColor(step.priority)
               )}>
                 {step.priority}
@@ -387,8 +387,8 @@ export const PlanCard: React.FC<PlanCardProps> = ({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
       className={cn(
-        "bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm",
-        "hover:shadow-md hover:border-gray-300 transition-all duration-300",
+        "bg-background border border-border rounded-lg overflow-hidden shadow-sm",
+        "hover:shadow-md hover:border-border-dark transition-all duration-300",
         isApproved && "border-green-300 bg-green-50",
         isRejected && "border-red-300 bg-red-50",
         isPending && "border-blue-300 bg-blue-50",
@@ -396,11 +396,11 @@ export const PlanCard: React.FC<PlanCardProps> = ({
       )}
     >
       {/* 卡片头部 */}
-      <div className="p-4 border-b border-gray-200/50 bg-gradient-to-r from-gray-50/80 to-white/90">
+      <div className="p-4 border-b border-border/50 bg-gradient-to-r from-muted/80 to-background/90">
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-2">
-              <h3 className="font-semibold text-base text-gray-800">{plan.title}</h3>
+              <h3 className="font-semibold text-base text-foreground">{plan.title}</h3>
               <StatusBadge 
                 status={plan.status} 
                 size="sm"
@@ -411,11 +411,11 @@ export const PlanCard: React.FC<PlanCardProps> = ({
             <MarkdownRenderer
               content={plan.objective}
               variant="compact"
-              className="text-sm text-gray-600 mb-3"
+              className="text-sm text-muted-foreground mb-3"
             />
 
             {/* 计划统计 */}
-            <div className="flex items-center gap-4 text-xs text-gray-500">
+            <div className="flex items-center gap-4 text-xs text-muted-foreground">
               <span>📋 {plan.steps.length} 个步骤</span>
               {plan.estimatedDuration && (
                 <span>⏱️ 预计 {formatDuration(plan.estimatedDuration)}</span>
@@ -427,7 +427,7 @@ export const PlanCard: React.FC<PlanCardProps> = ({
               <div className="flex items-center gap-4 mt-2">
                 <ComplexityIndicator complexity={plan.complexity} />
                 {plan.version > 1 && (
-                  <span className="text-xs text-gray-500">
+                  <span className="text-xs text-muted-foreground">
                     v{plan.version}
                   </span>
                 )}
@@ -440,7 +440,7 @@ export const PlanCard: React.FC<PlanCardProps> = ({
             variant="ghost"
             size="sm"
             onClick={() => setIsExpanded(!isExpanded)}
-            className="h-8 w-8 p-0 hover:bg-gray-100/80 text-gray-600"
+            className="h-8 w-8 p-0 hover:bg-muted/80 text-muted-foreground"
           >
             <motion.div
               animate={{ rotate: isExpanded ? 180 : 0 }}
@@ -464,7 +464,7 @@ export const PlanCard: React.FC<PlanCardProps> = ({
           >
             {/* 计划步骤 */}
             <div className="p-4">
-              <h4 className="font-medium text-sm mb-4 text-gray-700">执行步骤</h4>
+              <h4 className="font-medium text-sm mb-4 text-foreground">执行步骤</h4>
               <div className="space-y-3">
                 {plan.steps.map((step, index) => (
                   <PlanStepItem
@@ -486,29 +486,29 @@ export const PlanCard: React.FC<PlanCardProps> = ({
 
             {/* 元数据 */}
             {showMetadata && plan.metadata && (
-              <div className="p-4 border-t border-gray-200/40 bg-gray-50/40">
-                <h4 className="font-medium text-sm mb-2 text-gray-700">计划详情</h4>
+              <div className="p-4 border-t border-border/40 bg-muted/40">
+                <h4 className="font-medium text-sm mb-2 text-foreground">计划详情</h4>
                 <div className="grid grid-cols-2 gap-4 text-xs">
                   {plan.metadata.sources && (
                     <div>
-                      <span className="text-gray-500">数据源: </span>
-                      <span className="font-medium text-gray-700">{plan.metadata.sources} 个</span>
+                      <span className="text-muted-foreground">数据源: </span>
+                      <span className="font-medium text-foreground">{plan.metadata.sources} 个</span>
                     </div>
                   )}
                   {plan.metadata.tools && (
                     <div>
-                      <span className="text-gray-500">工具: </span>
-                      <span className="font-medium text-gray-700">{plan.metadata.tools.join(", ")}</span>
+                      <span className="text-muted-foreground">工具: </span>
+                      <span className="font-medium text-foreground">{plan.metadata.tools.join(", ")}</span>
                     </div>
                   )}
                   {plan.metadata.keywords && (
                     <div className="col-span-2">
-                      <span className="text-gray-500">关键词: </span>
+                      <span className="text-muted-foreground">关键词: </span>
                       <div className="flex flex-wrap gap-1 mt-1">
                         {plan.metadata.keywords.map((keyword, index) => (
                           <span 
                             key={index}
-                            className="px-2 py-0.5 bg-gray-100 border border-gray-200 rounded text-xs text-gray-600"
+                            className="px-2 py-0.5 bg-muted border border-border rounded text-xs text-muted-foreground"
                           >
                             {keyword}
                           </span>

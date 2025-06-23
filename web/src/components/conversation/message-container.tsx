@@ -73,7 +73,7 @@ const MessageAvatar: React.FC<{ role: Message["role"] }> = ({ role }) => {
     },
     system: {
       fallback: "SYS",
-      bgColor: "bg-gray-500",
+      bgColor: "bg-muted-foreground",
       icon: "⚙️"
     }
   };
@@ -82,7 +82,7 @@ const MessageAvatar: React.FC<{ role: Message["role"] }> = ({ role }) => {
 
   return (
     <div className={cn(
-      "h-8 w-8 shrink-0 rounded-full flex items-center justify-center text-white text-xs font-medium bg-gray-700",
+      "h-8 w-8 shrink-0 rounded-full flex items-center justify-center text-white text-xs font-medium",
       config.bgColor
     )}>
       {config.fallback}
@@ -268,7 +268,7 @@ export const MessageContainer: React.FC<MessageContainerProps> = ({
           animate={{ scale: 1 }}
           transition={{ delay: 0.2 }}
         >
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-800 text-white">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-white">
             {message.role === 'user' ? (
               <User className="h-4 w-4" />
             ) : (
@@ -288,12 +288,12 @@ export const MessageContainer: React.FC<MessageContainerProps> = ({
           "flex items-center gap-2 mb-2",
           isUserMessage ? "justify-end" : "justify-start"
         )}>
-          <span className="text-sm font-medium text-gray-900">
+          <span className="text-sm font-medium text-foreground">
             {message.role === 'user' ? '你' : 'YADRA'}
           </span>
 
           {showTimestamp && (
-            <span className="text-xs text-gray-500">
+            <span className="text-xs text-muted-foreground">
               {message.timestamp.toLocaleTimeString()}
             </span>
           )}
@@ -328,7 +328,7 @@ export const MessageContainer: React.FC<MessageContainerProps> = ({
               showText={false}
             />
           ) : (
-            <div className="prose prose-sm max-w-none text-gray-700">
+            <div className="prose prose-sm max-w-none text-foreground">
               <MarkdownRenderer content={message.content} />
             </div>
           )}

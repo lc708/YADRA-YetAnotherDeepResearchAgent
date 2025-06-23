@@ -935,12 +935,12 @@ export default function WorkspacePage() {
   );
 
   return (
-          <div className="h-full w-full flex flex-col bg-gradient-to-br from-gray-50 via-white to-gray-50 relative">
+          <div className="h-full w-full flex flex-col bg-app-background relative">
       {/* 顶部导航栏 - 仅在有消息时显示 */}
       {hasMessages && (
         <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 bg-transparent">
           <div className="flex items-center gap-2">
-            <h1 className="text-lg font-semibold text-gray-900">当前研究</h1>
+            <h1 className="text-lg font-semibold text-foreground">当前研究</h1>
           </div>
 
           {/* 面板控制按钮 */}
@@ -949,7 +949,7 @@ export default function WorkspacePage() {
               variant={conversationVisible ? "default" : "outline"}
               size="sm"
               onClick={toggleConversationPanel}
-              className="gap-1 bg-transparent border-gray-200 text-gray-700 hover:bg-gray-50"
+              className="gap-1 bg-transparent border-border text-muted-foreground hover:bg-muted"
             >
               <MessageSquare className="h-4 w-4" />
               <span className="hidden lg:inline">对话</span>
@@ -960,7 +960,7 @@ export default function WorkspacePage() {
               variant={artifactVisible ? "default" : "outline"}
               size="sm"
               onClick={toggleArtifactsPanel}
-              className="gap-1 bg-transparent border-gray-200 text-gray-700 hover:bg-gray-50"
+              className="gap-1 bg-transparent border-border text-muted-foreground hover:bg-muted"
             >
               <FileText className="h-4 w-4" />
               <span className="hidden lg:inline">工件</span>
@@ -971,7 +971,7 @@ export default function WorkspacePage() {
               variant={historyVisible ? "default" : "outline"}
               size="sm"
               onClick={toggleHistoryPanel}
-              className="gap-1 bg-transparent border-gray-200 text-gray-700 hover:bg-gray-50"
+              className="gap-1 bg-transparent border-border text-muted-foreground hover:bg-muted"
             >
               <Activity className="h-4 w-4" />
               <span className="hidden lg:inline">输出流</span>
@@ -982,7 +982,7 @@ export default function WorkspacePage() {
               variant={podcastVisible ? "default" : "outline"}
               size="sm"
               onClick={togglePodcastPanel}
-              className="gap-1 bg-transparent border-gray-200 text-gray-700 hover:bg-gray-50"
+              className="gap-1 bg-transparent border-border text-muted-foreground hover:bg-muted"
             >
               <Headphones className="h-4 w-4" />
               <span className="hidden lg:inline">播客</span>
@@ -1003,7 +1003,7 @@ export default function WorkspacePage() {
             {/* 对话面板 */}
             {conversationVisible && (
               <div className={cn("flex flex-col h-full relative", panelWidthClass, {
-                "border-r border-gray-200": visiblePanels.length > 1
+                "border-r border-border": visiblePanels.length > 1
               })}>
                 <ConversationPanel />
                 {/* 在多面板模式下，输入框属于对话面板 */}
@@ -1014,18 +1014,18 @@ export default function WorkspacePage() {
             {/* 工件面板 */}
             {artifactVisible && (
               <div className={cn("flex flex-col h-full", panelWidthClass, {
-                "border-r border-gray-200": historyVisible || podcastVisible
+                "border-r border-border": historyVisible || podcastVisible
               })}>
-                <div className="flex-shrink-0 px-4 py-3 border-b border-gray-200">
+                <div className="flex-shrink-0 px-4 py-3 border-b border-border">
                   <div className="flex items-center justify-between">
-                    <h2 className="text-lg font-semibold text-gray-900">
+                    <h2 className="text-lg font-semibold text-foreground">
                       研究工件
                     </h2>
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={toggleArtifactsPanel}
-                      className="h-8 w-8 p-0 text-gray-600 hover:bg-gray-100"
+                      className="h-8 w-8 p-0 text-muted-foreground hover:bg-muted"
                     >
                       <Minimize2 className="h-4 w-4" />
                     </Button>
@@ -1038,18 +1038,18 @@ export default function WorkspacePage() {
             {/* 输出流面板 */}
             {historyVisible && (
               <div className={cn("flex flex-col h-full", panelWidthClass, {
-                "border-r border-gray-200": podcastVisible
+                "border-r border-border": podcastVisible
               })}>
-                <div className="flex-shrink-0 px-4 py-3 border-b border-gray-200">
+                <div className="flex-shrink-0 px-4 py-3 border-b border-border">
                   <div className="flex items-center justify-between">
-                    <h2 className="text-lg font-semibold text-gray-900">
+                    <h2 className="text-lg font-semibold text-foreground">
                       实时输出流
                     </h2>
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={toggleHistoryPanel}
-                      className="h-8 w-8 p-0 text-gray-600 hover:bg-gray-100"
+                      className="h-8 w-8 p-0 text-muted-foreground hover:bg-muted"
                     >
                       <Minimize2 className="h-4 w-4" />
                     </Button>
@@ -1062,16 +1062,16 @@ export default function WorkspacePage() {
             {/* 播客面板 */}
             {podcastVisible && (
               <div className={cn("flex flex-col h-full", panelWidthClass)}>
-                <div className="flex-shrink-0 px-4 py-3 border-b border-gray-200">
+                <div className="flex-shrink-0 px-4 py-3 border-b border-border">
                   <div className="flex items-center justify-between">
-                    <h2 className="text-lg font-semibold text-gray-900">
+                    <h2 className="text-lg font-semibold text-foreground">
                       播客内容
                     </h2>
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={togglePodcastPanel}
-                      className="h-8 w-8 p-0 text-gray-600 hover:bg-gray-100"
+                      className="h-8 w-8 p-0 text-muted-foreground hover:bg-muted"
                     >
                       <Minimize2 className="h-4 w-4" />
                     </Button>
@@ -1086,10 +1086,10 @@ export default function WorkspacePage() {
               <div className="flex flex-1 items-center justify-center">
                 <div className="text-center">
                   <MessageSquare className="mx-auto h-12 w-12 text-gray-400" />
-                  <h3 className="mt-4 text-lg font-medium text-gray-900">
+                  <h3 className="mt-4 text-lg font-medium text-foreground">
                     选择要查看的面板
                   </h3>
-                  <p className="mt-2 text-sm text-gray-500">
+                  <p className="mt-2 text-sm text-muted-foreground">
                     使用右上角的按钮开启对话、工件或其他面板
                   </p>
                 </div>
