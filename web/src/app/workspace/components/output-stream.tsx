@@ -168,7 +168,7 @@ export function OutputStream({ className }: OutputStreamProps) {
         return false;
       }
       
-      if (agentFilter !== "all" && message.agent !== agentFilter) {
+      if (agentFilter !== "all" && message.langGraphMetadata?.agent !== agentFilter) {
         return false;
       }
       
@@ -212,7 +212,7 @@ export function OutputStream({ className }: OutputStreamProps) {
         outputStream: filteredMessages.map(msg => ({
           id: msg.id,
           role: msg.role,
-          agent: msg.agent,
+          agent: msg.langGraphMetadata?.agent,
           source: msg.source,
           content: msg.content,
           isStreaming: msg.isStreaming,
@@ -242,23 +242,15 @@ export function OutputStream({ className }: OutputStreamProps) {
   }, [currentUrlParam, filteredMessages, threadData, responding, allMessages.length]);
 
   const getEventType = useCallback((message: Message): string => {
-    // 🔥 优先基于 metadata 信息识别真实的 SSE 事件类型
-    if (message.metadata?.nodeEvent) {
-      return message.metadata.nodeType === 'start' ? 'node_start' : 'node_complete';
-    }
-    if (message.metadata?.planEvent) return 'plan_generated';
-    if (message.metadata?.searchEvent) return 'search_results';
-    if (message.metadata?.agentEvent) return 'agent_output';
-    if (message.metadata?.progressEvent) return 'progress';
-    if (message.metadata?.artifactEvent) return 'artifact';
-    if (message.metadata?.completeEvent) return 'complete';
-    if (message.metadata?.errorEvent) return 'error';
-    if (message.metadata?.chunkType) return 'message_chunk';
-    if (message.metadata?.interruptEvent) return 'interrupt';
-    if (message.metadata?.userInput) return 'user_input';
-    if (message.metadata?.userFeedback) return 'user_feedback';
+    // 🔥 修复：使用LangGraph原生字段识别事件类型
+    const agent = message.langGraphMetadata?.agent;
     
-    // 🔥 Fallback 到原有的推断逻辑
+    // 基于agent类型识别特定事件
+    if (agent === 'projectmanager') return 'plan_generated';
+    if (agent === 'reporter') return 'artifact';
+    if (agent === 'podcast') return 'artifact';
+    
+    // 基于消息内容和状态识别事件类型
     if (message.toolCalls && message.toolCalls.length > 0) return 'tool_calls';
     if (message.finishReason === 'interrupt') return 'interrupt';
     if (message.finishReason === 'reask') return 'reask';
@@ -266,6 +258,7 @@ export function OutputStream({ className }: OutputStreamProps) {
     if (message.reasoningContent) return 'reasoning';
     if (message.resources && message.resources.length > 0) return 'resource';
     
+    // 🔥 移除废弃的metadata事件检查，使用简化的逻辑
     return 'message';
   }, []);
 
@@ -336,10 +329,10 @@ export function OutputStream({ className }: OutputStreamProps) {
           {message.source === "button" ? "指令" : "查询"}
         </Badge>
       );
-    } else if (message.agent) {
+    } else if (message.langGraphMetadata?.agent) {
       badges.push(
         <Badge key="agent" variant="outline">
-          {message.agent}
+          {message.langGraphMetadata.agent}
         </Badge>
       );
     } else {
@@ -539,7 +532,7 @@ export function OutputStream({ className }: OutputStreamProps) {
                       <CardTitle className="text-sm">
                         {message.role === "user" 
                           ? (message.source === "button" ? "用户指令" : "用户查询")
-                          : message.agent || message.role
+                          : message.langGraphMetadata?.agent || message.role
                         }
                       </CardTitle>
                       {getEventBadge(message)}

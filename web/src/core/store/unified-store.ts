@@ -19,7 +19,7 @@ import type { Message, Resource } from "~/core/messages";
 import type { Artifact } from "~/lib/supa";
 import { nanoid } from "nanoid";
 import React, { useCallback } from "react";
-import { messageToArtifact } from "~/core/adapters/state-adapter";
+// 🔥 state-adapter已废弃，artifact转换逻辑待重新设计
 
 // Enable Immer MapSet plugin
 enableMapSet();
@@ -102,6 +102,7 @@ export interface BusinessPlan {
     sources?: number;
     tools?: string[];
     keywords?: string[];
+    locale?: string;
   };
 }
 
@@ -453,24 +454,8 @@ export const useUnifiedStore = create<UnifiedStore>()(
       
       // 派生数据
       getArtifacts: (threadId: string): Artifact[] => {
-        const thread = get().threads.get(threadId);
-        if (!thread) return [];
-        
-        // 使用 state-adapter 的逻辑转换消息为 artifacts
-        const artifacts: Artifact[] = [];
-        
-        // 转换所有消息
-        for (const message of thread.messages) {
-          const artifact = messageToArtifact(message, threadId);
-          if (artifact) {
-            artifacts.push(artifact);
-          }
-        }
-        
-        // 按创建时间排序
-        return artifacts.sort((a, b) => 
-          new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-        );
+        // 🔥 暂时返回空数组，artifact转换逻辑待重新设计
+        return [];
       },
       
       getMessageById: (threadId: string, messageId: string) => {
@@ -483,38 +468,27 @@ export const useUnifiedStore = create<UnifiedStore>()(
         const thread = get().threads.get(threadId);
         if (!thread) return null;
         
-        // 🔥 查找包含计划数据的projectmanager消息
+        // 🔥 修复：直接从LangGraph原生消息中获取Plan数据
         const projectmanagerMessages = thread.messages.filter(msg =>
-          msg.agent === 'projectmanager' && msg.metadata?.planEvent === true
+          msg.langGraphMetadata?.agent === 'projectmanager' && msg.content
         );
         
         if (projectmanagerMessages.length === 0) return null;
         
         const latestPlanMessage = projectmanagerMessages[projectmanagerMessages.length - 1];
-        if (!latestPlanMessage?.metadata?.planData) return null;
+        if (!latestPlanMessage?.content) return null;
         
         try {
-          // 🔥 从metadata中获取计划数据
-          const planData = latestPlanMessage.metadata.planData;
-          let backendPlan: any = null;
+          // 🔥 从message.content解析LangGraph原生Plan JSON
+          const backendPlan = JSON.parse(latestPlanMessage.content);
           
-          // 🔥 处理不同的plan数据格式
-          if (planData && typeof planData === 'object') {
-            if (planData.plan && typeof planData.plan === 'string') {
-              // plan_data.plan是字符串，需要解析
-              try {
-                backendPlan = JSON.parse(planData.plan);
-              } catch (parseError) {
-                console.warn('❌ Failed to parse plan_data.plan string:', parseError);
-                return null;
-              }
-            } else if (planData.title && planData.steps) {
-              // plan_data直接包含计划数据
-              backendPlan = planData;
-            }
+          if (!backendPlan || !backendPlan.title || !backendPlan.steps) {
+            console.warn('❌ Invalid plan structure in message.content:', backendPlan);
+            return null;
           }
           
-          if (!backendPlan) return null;
+          // 🔥 计算版本号：projectmanager消息的数量
+          const version = projectmanagerMessages.length;
           
           // 🔥 转换为标准的BusinessPlan对象
           const steps: BusinessPlanStep[] = (backendPlan.steps || []).map((step: any, index: number) => ({
@@ -526,11 +500,10 @@ export const useUnifiedStore = create<UnifiedStore>()(
             estimatedTime: 15 // 默认估算时间
           }));
           
-          // 获取当前interrupt状态
-          const currentInterrupt = thread.ui.currentInterrupt;
-          const planId = currentInterrupt?.interruptId || `plan-${Date.now()}`;
+          // 🔥 使用LangGraph原生数据构建BusinessPlan
+          const planId = `plan-${latestPlanMessage.id}`;
           const planTitle = backendPlan.title || '研究计划';
-          const planObjective = backendPlan.thought || currentInterrupt?.message || '研究目标';
+          const planObjective = backendPlan.thought || '研究目标';
           
           return {
             id: planId,
@@ -541,18 +514,19 @@ export const useUnifiedStore = create<UnifiedStore>()(
             estimatedDuration: steps.length * 15, // 基于步骤数估算总时长
             complexity: steps.length <= 2 ? 'simple' as const : 
                        steps.length <= 4 ? 'moderate' as const : 'complex' as const,
-            confidence: 0.8,
-            createdAt: new Date(),
-            version: 1,
+            confidence: backendPlan.has_enough_context ? 0.9 : 0.7,
+            createdAt: new Date(latestPlanMessage.langGraphMetadata?.timestamp || Date.now()),
+            version: version, // 🔥 新增：版本号
             metadata: {
               sources: 0,
               tools: ['tavily_search'],
-              keywords: []
+              keywords: [],
+              locale: backendPlan.locale || 'zh-CN'
             }
           };
           
         } catch (error) {
-          console.warn('❌ Failed to process plan data from metadata:', error);
+          console.warn('❌ Failed to parse plan JSON from message.content:', error, latestPlanMessage.content);
           return null;
         }
       },
@@ -594,11 +568,11 @@ export const useUnifiedStore = create<UnifiedStore>()(
         const thread = get().threads.get(threadId);
         if (!thread) return { stage: 'idle', progress: 0, currentActivity: null };
         
-        // 分析研究阶段
-        const hasPlanning = thread.messages.some(m => m.agent === 'projectmanager');
-        const hasResearch = thread.messages.some(m => m.agent === 'researcher');
-        const hasCoding = thread.messages.some(m => m.agent === 'coder');
-        const hasReport = thread.messages.some(m => m.agent === 'reporter');
+        // 🔥 修复：使用LangGraph原生字段分析研究阶段
+        const hasPlanning = thread.messages.some(m => m.langGraphMetadata?.agent === 'projectmanager');
+        const hasResearch = thread.messages.some(m => m.langGraphMetadata?.agent === 'researcher');
+        const hasCoding = thread.messages.some(m => m.langGraphMetadata?.agent === 'coder');
+        const hasReport = thread.messages.some(m => m.langGraphMetadata?.agent === 'reporter');
         
         let stage = 'idle';
         let progress = 0;
@@ -625,7 +599,7 @@ export const useUnifiedStore = create<UnifiedStore>()(
         // 检查是否有正在流式传输的消息
         const streamingMessage = thread.messages.find(m => m.isStreaming);
         if (streamingMessage) {
-          currentActivity = `正在执行: ${streamingMessage.agent || '研究任务'}`;
+          currentActivity = `正在执行: ${streamingMessage.langGraphMetadata?.agent || '研究任务'}`;
         }
         
         return { stage, progress, currentActivity };
@@ -635,8 +609,8 @@ export const useUnifiedStore = create<UnifiedStore>()(
         const thread = get().threads.get(threadId);
         if (!thread) return null;
         
-        // 查找reporter生成的最终报告
-        const reportMessages = thread.messages.filter(m => m.agent === 'reporter');
+        // 🔥 修复：使用LangGraph原生字段查找reporter生成的最终报告
+        const reportMessages = thread.messages.filter(m => m.langGraphMetadata?.agent === 'reporter');
         if (reportMessages.length === 0) return null;
         
         // 返回最新的报告消息
@@ -647,11 +621,11 @@ export const useUnifiedStore = create<UnifiedStore>()(
         const thread = get().threads.get(threadId);
         if (!thread) return [];
         
-        // 返回所有研究相关的消息（排除用户消息和系统消息）
+        // 🔥 修复：使用LangGraph原生字段返回所有研究相关的消息
         return thread.messages.filter(m => 
           m.role === 'assistant' && 
-          m.agent && 
-          ['researcher', 'coder', 'projectmanager', 'reporter'].includes(m.agent)
+          m.langGraphMetadata?.agent && 
+          ['researcher', 'coder', 'projectmanager', 'reporter'].includes(m.langGraphMetadata.agent)
         );
       },
     }))

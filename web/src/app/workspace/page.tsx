@@ -221,8 +221,8 @@ export default function WorkspacePage() {
         .filter((msg: any) => {
           // 只显示用户消息和主要的AI回复，过滤掉技术性的输出流内容
           if (msg.role === 'user') return true;
-          if (msg.role === 'assistant' && msg.agent === 'generalmanager') return true;
-          if (msg.role === 'assistant' && msg.agent === 'reporter') return true;
+          if (msg.role === 'assistant' && msg.langGraphMetadata?.agent === 'generalmanager') return true;
+          if (msg.role === 'assistant' && msg.langGraphMetadata?.agent === 'reporter') return true;
           return false;
         })
         .map((msg: any) => ({
@@ -472,11 +472,11 @@ export default function WorkspacePage() {
       window.location.href = '/workspace';
     };
 
-    // 🔥 修复：只有在确实有计划消息时才调用getLatestPlan，避免不必要的日志
+    // 🔥 修复：使用LangGraph原生字段检查计划消息
     const hasPlanMessage = currentThreadId ? (() => {
       const thread = useUnifiedStore.getState().threads.get(currentThreadId);
       return thread?.messages?.some(msg => 
-        msg.agent === 'projectmanager' && msg.metadata?.planEvent === true
+        msg.langGraphMetadata?.agent === 'projectmanager' && msg.content
       ) || false;
     })() : false;
     

@@ -179,7 +179,7 @@ export function ArtifactFeed({ traceId, className }: ArtifactFeedProps) {
     try {
       // 更新本地状态 - 这里可以添加保存到后端的逻辑
       console.log("Saving artifact:", artifact.id, content);
-      // 注意：由于我们现在使用state-adapter，保存逻辑需要更新到主store
+      // 🔥 注意：artifact转换逻辑已迁移到unified-store，待重新设计
       // 这个功能将在后续的Phase中完善
     } catch (error) {
       console.error("Failed to save artifact:", error);
