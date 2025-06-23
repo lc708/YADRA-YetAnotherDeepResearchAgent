@@ -9,7 +9,13 @@ import { cn } from "~/lib/utils";
 import { Button } from "~/components/ui/button";
 import { ScrollContainer, type ScrollContainerRef } from "~/components/conversation/scroll-container";
 import { HeroInput } from "~/components/yadra/hero-input";
-import { useUnifiedStore, sendAskMessage } from "~/core/store/unified-store";
+import { 
+  useUnifiedStore, 
+  sendAskMessage,
+  useCurrentPlan,
+  useCurrentInterrupt,
+} from "~/core/store/unified-store";
+import { type StatusType } from "~/components/conversation/status-badge";
 import type { MessageRole } from "~/core/messages/types";
 import type { ResearchRequest } from "~/core/store/unified-store";
 import { useSettingsStore } from "~/core/store/settings-store";
@@ -80,369 +86,18 @@ export default function WorkspacePage() {
     try {
       console.log("[WorkspacePage] Handling research request:", request);
       
-      // 调用sendAskMessage处理研究请求
-      const result = await sendAskMessage(
-        request,
-        {
-          // 🔥 事件处理器 - 添加OutputStream需要的所有13种事件处理
-          onNavigation: async (data) => {
-            console.log("[WorkspacePage] Navigation event received:", data);
-            // sendAskMessage内部已处理导航逻辑
-          },
-          onMetadata: async (data) => {
-            console.log("[WorkspacePage] Metadata event received:", data);
-            // sendAskMessage内部已处理metadata
-          },
-          onNodeStart: async (data) => {
-            console.log('[WorkspacePage] Node started:', data.node_name);
-            const currentThreadId = useUnifiedStore.getState().currentThreadId;
-            if (currentThreadId) {
-              const progressMessage = {
-                id: `node-start-${data.node_name}-${Date.now()}`,
-                content: `🚀 开始执行: ${data.node_name}`,
-                contentChunks: [`🚀 开始执行: ${data.node_name}`],
-                role: "assistant" as const,
-                threadId: currentThreadId,
-                isStreaming: false,
-                agent: undefined,
-                resources: [],
-                metadata: {
-                  nodeEvent: true,
-                  nodeType: 'start',
-                  nodeName: data.node_name,
-                  timestamp: data.timestamp,
-                },
-                originalInput: {
-                  text: '',
-                  locale: 'zh-CN',
-                  settings: {},
-                  resources: [],
-                  timestamp: data.timestamp,
-                },
-              };
-              useUnifiedStore.getState().addMessage(currentThreadId, progressMessage);
-            }
-          },
-          onNodeComplete: async (data) => {
-            console.log('[WorkspacePage] Node completed:', data.node_name);
-            const currentThreadId = useUnifiedStore.getState().currentThreadId;
-            if (currentThreadId) {
-              const progressMessage = {
-                id: `node-complete-${data.node_name}-${Date.now()}`,
-                content: `✅ 完成执行: ${data.node_name}${data.duration_ms ? ` (${data.duration_ms}ms)` : ''}`,
-                contentChunks: [`✅ 完成执行: ${data.node_name}${data.duration_ms ? ` (${data.duration_ms}ms)` : ''}`],
-                role: "assistant" as const,
-                threadId: currentThreadId,
-                isStreaming: false,
-                agent: undefined,
-                resources: [],
-                metadata: {
-                  nodeEvent: true,
-                  nodeType: 'complete',
-                  nodeName: data.node_name,
-                  duration: data.duration_ms,
-                  timestamp: data.timestamp,
-                },
-                originalInput: {
-                  text: '',
-                  locale: 'zh-CN',
-                  settings: {},
-                  resources: [],
-                  timestamp: data.timestamp,
-                },
-              };
-              useUnifiedStore.getState().addMessage(currentThreadId, progressMessage);
-            }
-          },
-          onPlanGenerated: async (data) => {
-            console.log('[WorkspacePage] Plan generated:', data);
-            const currentThreadId = useUnifiedStore.getState().currentThreadId;
-            if (currentThreadId) {
-              const planMessage = {
-                id: `plan-${data.execution_id}-${Date.now()}`,
-                content: `📋 研究计划已生成 (第${data.plan_iterations}次迭代)`,
-                contentChunks: [`📋 研究计划已生成 (第${data.plan_iterations}次迭代)`],
-                role: "assistant" as const,
-                threadId: currentThreadId,
-                isStreaming: false,
-                agent: "projectmanager" as const,
-                resources: [],
-                metadata: {
-                  planEvent: true,
-                  planData: data.plan_data,
-                  planIterations: data.plan_iterations,
-                  timestamp: data.timestamp,
-                },
-                originalInput: {
-                  text: '',
-                  locale: 'zh-CN',
-                  settings: {},
-                  resources: [],
-                  timestamp: data.timestamp,
-                },
-              };
-              useUnifiedStore.getState().addMessage(currentThreadId, planMessage);
-            }
-          },
-          onSearchResults: async (data) => {
-            console.log('[WorkspacePage] Search results:', data);
-            const currentThreadId = useUnifiedStore.getState().currentThreadId;
-            if (currentThreadId) {
-              const searchMessage = {
-                id: `search-${data.execution_id}-${Date.now()}`,
-                content: `🔍 搜索完成: "${data.query}" (${data.results.length} 个结果)`,
-                contentChunks: [`🔍 搜索完成: "${data.query}" (${data.results.length} 个结果)`],
-                role: "assistant" as const,
-                threadId: currentThreadId,
-                isStreaming: false,
-                agent: "researcher" as const,
-                resources: data.results.map((result: any) => ({
-                  uri: result.url || '',
-                  title: result.title || '',
-                })),
-                metadata: {
-                  searchEvent: true,
-                  query: data.query,
-                  source: data.source,
-                  resultsCount: data.results.length,
-                  timestamp: data.timestamp,
-                },
-                originalInput: {
-                  text: '',
-                  locale: 'zh-CN',
-                  settings: {},
-                  resources: [],
-                  timestamp: data.timestamp,
-                },
-              };
-              useUnifiedStore.getState().addMessage(currentThreadId, searchMessage);
-            }
-          },
-          onAgentOutput: async (data) => {
-            console.log('[WorkspacePage] Agent output:', data);
-            const currentThreadId = useUnifiedStore.getState().currentThreadId;
-            if (currentThreadId) {
-              const agentMessage = {
-                id: `agent-${data.agent_name}-${Date.now()}`,
-                content: data.content,
-                contentChunks: [data.content],
-                role: "assistant" as const,
-                threadId: currentThreadId,
-                isStreaming: false,
-                agent: data.agent_name as any,
-                resources: [],
-                metadata: {
-                  agentEvent: true,
-                  agentType: data.agent_type,
-                  agentMetadata: data.metadata,
-                  timestamp: data.timestamp,
-                },
-                originalInput: {
-                  text: '',
-                  locale: 'zh-CN',
-                  settings: {},
-                  resources: [],
-                  timestamp: data.timestamp,
-                },
-              };
-              useUnifiedStore.getState().addMessage(currentThreadId, agentMessage);
-            }
-          },
-          onMessageChunk: async (data) => {
-            console.log('[WorkspacePage] Message chunk:', data);
-            const currentThreadId = useUnifiedStore.getState().currentThreadId;
-            if (currentThreadId) {
-              // 🔥 使用新的消息块合并逻辑
-              useUnifiedStore.getState().mergeMessageChunk(currentThreadId, {
-                execution_id: data.execution_id,
-                agent_name: data.agent_name,
-                chunk_type: data.chunk_type,
-                chunk_id: data.chunk_id,
-                content: data.content,
-                sequence: data.sequence,
-                is_final: data.is_final,
-                metadata: data.metadata,
-                timestamp: data.timestamp,
-              });
-            }
-          },
-          onArtifact: async (data) => {
-            console.log('[WorkspacePage] Artifact generated:', data);
-            const currentThreadId = useUnifiedStore.getState().currentThreadId;
-            if (currentThreadId) {
-              const artifactMessage = {
-                id: data.artifact_id,
-                content: data.content,
-                contentChunks: [data.content],
-                role: "assistant" as const,
-                threadId: currentThreadId,
-                isStreaming: false,
-                agent: "reporter" as const,
-                resources: [],
-                metadata: {
-                  artifactEvent: true,
-                  artifactType: data.type,
-                  artifactTitle: data.title,
-                  artifactFormat: data.format,
-                  artifactMetadata: data.metadata,
-                  timestamp: data.timestamp,
-                },
-                originalInput: {
-                  text: '',
-                  locale: 'zh-CN',
-                  settings: {},
-                  resources: [],
-                  timestamp: data.timestamp,
-                },
-              };
-              useUnifiedStore.getState().addMessage(currentThreadId, artifactMessage);
-            }
-          },
-          onInterrupt: async (data) => {
-            console.log('[WorkspacePage] Interrupt event:', data);
-            const currentThreadId = useUnifiedStore.getState().currentThreadId;
-            if (currentThreadId) {
-              const interruptMessage = {
-                id: `interrupt-${data.interrupt_id}-${Date.now()}`,
-                content: `⚠️ 需要用户决策: ${data.message}`,
-                contentChunks: [`⚠️ 需要用户决策: ${data.message}`],
-                role: "assistant" as const,
-                threadId: currentThreadId,
-                isStreaming: false,
-                agent: undefined,
-                resources: [],
-                metadata: {
-                  interruptEvent: true,
-                  interruptId: data.interrupt_id,
-                  interruptMessage: data.message,
-                  interruptOptions: data.options,
-                  nodeName: data.node_name,
-                  timestamp: data.timestamp,
-                },
-                finishReason: "interrupt" as const,
-                originalInput: {
-                  text: '',
-                  locale: 'zh-CN',
-                  settings: {},
-                  resources: [],
-                  timestamp: data.timestamp,
-                },
-              };
-              useUnifiedStore.getState().addMessage(currentThreadId, interruptMessage);
-            }
-          },
-          onProgress: async (data) => {
-            console.log("[WorkspacePage] Progress event received:", data);
-            const currentThreadId = useUnifiedStore.getState().currentThreadId;
-            if (currentThreadId) {
-              const progressMessage = {
-                id: `progress-${data.execution_id}-${Date.now()}`,
-                content: `⏳ ${data.current_step_description}`,
-                contentChunks: [`⏳ ${data.current_step_description}`],
-                role: "assistant" as const,
-                threadId: currentThreadId,
-                isStreaming: false,
-                agent: undefined,
-                resources: [],
-                metadata: {
-                  progressEvent: true,
-                  currentNode: data.current_node,
-                  completedNodes: data.completed_nodes,
-                  remainingNodes: data.remaining_nodes,
-                  timestamp: data.timestamp,
-                },
-                originalInput: {
-                  text: '',
-                  locale: 'zh-CN',
-                  settings: {},
-                  resources: [],
-                  timestamp: data.timestamp,
-                },
-              };
-              useUnifiedStore.getState().addMessage(currentThreadId, progressMessage);
-            }
-          },
-          onComplete: async (data) => {
-            console.log("[WorkspacePage] Research completed:", data);
-            const currentThreadId = useUnifiedStore.getState().currentThreadId;
-            if (currentThreadId) {
-              const completeMessage = {
-                id: `complete-${data.execution_id}`,
-                content: `🎉 研究完成！总耗时: ${data.total_duration_ms}ms，生成了 ${data.artifacts_generated.length} 个工件`,
-                contentChunks: [`🎉 研究完成！总耗时: ${data.total_duration_ms}ms，生成了 ${data.artifacts_generated.length} 个工件`],
-                role: "assistant" as const,
-                threadId: currentThreadId,
-                isStreaming: false,
-                agent: undefined,
-                resources: [],
-                metadata: {
-                  completeEvent: true,
-                  totalDuration: data.total_duration_ms,
-                  tokensConsumed: data.tokens_consumed,
-                  totalCost: data.total_cost,
-                  artifactsGenerated: data.artifacts_generated,
-                  finalStatus: data.final_status,
-                  summary: data.summary,
-                  timestamp: data.timestamp,
-                },
-                originalInput: {
-                  text: '',
-                  locale: 'zh-CN',
-                  settings: {},
-                  resources: [],
-                  timestamp: data.timestamp,
-                },
-              };
-              useUnifiedStore.getState().addMessage(currentThreadId, completeMessage);
-            }
-          },
-          onError: async (data) => {
-            console.error("[WorkspacePage] Research error:", data);
-            const currentThreadId = useUnifiedStore.getState().currentThreadId;
-            if (currentThreadId) {
-              const errorMessage = {
-                id: `error-${data.execution_id}-${Date.now()}`,
-                content: `❌ 错误: ${data.error_message}`,
-                contentChunks: [`❌ 错误: ${data.error_message}`],
-                role: "assistant" as const,
-                threadId: currentThreadId,
-                isStreaming: false,
-                agent: undefined,
-                resources: [],
-                metadata: {
-                  errorEvent: true,
-                  errorCode: data.error_code,
-                  errorDetails: data.error_details,
-                  suggestions: data.suggestions,
-                  timestamp: data.timestamp,
-                },
-                originalInput: {
-                  text: '',
-                  locale: 'zh-CN',
-                  settings: {},
-                  resources: [],
-                  timestamp: data.timestamp,
-                },
-              };
-              useUnifiedStore.getState().addMessage(currentThreadId, errorMessage);
-            }
-          }
-        },
-        {
-          // 🔥 配置选项
-          onNavigate: async (workspaceUrl) => {
-            // 处理URL跳转
-            console.log("[WorkspacePage] Navigating to:", workspaceUrl);
-            
-            // 提取URL参数
-            const urlMatch = workspaceUrl.match(/\/workspace\?id=([^&]+)/);
-            if (urlMatch && urlMatch[1]) {
-              const newUrlParam = urlMatch[1];
-              router.replace(`/workspace?id=${newUrlParam}`);
-            }
+      // 🚀 重构：使用简化的sendAskMessage调用，所有事件处理已在Store层统一处理
+      const result = await sendAskMessage(request, {
+        onNavigate: async (workspaceUrl: string) => {
+          console.log("[WorkspacePage] Navigating to:", workspaceUrl);
+          // 提取URL参数
+          const urlMatch = workspaceUrl.match(/\/workspace\?id=([^&]+)/);
+          if (urlMatch && urlMatch[1]) {
+            const newUrlParam = urlMatch[1];
+            router.replace(`/workspace?id=${newUrlParam}`);
           }
         }
-      );
+      });
       
       console.log("[WorkspacePage] Research request completed:", result as any);
       
@@ -651,9 +306,9 @@ export default function WorkspacePage() {
     // 🔥 添加本地状态控制按钮显示
     const [planActionInProgress, setPlanActionInProgress] = useState<string | null>(null);
 
-    const currentInterrupt = useUnifiedStore(state =>
-      currentThreadId ? state.getCurrentInterrupt(currentThreadId) : null
-    );
+    // 🚀 重构：使用Store层的Hook接口替代业务逻辑
+    const currentInterrupt = useCurrentInterrupt(currentThreadId || undefined);
+    const currentPlan = useCurrentPlan(currentThreadId || undefined);
     
     // 🔥 监听plan变化，当有新plan生成时重新显示按钮
     useEffect(() => {
@@ -662,103 +317,39 @@ export default function WorkspacePage() {
         setPlanActionInProgress(null);
       }
     }, [currentInterrupt, planActionInProgress]);
-
-    // 🔥 获取真实的计划数据 - 不依赖interrupt状态
-    const getPlanFromMessages = (): any | null => {
-      if (!currentThreadId) return null;
-      
-      const thread = useUnifiedStore.getState().threads.get(currentThreadId);
-      if (!thread) return null;
-      
-          // 🔥 修复：查找包含计划数据的projectmanager消息
-    const projectmanagerMessages = thread.messages.filter(msg =>
-      msg.agent === 'projectmanager' && msg.metadata?.planEvent === true
-    );
-    if (projectmanagerMessages.length === 0) return null;
     
-    const latestPlanMessage = projectmanagerMessages[projectmanagerMessages.length - 1];
-      if (!latestPlanMessage?.metadata?.planData) return null;
-      
-      try {
-        // 🔥 修复：从metadata中获取计划数据，而不是解析content
-        const planData = latestPlanMessage.metadata.planData;
-        console.log('🔍 Plan data from metadata:', planData);
-        
-        // 🔥 检查plan_data结构
-        if (planData && typeof planData === 'object') {
-          // 如果plan_data.plan是字符串，需要解析
-          if (planData.plan && typeof planData.plan === 'string') {
-            try {
-              const actualPlan = JSON.parse(planData.plan);
-              console.log('✅ Parsed plan from plan_data.plan:', actualPlan);
-              return actualPlan;
-            } catch (parseError) {
-              console.warn('❌ Failed to parse plan_data.plan string:', parseError);
-              return null;
-            }
-          }
-          
-          // 如果plan_data直接包含计划数据
-          if (planData.title && planData.steps) {
-            console.log('✅ Direct plan data found:', planData);
-            return planData;
-          }
-        }
-        
-        console.warn('⚠️ Plan data structure not recognized:', planData);
-        return null;
-      } catch (error) {
-        console.warn('❌ Failed to process plan data from metadata:', error);
-        return null;
-      }
-    };
-    
-    // 🔥 重构：获取最新计划，不依赖interrupt状态
-    const getLatestPlan = (): ResearchPlan | null => {
-      const backendPlan = getPlanFromMessages();
-      if (!backendPlan) {
-        // 🔥 修复：移除日志输出，避免重复刷新
-        return null;
-      }
-      
-      // 🔥 正确映射后端Plan数据结构
-      const steps: PlanStep[] = (backendPlan.steps || []).map((step: any, index: number) => ({
-        id: `step-${index + 1}`,
-        title: step.title || `步骤 ${index + 1}`,
-        description: step.description || '无描述',
-        priority: step.execution_res ? 'high' as const : 'medium' as const,
-        status: step.execution_res ? 'completed' as const : 'pending' as const,
-        estimatedTime: 15 // 默认估算时间
-      }));
-      
-      // 使用currentInterrupt的ID，如果没有则生成一个基于时间的ID
-      const planId = currentInterrupt?.interruptId || `plan-${Date.now()}`;
-      const planTitle = backendPlan.title || '研究计划';
-      const planObjective = backendPlan.thought || currentInterrupt?.message || '研究目标';
-      
-      return {
-        id: planId,
-        title: planTitle,
-        objective: planObjective,
-        steps: steps,
-        status: 'pending' as const,
-        estimatedDuration: steps.length * 15, // 基于步骤数估算总时长
-        complexity: steps.length <= 2 ? 'simple' as const : 
-                   steps.length <= 4 ? 'moderate' as const : 'complex' as const,
-        confidence: 0.8,
-        createdAt: new Date(),
-        version: 1,
-        metadata: {
-          sources: 0,
-          tools: ['tavily_search'],
-          keywords: []
-        }
-      };
-    };
-    
-    // 🔥 检查是否需要显示反馈按钮
+    // 🚀 重构：将业务逻辑移到Store层，组件只负责UI逻辑
     const shouldShowActions = (): boolean => {
       return currentInterrupt !== null && planActionInProgress === null;
+    };
+    
+    // 🚀 重构：转换BusinessPlan到ResearchPlan格式（为了兼容现有组件）
+    const getLatestPlan = (): ResearchPlan | null => {
+      if (!currentPlan) return null;
+      
+      return {
+        id: currentPlan.id,
+        title: currentPlan.title,
+        objective: currentPlan.objective,
+        steps: currentPlan.steps.map(step => ({
+          id: step.id,
+          title: step.title,
+          description: step.description,
+          priority: step.priority,
+          status: step.status,
+          estimatedTime: step.estimatedTime
+        })),
+        status: currentPlan.status === "approved" ? "completed" : 
+                currentPlan.status === "rejected" ? "error" : 
+                currentPlan.status as StatusType,
+        estimatedDuration: currentPlan.estimatedDuration,
+        complexity: currentPlan.complexity,
+        confidence: currentPlan.confidence,
+        createdAt: currentPlan.createdAt,
+        updatedAt: currentPlan.updatedAt,
+        version: currentPlan.version,
+        metadata: currentPlan.metadata
+      };
     };
 
     // 处理PlanCard回调函数

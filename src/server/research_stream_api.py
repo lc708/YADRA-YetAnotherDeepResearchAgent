@@ -332,7 +332,7 @@ class ResearchStreamService:
                 # 发送完成事件
                 yield self._make_research_event("complete", {
                     "execution_id": execution_id,
-                    "thread_id": thread_id,
+                        "thread_id": thread_id,
                     "total_duration_ms": duration_ms,
                     "tokens_consumed": {"input": 0, "output": 0},
                     "total_cost": 0.0,
@@ -514,9 +514,9 @@ class ResearchStreamService:
             )
             execution_id = execution_record.execution_id
 
-            # 获取LangGraph实例
-            graph = await self._get_graph()
-            
+                # 获取LangGraph实例
+                graph = await self._get_graph()
+
             # 构造continue状态
             initial_state = {
                 "messages": [{"role": "user", "content": request.message}],
@@ -524,15 +524,15 @@ class ResearchStreamService:
             }
 
             # 处理LangGraph流式执行
-            async for event in self._process_langgraph_stream(
-                graph,
+                async for event in self._process_langgraph_stream(
+                    graph,
                 initial_state,
-                thread_id,
-                execution_id,
-                request,
-                execution_type="continue",
-            ):
-                yield event
+                    thread_id,
+                    execution_id,
+                    request,
+                    execution_type="continue",
+                ):
+                    yield event
 
         except Exception as e:
             logger.error(f"Continue research stream failed: {e}")
