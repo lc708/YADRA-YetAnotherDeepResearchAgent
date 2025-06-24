@@ -97,7 +97,6 @@ export interface BusinessPlan {
   confidence: number; // 0-1
   createdAt: Date;
   updatedAt?: Date;
-  version: number;
   metadata?: {
     sources?: number;
     tools?: string[];
@@ -463,7 +462,7 @@ export const useUnifiedStore = create<UnifiedStore>()(
         return thread?.messages.find((m) => m.id === messageId);
       },
       
-      // 🚀 新增：业务状态派生方法实现
+      // 🚀 新增：业务状态派生方法
       getCurrentPlan: (threadId: string): BusinessPlan | null => {
         const thread = get().threads.get(threadId);
         if (!thread) return null;
@@ -530,9 +529,6 @@ export const useUnifiedStore = create<UnifiedStore>()(
             return null;
           }
           
-          // 🔥 计算版本号：projectmanager消息的数量
-          const version = projectmanagerMessages.length;
-          
           // 🔥 转换为标准的BusinessPlan对象
           const steps: BusinessPlanStep[] = (backendPlan.steps || []).map((step: any, index: number) => ({
             id: `step-${index + 1}`,
@@ -559,7 +555,6 @@ export const useUnifiedStore = create<UnifiedStore>()(
                        steps.length <= 4 ? 'moderate' as const : 'complex' as const,
             confidence: backendPlan.has_enough_context ? 0.9 : 0.7,
             createdAt: new Date(latestPlanMessage.langGraphMetadata?.timestamp || Date.now()),
-            version: version, // 🔥 新增：版本号
             metadata: {
               sources: 0,
               tools: ['tavily_search'],

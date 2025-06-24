@@ -305,10 +305,59 @@ export default function WorkspacePage() {
   const ArtifactsPanel = () => {
     // 🔥 添加本地状态控制按钮显示
     const [planActionInProgress, setPlanActionInProgress] = useState<string | null>(null);
+    
+    // 🚀 新增：计划历史状态管理
+    const [planHistory, setPlanHistory] = useState<ResearchPlan[]>([]);
+    const [interruptPlanMapping, setInterruptPlanMapping] = useState<Map<string, string>>(new Map());
 
     // 🚀 重构：使用Store层的Hook接口替代业务逻辑
     const currentInterrupt = useCurrentInterrupt(currentThreadId || undefined);
     const currentPlan = useCurrentPlan(currentThreadId || undefined);
+    
+    // 🔥 监听currentPlan变化，维护计划历史
+    useEffect(() => {
+      if (currentPlan && currentThreadId) {
+        // 检查是否是新计划（通过ID判断）
+        const isNewPlan = !planHistory.some(p => p.id === `plan-${currentPlan.id.split('-')[1]}`);
+        
+        if (isNewPlan) {
+          // 🔥 转换BusinessPlan到ResearchPlan格式（为了兼容现有组件）
+          const newPlan: ResearchPlan = {
+            id: `plan-${currentPlan.id.split('-')[1]}`, // 使用消息ID作为唯一标识
+            title: currentPlan.title,
+            objective: currentPlan.objective,
+            steps: currentPlan.steps.map(step => ({
+              id: step.id,
+              title: step.title,
+              description: step.description,
+              priority: step.priority,
+              status: step.status,
+              estimatedTime: step.estimatedTime
+            })),
+            status: "pending" as StatusType, // 新计划默认为pending状态
+            estimatedDuration: currentPlan.estimatedDuration,
+            complexity: currentPlan.complexity,
+            confidence: currentPlan.confidence,
+            createdAt: currentPlan.createdAt,
+            updatedAt: currentPlan.updatedAt,
+            version: planHistory.length + 1, // 🔥 简单的版本计算：基于历史长度
+            metadata: currentPlan.metadata
+          };
+          
+          // 添加到历史记录
+          setPlanHistory(prev => [...prev, newPlan]);
+          
+          // 🔥 关键：如果当前有interrupt，建立映射关系
+          if (currentInterrupt) {
+            setInterruptPlanMapping(prev => {
+              const newMapping = new Map(prev);
+              newMapping.set(currentInterrupt.messageId, newPlan.id);
+              return newMapping;
+            });
+          }
+        }
+      }
+    }, [currentPlan, currentThreadId, currentInterrupt, planHistory]);
     
     // 🔥 监听plan变化，当有新plan生成时重新显示按钮
     useEffect(() => {
@@ -319,42 +368,12 @@ export default function WorkspacePage() {
     }, [currentInterrupt, planActionInProgress]);
     
     // 🚀 重构：将业务逻辑移到Store层，组件只负责UI逻辑
-    const shouldShowActions = (): boolean => {
-      return currentInterrupt !== null && planActionInProgress === null;
-    };
-    
-    // 🚀 重构：转换BusinessPlan到ResearchPlan格式（为了兼容现有组件）
-    const getLatestPlan = (): ResearchPlan | null => {
-      if (!currentPlan) return null;
+    const shouldShowActions = (planId: string): boolean => {
+      // 🔥 关键：只有当前interrupt关联的plan才显示操作按钮
+      if (!currentInterrupt) return false;
       
-      // 🔥 修复：HITL状态下，确保status为"pending"以显示操作按钮
-      const planStatus = currentInterrupt !== null ? "pending" : (
-        currentPlan.status === "approved" ? "completed" : 
-        currentPlan.status === "rejected" ? "error" : 
-        currentPlan.status as StatusType
-      );
-      
-      return {
-        id: currentPlan.id,
-        title: currentPlan.title,
-        objective: currentPlan.objective,
-        steps: currentPlan.steps.map(step => ({
-          id: step.id,
-          title: step.title,
-          description: step.description,
-          priority: step.priority,
-          status: step.status,
-          estimatedTime: step.estimatedTime
-        })),
-        status: planStatus,
-        estimatedDuration: currentPlan.estimatedDuration,
-        complexity: currentPlan.complexity,
-        confidence: currentPlan.confidence,
-        createdAt: currentPlan.createdAt,
-        updatedAt: currentPlan.updatedAt,
-        version: currentPlan.version,
-        metadata: currentPlan.metadata
-      };
+      const interruptLinkedPlanId = interruptPlanMapping.get(currentInterrupt.messageId);
+      return interruptLinkedPlanId === planId && planActionInProgress === null;
     };
 
     // 处理PlanCard回调函数
@@ -393,8 +412,6 @@ export default function WorkspacePage() {
     const handlePlanModify = async (planId: string, modifications: string) => {
       if (!currentThreadId || !urlParam) return;
       
-      // 🔥 编辑计划：等用户提交修改建议后才隐藏按钮，这里不设置状态
-      
       // 获取session_id
       const sessionState = useUnifiedStore.getState().sessionState;
       const sessionId = sessionState?.sessionMetadata?.session_id;
@@ -407,9 +424,9 @@ export default function WorkspacePage() {
       // 🔥 用户提交修改建议后，立即隐藏按钮
       setPlanActionInProgress('modify');
       
-      // 🔥 HITL场景：发送修改建议给后端重新规划
+      // 🔥 修复：统一使用interrupt_feedback，移除question中的命令格式冲突
       await sendAskMessage({
-        question: `[EDIT_PLAN] ${modifications}`, // 🔥 修复：使用后端期望的格式
+        question: modifications, // 🔥 修复：直接传递用户的修改建议，不使用命令格式
         askType: "followup",
         config: {} as any,
         context: {
@@ -417,7 +434,7 @@ export default function WorkspacePage() {
           threadId: currentThreadId,
           urlParam: urlParam
         },
-        interrupt_feedback: "edit_plan" // 🔥 这会被question中的[EDIT_PLAN]格式覆盖
+        interrupt_feedback: "edit_plan" // 🔥 让interrupt_feedback独立工作
       });
     };
 
@@ -477,37 +494,25 @@ export default function WorkspacePage() {
       window.location.href = '/workspace';
     };
 
-    // 🔥 修复：使用LangGraph原生字段检查计划消息
-    const hasPlanMessage = currentThreadId ? (() => {
-      const thread = useUnifiedStore.getState().threads.get(currentThreadId);
-      return thread?.messages?.some(msg => 
-        msg.langGraphMetadata?.agent === 'projectmanager' && msg.content
-      ) || false;
-    })() : false;
-    
-    const latestPlan = hasPlanMessage ? getLatestPlan() : null;
-    
-    const showActionButtons = shouldShowActions();
-
     return (
       <div className="flex flex-col h-full p-4">
         <div className="flex-1 overflow-y-auto space-y-4">
-          {/* 🔥 显示计划卡片（如果有计划数据） - 不依赖interrupt状态 */}
-          {latestPlan && (
-            <PlanCard
-              plan={latestPlan}
-              variant="detailed"
-              showActions={showActionButtons}
-              onApprove={handlePlanApprove}
-              onModify={handlePlanModify}
-              onSkipToReport={handlePlanSkipToReport}
-              onReask={handlePlanReask}
-              className="mb-4"
-            />
-          )}
-          
-          {/* 🔥 取消工件流显示 - 只显示PlanCard */}
-          {!latestPlan && (
+          {/* 🔥 显示所有计划历史 - 从最新到最旧 */}
+          {planHistory.length > 0 ? (
+            planHistory.slice().reverse().map((plan, index) => (
+              <PlanCard
+                key={plan.id}
+                plan={plan}
+                variant="detailed"
+                showActions={shouldShowActions(plan.id)}
+                onApprove={handlePlanApprove}
+                onModify={handlePlanModify}
+                onSkipToReport={handlePlanSkipToReport}
+                onReask={handlePlanReask}
+                className="mb-4"
+              />
+            ))
+          ) : (
             <div className="text-center text-gray-400 mt-8">
               <FileText className="mx-auto h-12 w-12 mb-4" />
               <p>研究计划将在这里显示</p>
