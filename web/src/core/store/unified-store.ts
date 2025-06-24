@@ -478,6 +478,11 @@ export const useUnifiedStore = create<UnifiedStore>()(
         const latestPlanMessage = projectmanagerMessages[projectmanagerMessages.length - 1];
         if (!latestPlanMessage?.content) return null;
         
+        // 🔥 新增：跳过正在流式传输的消息，避免解析不完整的JSON
+        if (latestPlanMessage.isStreaming) {
+          return null; // 流式消息还未完成，跳过解析
+        }
+        
         try {
           // 🔥 修复：从流式内容中提取JSON部分
           let jsonContent = latestPlanMessage.content.trim();
@@ -509,7 +514,8 @@ export const useUnifiedStore = create<UnifiedStore>()(
           }
           
           if (jsonEnd === -1) {
-            console.warn('❌ No complete JSON object found in message.content');
+            // 🔥 修复：对于非流式消息，如果JSON不完整，只输出调试信息而不是警告
+            console.debug('❌ No complete JSON object found in message.content (message completed but JSON incomplete)');
             return null;
           }
           
