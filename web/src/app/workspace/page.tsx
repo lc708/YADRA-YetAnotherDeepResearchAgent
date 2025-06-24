@@ -1,35 +1,50 @@
 "use client";
 
-import { MessageSquare, FileText, Activity, Headphones, Minimize2, Maximize2 } from "lucide-react";
-import { useState, useCallback, useEffect, useMemo, useRef } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { motion } from "framer-motion";
 import { cn } from "~/lib/utils";
+import { useShallow } from "zustand/react/shallow";
+import { toast } from "sonner";
 
 import { Button } from "~/components/ui/button";
-import { ScrollContainer, type ScrollContainerRef } from "~/components/conversation/scroll-container";
-import { HeroInput } from "~/components/yadra/hero-input";
+import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { Input } from "~/components/ui/input";
+import { Badge } from "~/components/ui/badge";
+import { Textarea } from "~/components/ui/textarea";
+import {
+  MessageSquare,
+  FileText,
+  Activity,
+  Headphones,
+  Minimize2,
+  Maximize2,
+  Search,
+  Send,
+  Plus,
+  Mic,
+  MicOff,
+  Loader2,
+} from "lucide-react";
+
 import { 
   useUnifiedStore, 
+  useThreadMessages,
   sendAskMessage,
   useCurrentPlan,
   useCurrentInterrupt,
-} from "~/core/store/unified-store";
-import { type StatusType } from "~/components/conversation/status-badge";
-import type { MessageRole } from "~/core/messages/types";
-import type { ResearchRequest } from "~/core/store/unified-store";
-import { useSettingsStore } from "~/core/store/settings-store";
-import { Input } from "~/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+  useFinalReport
+} from "~/core/store";
+import type { ResearchRequest } from "~/core/store";
+import { PodcastPanel } from "~/app/workspace/components/podcast-panel";
+import { OutputStream } from "~/app/workspace/components/output-stream";
 import { PlanCard } from "~/components/research/plan-card";
 import type { ResearchPlan } from "~/components/research/plan-card";
-import type { PlanStep } from "~/components/research/plan-card";
-import { OutputStream } from "./components/output-stream";
-import { PodcastPanel } from "./components/podcast-panel";
-import { ArtifactFeed } from "~/components/yadra/artifact-feed";
 import { MessageContainer } from "~/components/conversation/message-container";
+import { ScrollContainer } from "~/components/conversation/scroll-container";
 import { LoadingAnimation } from "~/components/conversation/loading-animation";
-import { toast } from "sonner";
+import { MarkdownRenderer } from "~/components/conversation/markdown-renderer";
+import { HeroInput } from "~/components/yadra/hero-input";
+import ReportViewer from "~/components/editor/report-viewer";
 
 // 消息类型定义
 interface Message {
@@ -46,6 +61,9 @@ enum LayoutMode {
   MULTI_PANEL = 'multi_panel'
 }
 
+// 🔥 稳定的空数组引用，避免useShallow无限循环
+const EMPTY_MESSAGES: any[] = [];
+
 export default function WorkspacePage() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -53,24 +71,27 @@ export default function WorkspacePage() {
   // 🔥 获取URL参数
   const urlParam = searchParams.get('id');
   
-  // 🔥 从unified-store获取当前线程数据
-  const currentThreadId = useUnifiedStore((state) => {
-    if (urlParam) {
-      return state.getThreadIdByUrlParam(urlParam);
-    }
-    return state.currentThreadId;
-  });
+  // 🔥 修复：使用稳定的空数组引用，避免无限循环
   
-  const currentThread = useUnifiedStore((state) => {
-    if (currentThreadId) {
-      return state.getThread(currentThreadId);
-    }
-    return null;
-  });
-  
-  // 🔥 使用unified-store的消息而不是本地state
-  const storeMessages = currentThread?.messages || [];
-  const hasMessages = storeMessages.length > 0;
+  const { currentThreadId, hasMessages } = useUnifiedStore(
+    useShallow((state) => {
+      let threadId = null;
+      
+      if (urlParam) {
+        threadId = state.getThreadIdByUrlParam(urlParam);
+      } else {
+        threadId = state.currentThreadId;
+      }
+      
+      const thread = threadId ? state.getThread(threadId) : null;
+      const messages = thread?.messages || EMPTY_MESSAGES;
+      
+      return {
+        currentThreadId: threadId,
+        hasMessages: messages.length > 0
+      };
+    })
+  );
   
   // 面板可见性状态 - 默认只显示conversation panel
   const [conversationVisible, setConversationVisible] = useState(true);
@@ -205,183 +226,73 @@ export default function WorkspacePage() {
     </div>
   );
 
-  // 🚀 对话面板组件 - 使用智能滚动容器
+  // 🚀 对话面板组件 - 自己获取messages，避免父组件重新渲染
   const ConversationPanel = () => {
-    const messages = storeMessages; // 使用已定义的storeMessages
-    const responding = useUnifiedStore((state) => state.responding);
-    const scrollContainerRef = useRef<ScrollContainerRef>(null);
-
-    // 过滤和转换消息，只显示对话相关的内容
-    const conversationMessages = useMemo(() => {
-      if (!messages || messages.length === 0) {
-        return [];
+    // 🔥 ConversationPanel自己获取messages，避免父组件过度订阅
+    const storeMessages = useThreadMessages(currentThreadId || undefined);
+    
+    // 🔥 转换store消息格式为MessageContainer期望的格式
+    const messages = storeMessages.map((msg): import("~/components/conversation/message-container").Message => ({
+      id: msg.id,
+      role: msg.role as "user" | "assistant" | "system",
+      content: msg.content,
+      timestamp: msg.originalInput?.timestamp 
+        ? new Date(msg.originalInput.timestamp) 
+        : msg.langGraphMetadata?.timestamp 
+          ? new Date(msg.langGraphMetadata.timestamp)
+          : new Date(),
+      status: msg.isStreaming ? "pending" : "completed",
+      isStreaming: msg.isStreaming,
+      metadata: {
+        model: msg.agent,
+        reasoning: msg.reasoningContent,
+        artifacts: msg.resources?.map(r => r.title) || []
       }
-
-      return messages
-        .filter((msg: any) => {
-          // 只显示用户消息和主要的AI回复，过滤掉技术性的输出流内容
-          if (msg.role === 'user') return true;
-          if (msg.role === 'assistant' && msg.langGraphMetadata?.agent === 'generalmanager') return true;
-          if (msg.role === 'assistant' && msg.langGraphMetadata?.agent === 'reporter') return true;
-          return false;
-        })
-        .map((msg: any) => ({
-          id: msg.id,
-          role: msg.role as "user" | "assistant" | "system",
-          content: msg.content,
-          timestamp: new Date(msg.originalInput?.timestamp || Date.now()),
-          status: msg.isStreaming ? "pending" as const : "completed" as const,
-          isStreaming: msg.isStreaming,
-          metadata: {
-            model: msg.agent,
-            tokens: undefined,
-            reasoning: msg.reasoningContent,
-            artifacts: msg.resources?.map((r: any) => r.title) || []
-          }
-        }));
-    }, [messages]);
-
+    }));
+    
     return (
       <div className="flex flex-col h-full">
-        {/* 消息列表 */}
-        <ScrollContainer ref={scrollContainerRef} className="flex-1 px-2" autoScrollToBottom={true}>
-          <div className="space-y-4 py-4 pb-24">
-            {conversationMessages.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-center py-12">
-                <MessageSquare className="h-12 w-12 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-medium text-muted-foreground mb-2">
-                  开始对话
-                </h3>
-                <p className="text-sm text-muted-foreground max-w-sm">
-                  在下方输入您的研究问题，AI助手将为您提供深度分析和见解。
-                </p>
-              </div>
-            ) : (
-              conversationMessages.map((message: any, index: number) => (
-                <motion.div
-                  key={message.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3, delay: index * 0.1 }}
-                >
+        <div className="flex-1 overflow-hidden">
+          <ScrollContainer className="h-full px-4 py-4">
+            <div className="space-y-4 max-w-4xl mx-auto">
+              {messages.length === 0 ? (
+                <div className="flex items-center justify-center h-64">
+                  <div className="text-center text-gray-400">
+                    <MessageSquare className="mx-auto h-12 w-12 mb-4" />
+                    <p>开始新的研究对话</p>
+                  </div>
+                </div>
+              ) : (
+                messages.map((message) => (
                   <MessageContainer
+                    key={message.id}
                     message={message}
-                    showAvatar={true}
-                    showTimestamp={true}
-                    showActions={true}
-                    showStatus={true}
-                    isLatest={index === conversationMessages.length - 1}
-                    onCopy={(content) => {
-                      navigator.clipboard.writeText(content);
-                      toast.success("已复制到剪贴板");
-                    }}
-                    className="border-0 shadow-none bg-transparent"
+                    className="animate-in fade-in-0 slide-in-from-bottom-2 duration-300"
                   />
-                </motion.div>
-              ))
-            )}
-            
-            {/* 加载指示器 */}
-            {responding && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="flex items-center justify-center py-4"
-              >
-                <LoadingAnimation 
-                  type="typing" 
-                  size="md" 
-                  text="AI正在思考中..."
-                />
-              </motion.div>
-            )}
-          </div>
-        </ScrollContainer>
+                ))
+              )}
+            </div>
+          </ScrollContainer>
+        </div>
       </div>
     );
   };
 
   // 🚀 工件面板组件
   const ArtifactsPanel = () => {
-    // 🔥 添加本地状态控制按钮显示
-    const [planActionInProgress, setPlanActionInProgress] = useState<string | null>(null);
-    
-    // 🚀 新增：计划历史状态管理
-    const [planHistory, setPlanHistory] = useState<ResearchPlan[]>([]);
-    const [interruptPlanMapping, setInterruptPlanMapping] = useState<Map<string, string>>(new Map());
-
-    // 🚀 重构：使用Store层的Hook接口替代业务逻辑
+    // 🚀 使用Store层的Hook接口获取计划和报告
     const currentInterrupt = useCurrentInterrupt(currentThreadId || undefined);
     const currentPlan = useCurrentPlan(currentThreadId || undefined);
+    const finalReport = useFinalReport(currentThreadId || undefined); // 🔥 添加最终报告
     
-    // 🔥 监听currentPlan变化，维护计划历史
-    useEffect(() => {
-      if (currentPlan && currentThreadId) {
-        // 检查是否是新计划（通过ID判断）
-        const isNewPlan = !planHistory.some(p => p.id === `plan-${currentPlan.id.split('-')[1]}`);
-        
-        if (isNewPlan) {
-          // 🔥 转换BusinessPlan到ResearchPlan格式（为了兼容现有组件）
-          const newPlan: ResearchPlan = {
-            id: `plan-${currentPlan.id.split('-')[1]}`, // 使用消息ID作为唯一标识
-            title: currentPlan.title,
-            objective: currentPlan.objective,
-            steps: currentPlan.steps.map(step => ({
-              id: step.id,
-              title: step.title,
-              description: step.description,
-              priority: step.priority,
-              status: step.status,
-              estimatedTime: step.estimatedTime
-            })),
-            status: "pending" as StatusType, // 新计划默认为pending状态
-            estimatedDuration: currentPlan.estimatedDuration,
-            complexity: currentPlan.complexity,
-            confidence: currentPlan.confidence,
-            createdAt: currentPlan.createdAt,
-            updatedAt: currentPlan.updatedAt,
-            version: planHistory.length + 1, // 🔥 简单的版本计算：基于历史长度
-            metadata: currentPlan.metadata
-          };
-          
-          // 添加到历史记录
-          setPlanHistory(prev => [...prev, newPlan]);
-          
-          // 🔥 关键：如果当前有interrupt，建立映射关系
-          if (currentInterrupt) {
-            setInterruptPlanMapping(prev => {
-              const newMapping = new Map(prev);
-              newMapping.set(currentInterrupt.messageId, newPlan.id);
-              return newMapping;
-            });
-          }
-        }
-      }
-    }, [currentPlan, currentThreadId, currentInterrupt, planHistory]);
-    
-    // 🔥 监听plan变化，当有新plan生成时重新显示按钮
-    useEffect(() => {
-      // 如果当前是modify状态，且有新的interrupt（说明重新生成了plan），则重新显示按钮
-      if (planActionInProgress === 'modify' && currentInterrupt !== null) {
-        setPlanActionInProgress(null);
-      }
-    }, [currentInterrupt, planActionInProgress]);
-    
-    // 🚀 重构：将业务逻辑移到Store层，组件只负责UI逻辑
-    const shouldShowActions = (planId: string): boolean => {
-      // 🔥 关键：只有当前interrupt关联的plan才显示操作按钮
-      if (!currentInterrupt) return false;
-      
-      const interruptLinkedPlanId = interruptPlanMapping.get(currentInterrupt.messageId);
-      return interruptLinkedPlanId === planId && planActionInProgress === null;
+    // 🚀 简化：直接判断是否显示操作按钮
+    const shouldShowActions = (): boolean => {
+      return currentInterrupt !== null && currentPlan !== null;
     };
 
-    // 处理PlanCard回调函数
+    // 🚀 简化：处理PlanCard回调函数
     const handlePlanApprove = async (planId: string) => {
       if (!currentThreadId || !urlParam) return;
-      
-      // 🔥 立即隐藏按钮
-      setPlanActionInProgress('approve');
       
       // 获取session_id
       const sessionState = useUnifiedStore.getState().sessionState;
@@ -389,7 +300,6 @@ export default function WorkspacePage() {
       
       if (!sessionId) {
         console.error('❌ [handlePlanApprove] Session ID not found for followup request');
-        setPlanActionInProgress(null); // 🔥 出错时恢复按钮
         return;
       }
       
@@ -405,8 +315,6 @@ export default function WorkspacePage() {
         },
         interrupt_feedback: "accepted" // ✅ 格式正确，后端会自然继续执行
       });
-      
-      // 🔥 不需要清除planActionInProgress，因为用户操作已完成，按钮应该保持隐藏
     };
 
     const handlePlanModify = async (planId: string, modifications: string) => {
@@ -420,9 +328,6 @@ export default function WorkspacePage() {
         console.error('❌ [handlePlanModify] Session ID not found for followup request');
         return;
       }
-      
-      // 🔥 用户提交修改建议后，立即隐藏按钮
-      setPlanActionInProgress('modify');
       
       // 🔥 修复：统一使用interrupt_feedback，移除question中的命令格式冲突
       await sendAskMessage({
@@ -441,16 +346,12 @@ export default function WorkspacePage() {
     const handlePlanSkipToReport = async (planId: string) => {
       if (!currentThreadId || !urlParam) return;
       
-      // 🔥 立即隐藏按钮
-      setPlanActionInProgress('skip_to_report');
-      
       // 获取session_id
       const sessionState = useUnifiedStore.getState().sessionState;
       const sessionId = sessionState?.sessionMetadata?.session_id;
       
       if (!sessionId) {
         console.error('❌ [handlePlanSkipToReport] Session ID not found for followup request');
-        setPlanActionInProgress(null); // 🔥 出错时恢复按钮
         return;
       }
       
@@ -470,9 +371,6 @@ export default function WorkspacePage() {
 
     const handlePlanReask = (planId: string) => {
       if (!currentThreadId) return;
-      
-      // 🔥 立即隐藏按钮
-      setPlanActionInProgress('reask');
       
       // 🔥 重新提问是纯前端操作，立即清除状态
       const store = useUnifiedStore.getState();
@@ -497,25 +395,74 @@ export default function WorkspacePage() {
     return (
       <div className="flex flex-col h-full p-4">
         <div className="flex-1 overflow-y-auto space-y-4">
-          {/* 🔥 显示所有计划历史 - 从最新到最旧 */}
-          {planHistory.length > 0 ? (
-            planHistory.slice().reverse().map((plan, index) => (
-              <PlanCard
-                key={plan.id}
-                plan={plan}
-                variant="detailed"
-                showActions={shouldShowActions(plan.id)}
-                onApprove={handlePlanApprove}
-                onModify={handlePlanModify}
-                onSkipToReport={handlePlanSkipToReport}
-                onReask={handlePlanReask}
-                className="mb-4"
-              />
-            ))
-          ) : (
-            <div className="text-center text-gray-400 mt-8">
-              <FileText className="mx-auto h-12 w-12 mb-4" />
-              <p>研究计划将在这里显示</p>
+          {/* 🔥 显示计划（如果存在） */}
+          {currentPlan && (
+            (() => {
+              // 转换BusinessPlan到ResearchPlan格式（为了兼容PlanCard组件）
+              const displayPlan: ResearchPlan = {
+                id: currentPlan.id,
+                title: currentPlan.title,
+                objective: currentPlan.objective,
+                steps: currentPlan.steps.map(step => ({
+                  id: step.id,
+                  title: step.title,
+                  description: step.description,
+                  priority: step.priority,
+                  status: step.status,
+                  estimatedTime: step.estimatedTime
+                })),
+                status: "pending",
+                estimatedDuration: currentPlan.estimatedDuration,
+                complexity: currentPlan.complexity,
+                confidence: currentPlan.confidence,
+                createdAt: currentPlan.createdAt,
+                updatedAt: currentPlan.updatedAt,
+                version: 1, // 简化版本号
+                metadata: currentPlan.metadata
+              };
+
+              return (
+                <PlanCard
+                  key={displayPlan.id}
+                  plan={displayPlan}
+                  variant="detailed"
+                  showActions={shouldShowActions()}
+                  onApprove={handlePlanApprove}
+                  onModify={handlePlanModify}
+                  onSkipToReport={handlePlanSkipToReport}
+                  onReask={handlePlanReask}
+                  className="mb-4"
+                />
+              );
+            })()
+          )}
+
+          {/* 🔥 显示最终报告（如果存在） */}
+          {finalReport && (
+            <Card className="mb-4">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  最终研究报告
+                </CardTitle>
+              </CardHeader>
+                              <CardContent>
+                 <ReportViewer 
+                   content={finalReport.content} 
+                   title="研究报告"
+                   readonly={false}
+                 />
+                </CardContent>
+            </Card>
+          )}
+
+          {/* 🔥 空状态显示 */}
+          {!currentPlan && !finalReport && (
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-center text-gray-400">
+                <FileText className="mx-auto h-12 w-12 mb-4" />
+                <p>研究计划和报告将在这里显示</p>
+              </div>
             </div>
           )}
         </div>

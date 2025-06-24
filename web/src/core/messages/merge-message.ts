@@ -5,12 +5,12 @@ import type {
   LangGraphNativeEvent,
   ToolCall,
 } from "../api";
-import { deepClone } from "../utils/deep-clone";
+import { cloneMessage } from "../utils/deep-clone";
 
 import type { Message, ToolCallChunk } from "./types";
 
 export function mergeMessage(message: Message, event: ChatEvent): Message {
-  const clonedMessage = deepClone(message);
+  const clonedMessage = cloneMessage(message);
   
   // 🔥 统一事件处理：支持"type"和"event"两种格式
   const eventType = event.event;

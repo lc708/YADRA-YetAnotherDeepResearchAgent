@@ -415,7 +415,12 @@ def reporter_node(state: State, config: RunnableConfig):
     response_content = response.content
     logger.info(f"reporter response: {response_content}")
 
-    return {"final_report": response_content}
+    return Command(
+        update={
+            "messages": [AIMessage(content=response_content, name="reporter")],
+            "final_report": response_content,
+        }
+    )
 
 
 def reask_node(state: State) -> Command[Literal["__end__"]]:

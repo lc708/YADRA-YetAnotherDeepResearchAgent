@@ -517,11 +517,27 @@ class ResearchStreamService:
             # 获取LangGraph实例
             graph = await self._get_graph()
 
+            # 🔥 修复：添加interrupt_feedback处理逻辑（完全对齐app.py）
+            # 获取interrupt_feedback
+            interrupt_feedback = None
+            if request.context and "interrupt_feedback" in request.context:
+                interrupt_feedback = request.context["interrupt_feedback"]
+            
             # 构造continue状态
             initial_state = {
                 "messages": [{"role": "user", "content": request.message}],
                 "research_topic": request.message,
+                "auto_accepted_plan": False,  # continue场景默认需要用户确认
             }
+            
+            # 🔥 关键修复：如果有interrupt_feedback，使用Command(resume=...)而不是普通状态
+            if interrupt_feedback:
+                resume_msg = f"[{interrupt_feedback}]"
+                if request.message:
+                    resume_msg += f" {request.message}"
+                from langgraph.types import Command
+                initial_state = Command(resume=resume_msg)
+                logger.info(f"🔄 Resume with interrupt_feedback: {interrupt_feedback}, resume_msg: {resume_msg}")
 
             # 处理LangGraph流式执行
             async for event in self._process_langgraph_stream(

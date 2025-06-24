@@ -44,8 +44,7 @@ interface OutputStreamProps {
   className?: string;
 }
 
-type FilterType = "all" | "user" | "assistant" | "tool";
-type SourceFilter = "all" | "input" | "button" | "system";
+type FilterType = "all" | "user" | "assistant";
 
 export function OutputStream({ className }: OutputStreamProps) {
   // 🔥 使用新的数据架构 - 从 unified-store 获取数据
@@ -56,9 +55,6 @@ export function OutputStream({ className }: OutputStreamProps) {
   
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<FilterType>("all");
-  const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
-  const [agentFilter, setAgentFilter] = useState<string>("all");
-  const [eventTypeFilter, setEventTypeFilter] = useState<string>("all");
   const [autoScroll, setAutoScroll] = useState(true);
   
   // 🔥 使用智能滚动容器
@@ -112,91 +108,29 @@ export function OutputStream({ className }: OutputStreamProps) {
     });
   }, [messages]);
 
-  const availableOptions = useMemo(() => {
-    const roles = new Set<string>();
-    const agents = new Set<string>();
-    const sources = new Set<string>();
-    const eventTypes = new Set<string>();
-    
-    allMessages.forEach(msg => {
-      roles.add(msg.role);
-      if (msg.agent) agents.add(msg.agent);
-      if (msg.source) sources.add(msg.source);
-      
-      // 基于现有字段推断事件类型
-      if (msg.toolCalls && msg.toolCalls.length > 0) {
-        eventTypes.add('tool_calls');
-      }
-      if (msg.finishReason === 'interrupt') {
-        eventTypes.add('interrupt');
-      }
-      if (msg.finishReason === 'reask') {
-        eventTypes.add('reask');
-      }
-      if (msg.isStreaming) {
-        eventTypes.add('streaming');
-      }
-      if (msg.reasoningContent) {
-        eventTypes.add('reasoning');
-      }
-      if (msg.resources && msg.resources.length > 0) {
-        eventTypes.add('resource');
-      }
-      
-      // 默认消息类型
-      eventTypes.add('message');
-    });
-    
-    return {
-      roles: Array.from(roles),
-      agents: Array.from(agents),
-      sources: Array.from(sources),
-      eventTypes: Array.from(eventTypes),
-    };
-  }, [allMessages]);
+  // 🔥 移除复杂的availableOptions计算，简化代码
 
+  // 🔥 修复：简化过滤逻辑，默认显示所有消息，只保留基本搜索
   const filteredMessages = useMemo(() => {
-    return allMessages.filter(message => {
-      if (searchQuery && !message.content.toLowerCase().includes(searchQuery.toLowerCase())) {
-        return false;
-      }
-      
-      if (roleFilter !== "all" && message.role !== roleFilter) {
-        return false;
-      }
-      
-      if (sourceFilter !== "all" && message.source !== sourceFilter) {
-        return false;
-      }
-      
-      if (agentFilter !== "all" && message.langGraphMetadata?.agent !== agentFilter) {
-        return false;
-      }
-      
-      if (eventTypeFilter !== "all") {
-        switch (eventTypeFilter) {
-          case 'tool_calls':
-            return message.toolCalls && message.toolCalls.length > 0;
-          case 'interrupt':
-            return message.finishReason === 'interrupt';
-          case 'reask':
-            return message.finishReason === 'reask';
-          case 'streaming':
-            return message.isStreaming;
-          case 'reasoning':
-            return !!message.reasoningContent;
-          case 'resource':
-            return message.resources && message.resources.length > 0;
-          case 'message':
-            return true; // 所有消息都是message类型
-          default:
-            return true;
-        }
-      }
-      
-      return true;
-    });
-  }, [allMessages, searchQuery, roleFilter, sourceFilter, agentFilter, eventTypeFilter]);
+    // 🚀 按照用户要求：不要做那么多筛选，直接显示所有store中的消息
+    let filtered = allMessages;
+    
+    // 只保留基本的文本搜索功能
+    if (searchQuery) {
+      filtered = filtered.filter(message => 
+        message.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (message.reasoningContent && message.reasoningContent.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (message.langGraphMetadata?.agent && message.langGraphMetadata.agent.toLowerCase().includes(searchQuery.toLowerCase()))
+      );
+    }
+    
+    // 🔥 可选的角色筛选（但默认显示全部）
+    if (roleFilter !== "all") {
+      filtered = filtered.filter(message => message.role === roleFilter);
+    }
+    
+    return filtered;
+  }, [allMessages, searchQuery, roleFilter]);
 
   const handleExport = useCallback(() => {
     try {
@@ -501,70 +435,21 @@ export function OutputStream({ className }: OutputStreamProps) {
           </Button>
         </div>
         
-        <div className="flex items-center gap-2 flex-wrap">
+        {/* 🔥 简化过滤器：只保留基本的角色筛选和统计信息 */}
+        <div className="flex items-center justify-between">
           <Select value={roleFilter} onValueChange={(value: FilterType) => setRoleFilter(value)}>
-            <SelectTrigger className="w-32">
-              <SelectValue placeholder="角色" />
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="角色筛选" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">所有角色</SelectItem>
-              <SelectItem value="user">用户</SelectItem>
-              <SelectItem value="assistant">助手</SelectItem>
-              <SelectItem value="tool">工具</SelectItem>
+              <SelectItem value="all">显示全部消息</SelectItem>
+              <SelectItem value="user">只显示用户消息</SelectItem>
+              <SelectItem value="assistant">只显示AI消息</SelectItem>
             </SelectContent>
           </Select>
-          
-          <Select value={sourceFilter} onValueChange={(value: SourceFilter) => setSourceFilter(value)}>
-            <SelectTrigger className="w-32">
-              <SelectValue placeholder="来源" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">所有来源</SelectItem>
-              <SelectItem value="input">输入框</SelectItem>
-              <SelectItem value="button">按钮</SelectItem>
-              <SelectItem value="system">系统</SelectItem>
-            </SelectContent>
-          </Select>
-          
-          {availableOptions.agents.length > 0 && (
-            <Select value={agentFilter} onValueChange={setAgentFilter}>
-              <SelectTrigger className="w-32">
-                <SelectValue placeholder="Agent" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">所有Agent</SelectItem>
-                {availableOptions.agents.map(agent => (
-                  <SelectItem key={agent} value={agent}>{agent}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-          
-          {availableOptions.eventTypes.length > 0 && (
-            <Select value={eventTypeFilter} onValueChange={setEventTypeFilter}>
-              <SelectTrigger className="w-32">
-                <SelectValue placeholder="事件类型" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">所有事件</SelectItem>
-                {availableOptions.eventTypes.map(eventType => (
-                  <SelectItem key={eventType} value={eventType}>
-                    {eventType === 'message' ? '普通消息' : 
-                     eventType === 'tool_calls' ? '工具调用' :
-                     eventType === 'interrupt' ? '中断事件' :
-                     eventType === 'reask' ? '重问事件' :
-                     eventType === 'streaming' ? '流式消息' :
-                     eventType === 'reasoning' ? '推理过程' :
-                     eventType === 'resource' ? '资源加载' :
-                     eventType}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
           
           <div className="text-sm text-muted-foreground">
-            共 {filteredMessages.length} 条输出 / {allMessages.length} 总计
+            显示 {filteredMessages.length} / {allMessages.length} 条消息
           </div>
         </div>
       </div>

@@ -16,6 +16,7 @@ import { subscribeWithSelector } from "zustand/middleware";
 import { shallow } from "zustand/shallow";
 import { useShallow } from "zustand/react/shallow";
 import type { Message, Resource } from "~/core/messages";
+import type { ChatEvent } from "~/core/api";
 import type { Artifact } from "~/lib/supa";
 import { nanoid } from "nanoid";
 import React, { useCallback } from "react";
@@ -174,6 +175,12 @@ type UnifiedStore = {
   updateMessage: (threadId: string, messageId: string, update: Partial<Message>) => void;
   
   // 🔥 废弃：mergeMessageChunk已删除 - 使用LangGraph原生事件和mergeMessage替代
+  
+  // 🚀 新增：三段式消息处理函数 - 基于DEERFLOW参考案例
+  appendMessage: (threadId: string, message: Message) => void;
+  existsMessage: (threadId: string, messageId: string) => boolean;
+  getMessage: (threadId: string, messageId: string) => Message | undefined;
+  findMessageByToolCallId: (threadId: string, toolCallId: string) => Message | undefined;
   
   // 研究操作
   setOngoingResearch: (threadId: string, researchId: string | null) => void;
@@ -338,22 +345,42 @@ export const useUnifiedStore = create<UnifiedStore>()(
         set((state) => {
           const thread = state.threads.get(threadId);
           if (thread) {
-            thread.messages.push(message);
+            // 🔥 使用不可变更新：创建新的消息数组和thread对象
+            const newMessages = [...thread.messages, message];
+            const newThread = { ...thread, messages: newMessages };
+            
+            // 🔥 创建新的threads Map
+            const newThreads = new Map(state.threads);
+            newThreads.set(threadId, newThread);
+            
+            return { ...state, threads: newThreads };
           }
         });
       },
       
-             updateMessage: (threadId: string, messageId: string, update: Partial<Message>) => {
-         set((state) => {
-           const thread = state.threads.get(threadId);
-           if (thread) {
-             const messageIndex = thread.messages.findIndex(m => m.id === messageId);
-             if (messageIndex !== -1 && thread.messages[messageIndex]) {
-               Object.assign(thread.messages[messageIndex], update);
-             }
-           }
-         });
-       },
+                   updateMessage: (threadId: string, messageId: string, update: Partial<Message>) => {
+        set((state) => {
+          const thread = state.threads.get(threadId);
+          if (thread) {
+            const messageIndex = thread.messages.findIndex(m => m.id === messageId);
+            if (messageIndex !== -1 && thread.messages[messageIndex]) {
+              // 🔥 使用不可变更新：创建新的消息对象和新的消息数组
+              const updatedMessage = { ...thread.messages[messageIndex], ...update };
+              const newMessages = [...thread.messages];
+              newMessages[messageIndex] = updatedMessage;
+              
+              // 🔥 创建新的thread对象
+              const newThread = { ...thread, messages: newMessages };
+              
+              // 🔥 创建新的threads Map
+              const newThreads = new Map(state.threads);
+              newThreads.set(threadId, newThread);
+              
+              return { ...state, threads: newThreads };
+            }
+          }
+        });
+      },
       
              // 🔥 废弃：mergeMessageChunk方法已删除
       
@@ -362,7 +389,12 @@ export const useUnifiedStore = create<UnifiedStore>()(
         set((state) => {
           const thread = state.threads.get(threadId);
           if (thread) {
-            thread.metadata.ongoingResearchId = researchId;
+            // 🔥 使用不可变更新：保持一致性
+            const newMetadata = { ...thread.metadata, ongoingResearchId: researchId };
+            const newThread = { ...thread, metadata: newMetadata };
+            const newThreads = new Map(state.threads);
+            newThreads.set(threadId, newThread);
+            return { ...state, threads: newThreads };
           }
         });
       },
@@ -371,7 +403,12 @@ export const useUnifiedStore = create<UnifiedStore>()(
         set((state) => {
           const thread = state.threads.get(threadId);
           if (thread) {
-            thread.metadata.openResearchId = researchId;
+            // 🔥 使用不可变更新：保持一致性
+            const newMetadata = { ...thread.metadata, openResearchId: researchId };
+            const newThread = { ...thread, metadata: newMetadata };
+            const newThreads = new Map(state.threads);
+            newThreads.set(threadId, newThread);
+            return { ...state, threads: newThreads };
           }
         });
       },
@@ -381,9 +418,26 @@ export const useUnifiedStore = create<UnifiedStore>()(
           const thread = state.threads.get(threadId);
           if (!thread) return;
           
-          thread.metadata.researchIds.push(researchId);
-          thread.metadata.planMessageIds.set(researchId, planMessageId);
-          thread.metadata.ongoingResearchId = researchId;
+          // 🔥 使用不可变更新：创建新的数组和Map
+          const newResearchIds = [...thread.metadata.researchIds, researchId];
+          const newPlanMessageIds = new Map(thread.metadata.planMessageIds);
+          newPlanMessageIds.set(researchId, planMessageId);
+          
+          // 🔥 创建新的metadata和thread对象
+          const newMetadata = {
+            ...thread.metadata,
+            researchIds: newResearchIds,
+            planMessageIds: newPlanMessageIds,
+            ongoingResearchId: researchId
+          };
+          
+          const newThread = { ...thread, metadata: newMetadata };
+          
+          // 🔥 创建新的threads Map
+          const newThreads = new Map(state.threads);
+          newThreads.set(threadId, newThread);
+          
+          return { ...state, threads: newThreads };
         });
       },
       
@@ -391,7 +445,23 @@ export const useUnifiedStore = create<UnifiedStore>()(
         set((state) => {
           const thread = state.threads.get(threadId);
           if (thread) {
-            thread.metadata.reportMessageIds.set(researchId, reportMessageId);
+            // 🔥 使用不可变更新：创建新的Map
+            const newReportMessageIds = new Map(thread.metadata.reportMessageIds);
+            newReportMessageIds.set(researchId, reportMessageId);
+            
+            // 🔥 创建新的metadata和thread对象
+            const newMetadata = {
+              ...thread.metadata,
+              reportMessageIds: newReportMessageIds
+            };
+            
+            const newThread = { ...thread, metadata: newMetadata };
+            
+            // 🔥 创建新的threads Map
+            const newThreads = new Map(state.threads);
+            newThreads.set(threadId, newThread);
+            
+            return { ...state, threads: newThreads };
           }
         });
       },
@@ -407,7 +477,12 @@ export const useUnifiedStore = create<UnifiedStore>()(
         set((state) => {
           const thread = state.threads.get(threadId);
           if (thread) {
-            thread.ui.lastInterruptMessageId = messageId;
+            // 🔥 使用不可变更新：保持一致性
+            const newUi = { ...thread.ui, lastInterruptMessageId: messageId };
+            const newThread = { ...thread, ui: newUi };
+            const newThreads = new Map(state.threads);
+            newThreads.set(threadId, newThread);
+            return { ...state, threads: newThreads };
           }
         });
       },
@@ -416,7 +491,12 @@ export const useUnifiedStore = create<UnifiedStore>()(
         set((state) => {
           const thread = state.threads.get(threadId);
           if (thread) {
-            thread.ui.waitingForFeedbackMessageId = messageId;
+            // 🔥 使用不可变更新：保持一致性
+            const newUi = { ...thread.ui, waitingForFeedbackMessageId: messageId };
+            const newThread = { ...thread, ui: newUi };
+            const newThreads = new Map(state.threads);
+            newThreads.set(threadId, newThread);
+            return { ...state, threads: newThreads };
           }
         });
       },
@@ -426,7 +506,12 @@ export const useUnifiedStore = create<UnifiedStore>()(
         set((state) => {
           const thread = state.threads.get(threadId);
           if (thread) {
-            thread.ui.currentInterrupt = interruptData;
+            // 🔥 使用不可变更新：保持一致性
+            const newUi = { ...thread.ui, currentInterrupt: interruptData };
+            const newThread = { ...thread, ui: newUi };
+            const newThreads = new Map(state.threads);
+            newThreads.set(threadId, newThread);
+            return { ...state, threads: newThreads };
           }
         });
       },
@@ -439,7 +524,12 @@ export const useUnifiedStore = create<UnifiedStore>()(
         set((state) => {
           const thread = state.threads.get(threadId);
           if (thread) {
-            thread.ui.currentInterrupt = null;
+            // 🔥 使用不可变更新：保持一致性
+            const newUi = { ...thread.ui, currentInterrupt: null };
+            const newThread = { ...thread, ui: newUi };
+            const newThreads = new Map(state.threads);
+            newThreads.set(threadId, newThread);
+            return { ...state, threads: newThreads };
           }
         });
       },
@@ -447,7 +537,11 @@ export const useUnifiedStore = create<UnifiedStore>()(
       // 工作区操作
       setWorkspaceState: (update: Partial<UnifiedStore['workspace']>) => {
         set((state) => {
-          Object.assign(state.workspace, update);
+          // 🔥 使用不可变更新：创建新的workspace对象
+          return {
+            ...state,
+            workspace: { ...state.workspace, ...update }
+          };
         });
       },
       
@@ -666,6 +760,35 @@ export const useUnifiedStore = create<UnifiedStore>()(
           ['researcher', 'coder', 'projectmanager', 'reporter'].includes(m.langGraphMetadata.agent)
         );
       },
+      
+      // 🚀 新增：三段式消息处理函数 - 基于DEERFLOW参考案例
+      appendMessage: (threadId: string, message: Message) => {
+        set((state) => {
+          const thread = state.threads.get(threadId);
+          if (thread) {
+            const newMessages = [...thread.messages, message];
+            const newThread = { ...thread, messages: newMessages };
+            const newThreads = new Map(state.threads);
+            newThreads.set(threadId, newThread);
+            return { ...state, threads: newThreads };
+          }
+        });
+      },
+      
+      existsMessage: (threadId: string, messageId: string) => {
+        const thread = get().threads.get(threadId);
+        return thread?.messages.some(m => m.id === messageId) || false;
+      },
+      
+      getMessage: (threadId: string, messageId: string) => {
+        const thread = get().threads.get(threadId);
+        return thread?.messages.find(m => m.id === messageId);
+      },
+      
+      findMessageByToolCallId: (threadId: string, toolCallId: string) => {
+        const thread = get().threads.get(threadId);
+        return thread?.messages.find(m => m.toolCalls?.some(tc => tc.id === toolCallId) || false);
+      },
     }))
   )
 );
@@ -680,31 +803,30 @@ export const useCurrentThread = () => {
 };
 
 export const useThreadMessages = (threadIdOrUrlParam?: string) => {
-  const currentThreadId = useUnifiedStore((state) => state.currentThreadId);
-  const threads = useUnifiedStore((state) => state.threads);
-  const urlParamToThreadId = useUnifiedStore((state) => state.urlParamToThreadId);
-  
-  // 解析实际的thread_id：可能是URL参数，需要映射
-  const actualThreadId = React.useMemo(() => {
-    if (threadIdOrUrlParam) {
-      // 首先尝试作为thread_id直接使用
-      if (threads.has(threadIdOrUrlParam)) {
-        return threadIdOrUrlParam;
-      }
-      // 然后尝试作为URL参数映射
-      const mappedThreadId = urlParamToThreadId.get(threadIdOrUrlParam);
-      if (mappedThreadId && threads.has(mappedThreadId)) {
-        return mappedThreadId;
-      }
-    }
-    return currentThreadId;
-  }, [threadIdOrUrlParam, currentThreadId, threads, urlParamToThreadId]);
-  
-  return React.useMemo(() => {
-    if (!actualThreadId) return [];
-    const thread = threads.get(actualThreadId);
-    return thread?.messages || [];
-  }, [actualThreadId, threads]);
+  // 🔥 优化：使用选择性订阅，只订阅特定thread的消息
+  return useUnifiedStore(
+    useShallow((state) => {
+      // 解析实际的thread_id
+      let actualThreadId = threadIdOrUrlParam;
+      
+      if (threadIdOrUrlParam) {
+        // 首先尝试作为thread_id直接使用
+        if (!state.threads.has(threadIdOrUrlParam)) {
+          // 然后尝试作为URL参数映射
+          const mappedThreadId = state.urlParamToThreadId.get(threadIdOrUrlParam);
+          if (mappedThreadId && state.threads.has(mappedThreadId)) {
+            actualThreadId = mappedThreadId;
+          }
+        }
+             } else {
+         actualThreadId = state.currentThreadId || undefined;
+       }
+      
+      if (!actualThreadId) return [];
+      const thread = state.threads.get(actualThreadId);
+      return thread?.messages || [];
+    })
+  );
 };
 
 export const useThreadArtifacts = (threadIdOrUrlParam?: string) => {
@@ -1067,6 +1189,7 @@ export const sendAskMessage = async (
   const { resolveServiceURL } = await import("~/core/api/resolve-service-url");
   const { generateInitialQuestionIDs, getVisitorId } = await import("~/core/utils");
   const { mergeMessage } = await import("~/core/messages");
+
   
   try {
     // 🔥 设置响应状态
@@ -1139,7 +1262,6 @@ export const sendAskMessage = async (
     } | null = null;
     
     let currentThreadId: string | null = null;
-    let assistantMessage: Message | null = null;
     
     // 🔥 处理SSE事件流 - 重构为LangGraph原生事件处理
     for await (const event of sseStream) {
@@ -1207,35 +1329,43 @@ export const sendAskMessage = async (
                  console.log('⚠️ [Navigation Event] No session_id in eventData:', eventData);
                }
                
-               // 创建用户消息（只在initial时创建）
-               if (request.askType === 'initial' && currentThreadId) {
-                 const userMessage: Message = {
-                   id: nanoid(),
-                   content: request.question,
-                   contentChunks: [request.question],
-                   role: "user",
-                   threadId: currentThreadId,
-                   isStreaming: false,
-                 };
-                 state.addMessage(currentThreadId, userMessage);
+               // 🔥 修复：为每次请求创建必要的消息
+               if (currentThreadId) {
+                 // 对于initial请求，创建用户消息
+                 if (request.askType === 'initial') {
+                   const userMessage: Message = {
+                     id: nanoid(),
+                     content: request.question,
+                     contentChunks: [request.question],
+                     role: "user",
+                     threadId: currentThreadId,
+                     isStreaming: false,
+                   };
+                   state.addMessage(currentThreadId, userMessage);
+                 }
+                 
+                 // 🔥 对于followup请求，如果有interrupt_feedback，也创建用户消息记录
+                 if (request.askType === 'followup' && request.interrupt_feedback) {
+                   const feedbackMessage: Message = {
+                     id: nanoid(),
+                     content: `[${request.interrupt_feedback}]${request.question ? ' ' + request.question : ''}`,
+                     contentChunks: [`[${request.interrupt_feedback}]${request.question ? ' ' + request.question : ''}`],
+                     role: "user",
+                     threadId: currentThreadId,
+                     isStreaming: false,
+                     interruptFeedback: request.interrupt_feedback,
+                   };
+                   state.addMessage(currentThreadId, feedbackMessage);
+                 }
                 
-                // 创建助手消息用于接收流式内容
-                assistantMessage = {
-                  id: nanoid(),
-                  content: "",
-                  contentChunks: [],
-                  role: "assistant",
-                  threadId: currentThreadId,
-                  isStreaming: true,
-                  agent: "researcher",
-                };
-                state.addMessage(currentThreadId, assistantMessage);
-              }
-              
-              // 调用导航回调
-              if (config?.onNavigate) {
-                await config.onNavigate(eventData.workspace_url);
-              }
+                 // 🚀 方案A：移除单一助手消息创建 - 改为基于eventData.id的动态消息创建
+                // 不再预先创建助手消息，而是在收到LangGraph事件时动态创建
+               }
+               
+               // 调用导航回调
+               if (config?.onNavigate) {
+                 await config.onNavigate(eventData.workspace_url);
+               }
             }
             break;
             
@@ -1280,7 +1410,7 @@ export const sendAskMessage = async (
             state.setSessionState(newSessionState);
             break;
             
-         // 🚀 LangGraph原生事件处理 - 纯Store层逻辑，不调用业务事件处理器
+                  // 🚀 方案A：基于DEERFLOW的三段式处理逻辑
           case 'message_chunk':
          case 'tool_calls':
          case 'tool_call_chunks':
@@ -1289,20 +1419,46 @@ export const sendAskMessage = async (
          case 'reask':
           case 'complete':
          case 'error':
-           // 🔥 统一使用mergeMessage处理所有LangGraph原生事件
-            if (currentThreadId && assistantMessage) {
-             // 获取当前消息
-             let currentMessage = state.getMessageById(currentThreadId, assistantMessage.id);
+           // 🚀 关键：使用后端提供的eventData.id而不是单一assistantMessage.id
+            if (currentThreadId && eventData.id) {
+             const messageId = eventData.id;
+             let message: Message | undefined;
              
-             if (currentMessage) {
-               // 使用mergeMessage合并事件
-               const mergedMessage = mergeMessage(currentMessage, {
+             // 步骤1：消息初始化判断 - 基于DEERFLOW参考案例
+             if (event.event === "tool_call_result") {
+               // 工具调用结果需要查找对应的工具调用消息
+               message = state.findMessageByToolCallId(currentThreadId, eventData.tool_call_id);
+             } else if (!state.existsMessage(currentThreadId, messageId)) {
+               // 步骤2：创建新消息容器（appendMessage的职责）
+               message = {
+                 id: messageId,
+                 threadId: currentThreadId,
+                 agent: eventData.agent,  // 🚀 关键：使用动态agent字段
+                 role: eventData.role || "assistant",
+                 content: "",
+                 contentChunks: [],
+                 isStreaming: true,
+                 langGraphMetadata: {
+                   agent: eventData.agent,
+                   timestamp: eventData.timestamp || new Date().toISOString(),
+                   execution_id: eventData.execution_id,
+                 }
+               };
+               state.appendMessage(currentThreadId, message);  // 调用appendMessage
+             }
+             
+             // 获取消息（新创建的或已存在的）
+             message = message || state.getMessage(currentThreadId, messageId);
+             
+             if (message) {
+               // 步骤3：数据合并（mergeMessage的职责）
+               const mergedMessage = mergeMessage(message, {
                  event: event.event,
                  data: eventData
-               });
+               } as ChatEvent);
                
-               // 更新消息
-               state.updateMessage(currentThreadId, assistantMessage.id, mergedMessage);
+               // 步骤4：状态同步（updateMessage的职责）
+               state.updateMessage(currentThreadId, messageId, mergedMessage);
                
                // 🔥 特殊处理：interrupt事件时设置currentInterrupt状态
                if (event.event === 'interrupt') {
@@ -1314,14 +1470,14 @@ export const sendAskMessage = async (
                    executionId: eventData.execution_id || "",
                    nodeName: eventData.node_name || "",
                    timestamp: new Date().toISOString(),
-                   messageId: assistantMessage.id
+                   messageId: messageId  // 使用动态messageId
                  };
                  state.setCurrentInterrupt(currentThreadId, interruptData);
                }
                
                // 特殊处理：complete事件时停止流式状态和清除interrupt
                if (event.event === 'complete') {
-                 state.updateMessage(currentThreadId, assistantMessage.id, {
+                 state.updateMessage(currentThreadId, messageId, {
                    isStreaming: false,
                  });
                  state.clearCurrentInterrupt(currentThreadId);

@@ -207,6 +207,21 @@ export function ArtifactViewer({
                             {children}
                           </h3>
                         ),
+                        // 🔥 修复嵌套链接问题：添加自定义链接处理
+                        a: ({ href, children }) => (
+                          <span 
+                            className="text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              if (href) {
+                                window.open(href, '_blank', 'noopener,noreferrer');
+                              }
+                            }}
+                            title={href}
+                          >
+                            {children}
+                          </span>
+                        ),
                         // 自定义段落样式
                         p: ({children}) => (
                           <p className="mb-4 leading-relaxed text-gray-700 dark:text-gray-300">
