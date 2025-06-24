@@ -28,6 +28,7 @@ import { Badge } from "~/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
 import { Markdown } from "~/components/yadra/markdown";
+import { parseJSON } from "~/core/utils/json";
 import { ScrollContainer, type ScrollContainerRef } from "~/components/conversation/scroll-container";
 import { cn } from "~/lib/utils";
 
@@ -319,6 +320,75 @@ export function OutputStream({ className }: OutputStreamProps) {
     return <Bot className="h-4 w-4" />;
   };
 
+  // 智能内容渲染函数
+  const renderSmartContent = useCallback((content: string) => {
+    // 尝试检测和格式化JSON内容
+    const trimmedContent = content.trim();
+    
+    // 检测是否为JSON格式
+    if ((trimmedContent.startsWith('{') && trimmedContent.endsWith('}')) || 
+        (trimmedContent.startsWith('[') && trimmedContent.endsWith(']')) ||
+        trimmedContent.includes('```json')) {
+      
+      try {
+        // 使用项目现有的parseJSON工具处理JSON
+        const parsedData = parseJSON(trimmedContent, null);
+        
+        if (parsedData !== null) {
+          // 格式化JSON为易读的Markdown格式
+          const formattedJson = '```json\n' + JSON.stringify(parsedData, null, 2) + '\n```';
+          
+          return (
+            <div className="space-y-2">
+              <div className="text-xs text-muted-foreground bg-muted/30 px-2 py-1 rounded">
+                📄 JSON数据（已格式化）
+              </div>
+              <Markdown 
+                animated={true}
+                enableCopy={true}
+                className="prose-sm"
+              >
+                {formattedJson}
+              </Markdown>
+            </div>
+          );
+        }
+      } catch (error) {
+        // JSON解析失败，fallback到普通渲染
+      }
+    }
+    
+    // 检测是否包含结构化数据关键词
+    if (content.includes('"type":') || content.includes('"id":') || content.includes('"status":')) {
+      return (
+        <div className="space-y-2">
+          <div className="text-xs text-muted-foreground bg-blue-50 dark:bg-blue-950/20 px-2 py-1 rounded">
+            🔧 结构化数据
+          </div>
+          <Markdown 
+            animated={true}
+            enableCopy={true}
+            className="prose-sm"
+          >
+            {content}
+          </Markdown>
+        </div>
+      );
+    }
+    
+    // 普通Markdown渲染（启用所有增强功能）
+    return (
+      <Markdown 
+        animated={true}
+        enableCopy={true}
+        checkLinkCredibility={true}
+        className="prose-sm"
+      >
+        {content}
+      </Markdown>
+    );
+  }, []);
+
   const getEventBadge = useCallback((message: Message) => {
     const eventType = getEventType(message);
     const badges = [];
@@ -547,7 +617,7 @@ export function OutputStream({ className }: OutputStreamProps) {
                 </CardHeader>
                 <CardContent>
                   <div className="prose prose-sm max-w-none">
-                    <Markdown>{message.content}</Markdown>
+                    {renderSmartContent(message.content)}
                   </div>
                   
                   {/* 显示消息的额外信息 */}

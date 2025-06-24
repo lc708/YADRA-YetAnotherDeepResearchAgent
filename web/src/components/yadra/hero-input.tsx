@@ -243,9 +243,9 @@ export function HeroInput({
     <div className={cn("mx-auto w-full max-w-4xl", className)}>
       <div className="relative">
         <div className="relative w-full">
-          <div className="relative w-full overflow-hidden rounded-xl border border-border bg-background/90 backdrop-blur-sm shadow-sm transition-all duration-300 focus-within:border-primary focus-within:shadow-md">
+          <div className="relative w-full overflow-hidden rounded-xl border border-border bg-transparent shadow-sm transition-all duration-300 focus-within:border-primary focus-within:shadow-md">
             {/* 文字输入区域 */}
-            <div className="p-4">
+            <div className="p-4 bg-white">
               <textarea
                 value={currentPrompt}
                 onChange={(e) => setCurrentPrompt(e.target.value)}
@@ -273,7 +273,7 @@ export function HeroInput({
             </div>
             
             {/* 控制按钮行 - 始终在底部 */}
-                          <div className="flex items-center justify-between px-4 pb-4 border-t border-border/40">
+                          <div className="flex items-center justify-between px-4 pb-4 border-t border-border/40 bg-white">
               {/* 左侧控制组 */}
               <div className="flex items-center gap-2">
                 {/* 写作风格选择器 */}

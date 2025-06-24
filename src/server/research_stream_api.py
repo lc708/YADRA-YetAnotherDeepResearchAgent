@@ -98,7 +98,7 @@ class ResearchStreamService:
         """基于LangGraph原生AIMessageChunk创建消息事件"""
         data = {
             "thread_id": thread_id,
-            "agent": agent.split(":")[0],  # 提取节点名
+            "agent": agent[0].split(":")[0],  # 提取节点名
             "id": message.id,
             "role": "assistant", 
             "content": message.content,
@@ -126,7 +126,7 @@ class ResearchStreamService:
         """创建工具调用事件"""
         data = {
             "thread_id": thread_id,
-            "agent": agent.split(":")[0],
+            "agent": agent[0].split(":")[0],
             "id": message.id,
             "role": "assistant",
             "content": message.content,
@@ -150,7 +150,7 @@ class ResearchStreamService:
         """创建工具调用片段事件 - 新增：完全对齐app.py"""
         data = {
             "thread_id": thread_id,
-            "agent": agent.split(":")[0],
+            "agent": agent[0].split(":")[0],
             "id": message.id,
             "role": "assistant",
             "content": message.content,
@@ -173,7 +173,7 @@ class ResearchStreamService:
         """创建工具结果事件"""
         data = {
             "thread_id": thread_id,
-            "agent": agent.split(":")[0],
+            "agent": agent[0].split(":")[0],
             "id": message.id,
             "role": "assistant",
             "content": message.content,
@@ -514,8 +514,8 @@ class ResearchStreamService:
             )
             execution_id = execution_record.execution_id
 
-                # 获取LangGraph实例
-                graph = await self._get_graph()
+            # 获取LangGraph实例
+            graph = await self._get_graph()
 
             # 构造continue状态
             initial_state = {
@@ -524,15 +524,15 @@ class ResearchStreamService:
             }
 
             # 处理LangGraph流式执行
-                async for event in self._process_langgraph_stream(
-                    graph,
+            async for event in self._process_langgraph_stream(
+                graph,
                 initial_state,
-                    thread_id,
-                    execution_id,
-                    request,
-                    execution_type="continue",
-                ):
-                    yield event
+                thread_id,
+                execution_id,
+                request,
+                execution_type="continue",
+            ):
+                yield event
 
         except Exception as e:
             logger.error(f"Continue research stream failed: {e}")

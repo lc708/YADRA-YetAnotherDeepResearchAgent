@@ -183,7 +183,7 @@ export default function WorkspacePage() {
   const GlobalInputContainer = () => (
     <div className="absolute bottom-4 left-4 right-4 z-50">
       <div className="max-w-4xl mx-auto">
-        <div className="backdrop-blur-sm bg-black/20 rounded-lg p-4">
+        <div className="backdrop-blur-sm bg-black/0 rounded-lg p-4">
           <HeroInput 
             placeholder={hasMessages ? "继续研究对话..." : "开始您的研究之旅..."}
             className="w-full"
@@ -196,7 +196,7 @@ export default function WorkspacePage() {
 
   // 🚀 面板内输入框组件（用于多面板模式）
   const PanelInputContainer = () => (
-    <div className="absolute bottom-0 left-0 right-0 backdrop-blur-sm bg-black/20 p-4 z-10">
+    <div className="absolute bottom-0 left-0 right-0 backdrop-blur-sm bg-black/0 p-4 z-10">
       <HeroInput 
         placeholder="继续研究对话..."
         className="w-full"
@@ -245,7 +245,7 @@ export default function WorkspacePage() {
       <div className="flex flex-col h-full">
         {/* 消息列表 */}
         <ScrollContainer ref={scrollContainerRef} className="flex-1 px-2" autoScrollToBottom={true}>
-          <div className="space-y-4 py-4">
+          <div className="space-y-4 py-4 pb-24">
             {conversationMessages.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-center py-12">
                 <MessageSquare className="h-12 w-12 text-muted-foreground mb-4" />
