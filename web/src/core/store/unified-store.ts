@@ -479,11 +479,48 @@ export const useUnifiedStore = create<UnifiedStore>()(
         if (!latestPlanMessage?.content) return null;
         
         try {
-          // 🔥 从message.content解析LangGraph原生Plan JSON
-          const backendPlan = JSON.parse(latestPlanMessage.content);
+          // 🔥 修复：从流式内容中提取JSON部分
+          let jsonContent = latestPlanMessage.content.trim();
+          
+          // 🔥 查找JSON的开始和结束位置
+          const jsonStart = jsonContent.indexOf('{');
+          if (jsonStart === -1) {
+            console.warn('❌ No JSON object found in message.content');
+            return null;
+          }
+          
+          // 🔥 从JSON开始位置截取内容
+          jsonContent = jsonContent.substring(jsonStart);
+          
+          // 🔥 查找JSON的结束位置（最后一个完整的}）
+          let braceCount = 0;
+          let jsonEnd = -1;
+          
+          for (let i = 0; i < jsonContent.length; i++) {
+            if (jsonContent[i] === '{') {
+              braceCount++;
+            } else if (jsonContent[i] === '}') {
+              braceCount--;
+              if (braceCount === 0) {
+                jsonEnd = i + 1;
+                break;
+              }
+            }
+          }
+          
+          if (jsonEnd === -1) {
+            console.warn('❌ No complete JSON object found in message.content');
+            return null;
+          }
+          
+          // 🔥 提取完整的JSON字符串
+          const jsonString = jsonContent.substring(0, jsonEnd);
+          
+          // 🔥 解析JSON
+          const backendPlan = JSON.parse(jsonString);
           
           if (!backendPlan || !backendPlan.title || !backendPlan.steps) {
-            console.warn('❌ Invalid plan structure in message.content:', backendPlan);
+            console.warn('❌ Invalid plan structure in extracted JSON:', backendPlan);
             return null;
           }
           
@@ -1266,12 +1303,35 @@ export const sendAskMessage = async (
                // 更新消息
                state.updateMessage(currentThreadId, assistantMessage.id, mergedMessage);
                
-               // 特殊处理：complete事件时停止流式状态
+               // 🔥 特殊处理：interrupt事件时设置currentInterrupt状态
+               if (event.event === 'interrupt') {
+                 const interruptData = {
+                   interruptId: eventData.id || nanoid(),
+                   message: eventData.content || "Please Review the Plan.",
+                   options: eventData.options || [],
+                   threadId: currentThreadId,
+                   executionId: eventData.execution_id || "",
+                   nodeName: eventData.node_name || "",
+                   timestamp: new Date().toISOString(),
+                   messageId: assistantMessage.id
+                 };
+                 state.setCurrentInterrupt(currentThreadId, interruptData);
+               }
+               
+               // 特殊处理：complete事件时停止流式状态和清除interrupt
                if (event.event === 'complete') {
-              state.updateMessage(currentThreadId, assistantMessage.id, {
-                isStreaming: false,
-              });
-            }
+                 state.updateMessage(currentThreadId, assistantMessage.id, {
+                   isStreaming: false,
+                 });
+                 state.clearCurrentInterrupt(currentThreadId);
+                 state.setResponding(false);
+               }
+               
+               // 特殊处理：error事件时清除interrupt
+               if (event.event === 'error') {
+                 state.clearCurrentInterrupt(currentThreadId);
+                 state.setResponding(false);
+               }
              }
             }
             break;

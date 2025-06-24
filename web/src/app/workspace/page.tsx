@@ -327,6 +327,13 @@ export default function WorkspacePage() {
     const getLatestPlan = (): ResearchPlan | null => {
       if (!currentPlan) return null;
       
+      // 🔥 修复：HITL状态下，确保status为"pending"以显示操作按钮
+      const planStatus = currentInterrupt !== null ? "pending" : (
+        currentPlan.status === "approved" ? "completed" : 
+        currentPlan.status === "rejected" ? "error" : 
+        currentPlan.status as StatusType
+      );
+      
       return {
         id: currentPlan.id,
         title: currentPlan.title,
@@ -339,9 +346,7 @@ export default function WorkspacePage() {
           status: step.status,
           estimatedTime: step.estimatedTime
         })),
-        status: currentPlan.status === "approved" ? "completed" : 
-                currentPlan.status === "rejected" ? "error" : 
-                currentPlan.status as StatusType,
+        status: planStatus,
         estimatedDuration: currentPlan.estimatedDuration,
         complexity: currentPlan.complexity,
         confidence: currentPlan.confidence,

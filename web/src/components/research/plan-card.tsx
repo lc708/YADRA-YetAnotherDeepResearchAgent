@@ -73,7 +73,7 @@ interface PlanCardProps {
   className?: string;
 }
 
-// 步骤优先级颜色
+// 步骤优先级颜色 - 保留但不使用
 const getPriorityColor = (priority: PlanStep["priority"]) => {
   switch (priority) {
     case "critical":
@@ -89,18 +89,18 @@ const getPriorityColor = (priority: PlanStep["priority"]) => {
   }
 };
 
-// 复杂度指示器
+// 复杂度指示器 - 简化版本
 const ComplexityIndicator: React.FC<{ complexity: ResearchPlan["complexity"] }> = ({ complexity }) => {
   const getComplexityConfig = () => {
     switch (complexity) {
       case "simple":
-        return { color: "text-green-600", dots: 1, label: "简单" };
+        return { color: "text-green-700", bgColor: "bg-green-600", dots: 1, label: "简单" };
       case "moderate":
-        return { color: "text-blue-600", dots: 2, label: "中等" };
+        return { color: "text-blue-700", bgColor: "bg-blue-600", dots: 2, label: "中等" };
       case "complex":
-        return { color: "text-orange-600", dots: 3, label: "复杂" };
+        return { color: "text-orange-700", bgColor: "bg-orange-600", dots: 3, label: "复杂" };
       case "expert":
-        return { color: "text-red-600", dots: 4, label: "专家级" };
+        return { color: "text-red-700", bgColor: "bg-red-600", dots: 4, label: "专家级" };
     }
   };
 
@@ -108,14 +108,13 @@ const ComplexityIndicator: React.FC<{ complexity: ResearchPlan["complexity"] }> 
 
   return (
     <div className="flex items-center gap-1">
-      <span className="text-xs text-muted-foreground">复杂度:</span>
       <div className="flex items-center gap-0.5">
         {[...Array(4)].map((_, i) => (
           <div
             key={i}
             className={cn(
               "w-1.5 h-1.5 rounded-full",
-              i < config.dots ? config.color.replace("text-", "bg-") : "bg-muted"
+              i < config.dots ? config.bgColor : "bg-gray-200"
             )}
           />
         ))}
@@ -127,7 +126,7 @@ const ComplexityIndicator: React.FC<{ complexity: ResearchPlan["complexity"] }> 
   );
 };
 
-// 计划步骤组件
+// 计划步骤组件 - 简化版本
 const PlanStepItem: React.FC<{
   step: PlanStep;
   index: number;
@@ -161,18 +160,18 @@ const PlanStepItem: React.FC<{
     >
       {/* 连接线 */}
       {index > 0 && (
-        <div className="absolute left-4 -top-4 w-0.5 h-4 bg-gray-300/60" />
+        <div className="absolute left-4 -top-2 w-0.5 h-2 bg-gray-300/60" />
       )}
 
-      <div className="flex items-start gap-3 p-3 rounded-lg border border-border bg-muted hover:bg-muted/80 transition-colors">
+      <div className="flex items-start gap-3 p-3 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 hover:border-slate-300 transition-colors">
         {/* 步骤编号 */}
-        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center text-sm font-medium shadow-sm">
+        <div className="flex-shrink-0 w-7 h-7 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold shadow-md">
           {index + 1}
         </div>
 
         {/* 步骤内容 */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between gap-2 mb-2">
+          <div className="flex items-start justify-between gap-2 mb-1">
             <div className="flex-1">
               {isEditing ? (
                 <input
@@ -183,36 +182,21 @@ const PlanStepItem: React.FC<{
                   autoFocus
                 />
               ) : (
-                <h4 className="font-medium text-sm text-foreground">{step.title}</h4>
+                <h4 className="font-semibold text-sm text-gray-900">{step.title}</h4>
               )}
             </div>
 
-            <div className="flex items-center gap-1">
-              {/* 优先级标签 */}
-              <span className={cn(
-                "px-2 py-0.5 rounded text-xs",
-                getPriorityColor(step.priority)
-              )}>
-                {step.priority}
-              </span>
-
-              {/* 状态徽章 */}
-              {step.status && (
-                <StatusBadge status={step.status} size="sm" />
-              )}
-
-              {/* 编辑按钮 */}
-              {isEditable && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setIsEditing(!isEditing)}
-                  className="h-6 w-6 p-0"
-                >
-                  {isEditing ? "💾" : "✏️"}
-                </Button>
-              )}
-            </div>
+            {/* 编辑按钮 */}
+            {isEditable && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsEditing(!isEditing)}
+                className="h-6 w-6 p-0"
+              >
+                {isEditing ? "💾" : "✏️"}
+              </Button>
+            )}
           </div>
 
           {/* 步骤描述 */}
@@ -233,19 +217,9 @@ const PlanStepItem: React.FC<{
             <MarkdownRenderer
               content={step.description}
               variant="compact"
-              className="text-sm"
+              className="text-sm leading-relaxed"
             />
           )}
-
-          {/* 估计时间和依赖 */}
-          <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
-            {step.estimatedTime && (
-              <span>⏱️ {step.estimatedTime}分钟</span>
-            )}
-            {step.dependencies && step.dependencies.length > 0 && (
-              <span>🔗 依赖 {step.dependencies.length} 个步骤</span>
-            )}
-          </div>
         </div>
       </div>
     </motion.div>
@@ -273,7 +247,7 @@ const PlanActions: React.FC<{
   };
 
   return (
-    <div className="p-4 border-t border-gray-200/50 bg-gradient-to-r from-gray-50/60 to-white/80">
+    <div className="p-4 border-t border-slate-200 bg-gradient-to-r from-slate-50 to-white">
       <AnimatePresence mode="wait">
         {!showModifyInput ? (
           <motion.div
@@ -381,58 +355,63 @@ export const PlanCard: React.FC<PlanCardProps> = ({
     return `${mins}m`;
   };
 
+  // 🔥 新增：根据步骤数计算预估时间 x = n * 0.5 + 0.5
+  const calculateEstimatedTime = (stepCount: number) => {
+    return stepCount * 0.5 + 0.5; // 每个步骤0.5分钟 + 出具报告0.5分钟
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
       className={cn(
-        "bg-background border border-border rounded-lg overflow-hidden shadow-sm",
-        "hover:shadow-md hover:border-border-dark transition-all duration-300",
-        isApproved && "border-green-300 bg-green-50",
+        "bg-white border-2 border-slate-200 rounded-xl overflow-hidden shadow-lg",
+        "hover:shadow-xl hover:border-slate-300 transition-all duration-300",
+        isApproved && "border-emerald-300 bg-emerald-50",
         isRejected && "border-red-300 bg-red-50",
-        isPending && "border-blue-300 bg-blue-50",
+        isPending && "border-blue-400 bg-blue-50",
         className
       )}
     >
       {/* 卡片头部 */}
-      <div className="p-4 border-b border-border/50 bg-gradient-to-r from-muted/80 to-background/90">
+      <div className="p-4 border-b border-slate-200 bg-gradient-to-r from-slate-50 to-white plan-card-content">
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-2">
-              <h3 className="font-semibold text-base text-foreground">{plan.title}</h3>
-              <StatusBadge 
-                status={plan.status} 
-                size="sm"
-                showPulse={isPending}
-              />
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <div className="flex items-center gap-2">
+                <h3 className="font-bold text-lg text-gray-900">{plan.title}</h3>
+                <StatusBadge 
+                  status={plan.status} 
+                  size="sm"
+                  showPulse={isPending}
+                />
+              </div>
+              
+              {/* 🔥 新增：复杂度、时间、工具信息移到标题行右侧 */}
+              <div className="flex items-center gap-3">
+                {/* 复杂度指示器 */}
+                <ComplexityIndicator complexity={plan.complexity} />
+                
+                {/* 预计时间 */}
+                <span className="text-xs font-medium text-gray-700">
+                  ⏱️ {formatDuration(calculateEstimatedTime(plan.steps.length))}
+                </span>
+                
+                {/* 工具信息 */}
+                {showMetadata && plan.metadata?.tools && (
+                  <span className="text-xs font-medium text-gray-700">
+                    🔧 {plan.metadata.tools.join(", ")}
+                  </span>
+                )}
+              </div>
             </div>
 
             <MarkdownRenderer
               content={plan.objective}
               variant="compact"
-              className="text-sm text-muted-foreground mb-3"
+              className="text-sm leading-relaxed"
             />
-
-            {/* 计划统计 */}
-            <div className="flex items-center gap-4 text-xs text-muted-foreground">
-              <span>📋 {plan.steps.length} 个步骤</span>
-              {plan.estimatedDuration && (
-                <span>⏱️ 预计 {formatDuration(plan.estimatedDuration)}</span>
-              )}
-              <span>🎯 置信度 {Math.round(plan.confidence * 100)}%</span>
-            </div>
-
-            {showMetadata && (
-              <div className="flex items-center gap-4 mt-2">
-                <ComplexityIndicator complexity={plan.complexity} />
-                {plan.version > 1 && (
-                  <span className="text-xs text-muted-foreground">
-                    v{plan.version}
-                  </span>
-                )}
-              </div>
-            )}
           </div>
 
           {/* 展开按钮 */}
@@ -440,7 +419,7 @@ export const PlanCard: React.FC<PlanCardProps> = ({
             variant="ghost"
             size="sm"
             onClick={() => setIsExpanded(!isExpanded)}
-            className="h-8 w-8 p-0 hover:bg-muted/80 text-muted-foreground"
+            className="h-8 w-8 p-0 hover:bg-muted/80 text-muted-foreground flex-shrink-0"
           >
             <motion.div
               animate={{ rotate: isExpanded ? 180 : 0 }}
@@ -463,9 +442,8 @@ export const PlanCard: React.FC<PlanCardProps> = ({
             className="overflow-hidden"
           >
             {/* 计划步骤 */}
-            <div className="p-4">
-              <h4 className="font-medium text-sm mb-4 text-foreground">执行步骤</h4>
-              <div className="space-y-3">
+            <div className="p-4 plan-card-content">
+              <div className="space-y-2">
                 {plan.steps.map((step, index) => (
                   <PlanStepItem
                     key={step.id}
@@ -483,42 +461,6 @@ export const PlanCard: React.FC<PlanCardProps> = ({
                 ))}
               </div>
             </div>
-
-            {/* 元数据 */}
-            {showMetadata && plan.metadata && (
-              <div className="p-4 border-t border-border/40 bg-muted/40">
-                <h4 className="font-medium text-sm mb-2 text-foreground">计划详情</h4>
-                <div className="grid grid-cols-2 gap-4 text-xs">
-                  {plan.metadata.sources && (
-                    <div>
-                      <span className="text-muted-foreground">数据源: </span>
-                      <span className="font-medium text-foreground">{plan.metadata.sources} 个</span>
-                    </div>
-                  )}
-                  {plan.metadata.tools && (
-                    <div>
-                      <span className="text-muted-foreground">工具: </span>
-                      <span className="font-medium text-foreground">{plan.metadata.tools.join(", ")}</span>
-                    </div>
-                  )}
-                  {plan.metadata.keywords && (
-                    <div className="col-span-2">
-                      <span className="text-muted-foreground">关键词: </span>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {plan.metadata.keywords.map((keyword, index) => (
-                          <span 
-                            key={index}
-                            className="px-2 py-0.5 bg-muted border border-border rounded text-xs text-muted-foreground"
-                          >
-                            {keyword}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
 
             {/* 操作按钮 */}
             {showActions && isPending && (

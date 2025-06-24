@@ -182,3 +182,46 @@ textarea {
 button {
   cursor: pointer;
 }
+
+/* 🎨 修复prose文字颜色过浅的问题 - 强制覆盖Tailwind默认样式 */
+.prose p,
+.prose div,
+.prose span,
+.prose li,
+.prose blockquote {
+  color: #1f2937 !important; /* text-gray-800 */
+}
+
+.prose h1,
+.prose h2, 
+.prose h3,
+.prose h4,
+.prose h5,
+.prose h6 {
+  color: #111827 !important; /* text-gray-900 */
+}
+
+/* 🎨 针对PlanCard中的文字进行特殊处理 */
+.plan-card-content .prose p,
+.plan-card-content .prose div,
+.plan-card-content .prose span {
+  color: #1f2937 !important; /* text-gray-800 */
+}
+
+/* 🎨 修复所有可能的浅色文字问题 */
+.prose-slate p,
+.prose-slate div,
+.prose-slate span,
+.prose-slate li {
+  color: #1f2937 !important; /* text-gray-800 */
+}
+
+/* 🎨 确保标题文字足够深 */
+h1, h2, h3, h4, h5, h6 {
+  color: #111827 !important; /* text-gray-900 */
+}
+
+/* 🎨 修复可能的全局文字颜色问题 */
+p:not(.text-muted-foreground):not(.text-gray-400):not(.text-gray-500) {
+  color: #1f2937 !important; /* text-gray-800 */
+}
