@@ -188,7 +188,7 @@ export function ArtifactViewer({
                   </div>
                 ) : isMarkdown ? (
                   // 查看模式：优化的预览样式
-                  <div className="prose prose-gray max-w-none dark:prose-invert prose-headings:font-semibold prose-p:leading-relaxed prose-li:my-1 prose-blockquote:border-l-blue-500">
+                  <div className="prose prose-gray max-w-none prose-headings:font-semibold prose-p:leading-relaxed prose-li:my-1 prose-blockquote:border-l-blue-500">
                     <ReactMarkdown
                       components={{
                         // 自定义标题样式

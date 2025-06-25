@@ -34,7 +34,7 @@ import {
   useCurrentInterrupt,
   useFinalReport
 } from "~/core/store";
-import type { ResearchRequest } from "~/core/store";
+import type { ResearchRequest, BusinessPlan, BusinessPlanStep } from "~/core/store";
 import { PodcastPanel } from "~/app/workspace/components/podcast-panel";
 import { OutputStream } from "~/app/workspace/components/output-stream";
 import { PlanCard } from "~/components/research/plan-card";
@@ -253,7 +253,10 @@ export default function WorkspacePage() {
     return (
       <div className="flex flex-col h-full">
         <div className="flex-1 overflow-hidden">
-          <ScrollContainer className="h-full px-4 py-4">
+          <ScrollContainer 
+            className="h-full px-4 py-4"
+            autoScrollToBottom={true}
+          >
             <div className="space-y-4 max-w-4xl mx-auto">
               {messages.length === 0 ? (
                 <div className="flex items-center justify-center h-64">
@@ -282,8 +285,79 @@ export default function WorkspacePage() {
   const ArtifactsPanel = () => {
     // 🚀 使用Store层的Hook接口获取计划和报告
     const currentInterrupt = useCurrentInterrupt(currentThreadId || undefined);
-    const currentPlan = useCurrentPlan(currentThreadId || undefined);
+    const planData = useCurrentPlan(currentThreadId || undefined);
     const finalReport = useFinalReport(currentThreadId || undefined); // 🔥 添加最终报告
+    
+    // 🔥 解析计划数据
+    const currentPlan = useMemo(() => {
+      if (!planData || planData.isStreaming) return null;
+      
+      try {
+        // 🔥 从planData.content中解析BusinessPlan
+        let jsonContent = planData.content.trim();
+        
+        // 查找JSON的开始和结束位置
+        const jsonStart = jsonContent.indexOf('{');
+        if (jsonStart === -1) return null;
+        
+        jsonContent = jsonContent.substring(jsonStart);
+        
+        // 查找JSON的结束位置
+        let braceCount = 0;
+        let jsonEnd = -1;
+        
+        for (let i = 0; i < jsonContent.length; i++) {
+          if (jsonContent[i] === '{') {
+            braceCount++;
+          } else if (jsonContent[i] === '}') {
+            braceCount--;
+            if (braceCount === 0) {
+              jsonEnd = i + 1;
+              break;
+            }
+          }
+        }
+        
+        if (jsonEnd === -1) return null;
+        
+        const jsonString = jsonContent.substring(0, jsonEnd);
+        const backendPlan = JSON.parse(jsonString);
+        
+        if (!backendPlan || !backendPlan.title || !backendPlan.steps) return null;
+        
+        // 转换为BusinessPlan格式
+        const steps: BusinessPlanStep[] = (backendPlan.steps || []).map((step: any, index: number) => ({
+          id: `step-${index + 1}`,
+          title: step.title || `步骤 ${index + 1}`,
+          description: step.description || '无描述',
+          priority: step.execution_res ? 'high' as const : 'medium' as const,
+          status: step.execution_res ? 'completed' as const : 'pending' as const,
+          estimatedTime: 15
+        }));
+        
+        return {
+          id: `plan-${planData.messageId}`,
+          title: backendPlan.title || '研究计划',
+          objective: backendPlan.thought || '研究目标',
+          steps: steps,
+          status: 'pending' as const,
+          estimatedDuration: steps.length * 15,
+          complexity: steps.length <= 2 ? 'simple' as const : 
+                     steps.length <= 4 ? 'moderate' as const : 'complex' as const,
+          confidence: backendPlan.has_enough_context ? 0.9 : 0.7,
+          createdAt: new Date(planData.timestamp || Date.now()),
+          metadata: {
+            sources: 0,
+            tools: ['tavily_search'],
+            keywords: [],
+            locale: backendPlan.locale || 'zh-CN'
+          }
+        } as BusinessPlan;
+      } catch (error) {
+        console.warn('Failed to parse plan:', error);
+        return null;
+      }
+    }, [planData]);
     
     // 🚀 简化：直接判断是否显示操作按钮
     const shouldShowActions = (): boolean => {

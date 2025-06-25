@@ -125,7 +125,7 @@ const renderMarkdown = (content: string, showCopyButton: boolean): React.ReactNo
         parts.push(
           <div 
             key={`text-${keyCounter++}`}
-            className="prose prose-slate dark:prose-invert max-w-none"
+            className="prose prose-slate max-w-none"
             dangerouslySetInnerHTML={{ 
               __html: processInlineMarkdown(textBefore) 
             }} 
@@ -156,7 +156,7 @@ const renderMarkdown = (content: string, showCopyButton: boolean): React.ReactNo
       parts.push(
         <div 
           key={`text-${keyCounter++}`}
-          className="prose prose-slate dark:prose-invert max-w-none"
+          className="prose prose-slate max-w-none"
           dangerouslySetInnerHTML={{ 
             __html: processInlineMarkdown(remainingText) 
           }} 
@@ -169,7 +169,7 @@ const renderMarkdown = (content: string, showCopyButton: boolean): React.ReactNo
   if (parts.length === 0) {
     return (
       <div 
-        className="prose prose-slate dark:prose-invert max-w-none"
+        className="prose prose-slate max-w-none"
         dangerouslySetInnerHTML={{ 
           __html: processInlineMarkdown(content) 
         }} 

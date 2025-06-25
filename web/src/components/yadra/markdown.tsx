@@ -56,7 +56,7 @@ export function Markdown({
     return [rehypeKatex];
   }, [animated]);
   return (
-    <div className={cn(className, "prose dark:prose-invert")} style={style}>
+    <div className={cn(className, "prose")} style={style}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={rehypePlugins}

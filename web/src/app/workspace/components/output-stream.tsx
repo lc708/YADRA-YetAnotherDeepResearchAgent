@@ -44,7 +44,7 @@ interface OutputStreamProps {
   className?: string;
 }
 
-type FilterType = "all" | "user" | "assistant";
+// 🔥 移除FilterType，不再需要筛选功能
 
 export function OutputStream({ className }: OutputStreamProps) {
   // 🔥 使用新的数据架构 - 从 unified-store 获取数据
@@ -54,8 +54,8 @@ export function OutputStream({ className }: OutputStreamProps) {
   const responding = useUnifiedStore((state) => state.responding);
   
   const [searchQuery, setSearchQuery] = useState("");
-  const [roleFilter, setRoleFilter] = useState<FilterType>("all");
-  const [autoScroll, setAutoScroll] = useState(true);
+  // 🔥 简化：移除筛选功能，自动滚动始终开启
+  const autoScroll = true;
   
   // 🔥 使用智能滚动容器
   const scrollContainerRef = useRef<ScrollContainerRef>(null);
@@ -65,47 +65,9 @@ export function OutputStream({ className }: OutputStreamProps) {
       return [];
     }
     
-    return [...messages].sort((a, b) => {
-      // 🔥 修复时间排序：使用真实时间戳而非字符串比较
-      const timeA = a.metadata?.timestamp || a.originalInput?.timestamp;
-      const timeB = b.metadata?.timestamp || b.originalInput?.timestamp;
-      
-      // 🔥 尝试解析为Date对象进行真实时间比较
-      let dateA: Date | null = null;
-      let dateB: Date | null = null;
-      
-      if (timeA) {
-        try {
-          dateA = new Date(timeA);
-          if (isNaN(dateA.getTime())) dateA = null;
-        } catch {
-          dateA = null;
-        }
-      }
-      
-      if (timeB) {
-        try {
-          dateB = new Date(timeB);
-          if (isNaN(dateB.getTime())) dateB = null;
-        } catch {
-          dateB = null;
-        }
-      }
-      
-      // 🔥 如果都有有效时间戳，按时间排序
-      if (dateA && dateB) {
-        return dateA.getTime() - dateB.getTime();
-      }
-      
-      // 🔥 如果只有一个有时间戳，有时间戳的排在前面
-      if (dateA && !dateB) return -1;
-      if (!dateA && dateB) return 1;
-      
-      // 🔥 如果都没有时间戳，按ID字符串排序（fallback）
-      const idA = a.id || '';
-      const idB = b.id || '';
-      return idA.localeCompare(idB);
-    });
+    // 🔥 简化：直接使用生成顺序，避免时区问题和复杂的时间戳解析
+    // Store中的消息已经按接收顺序存储，这是最可靠的排序方式
+    return [...messages];
   }, [messages]);
 
   // 🔥 移除复杂的availableOptions计算，简化代码
@@ -124,13 +86,10 @@ export function OutputStream({ className }: OutputStreamProps) {
       );
     }
     
-    // 🔥 可选的角色筛选（但默认显示全部）
-    if (roleFilter !== "all") {
-      filtered = filtered.filter(message => message.role === roleFilter);
-    }
+    // 🔥 移除角色筛选功能
     
     return filtered;
-  }, [allMessages, searchQuery, roleFilter]);
+  }, [allMessages, searchQuery]);
 
   const handleExport = useCallback(() => {
     try {
@@ -406,17 +365,7 @@ export function OutputStream({ className }: OutputStreamProps) {
             )}
           </div>
           
-          <div className="flex items-center gap-2">
-            <label className="flex items-center gap-1 text-xs">
-              <input
-                type="checkbox"
-                checked={autoScroll}
-                onChange={(e) => setAutoScroll(e.target.checked)}
-                className="w-3 h-3"
-              />
-              自动滚动
-            </label>
-          </div>
+          {/* 🔥 移除自动滚动控制，始终开启 */}
         </div>
         
         <div className="flex items-center gap-2">
@@ -435,19 +384,8 @@ export function OutputStream({ className }: OutputStreamProps) {
           </Button>
         </div>
         
-        {/* 🔥 简化过滤器：只保留基本的角色筛选和统计信息 */}
-        <div className="flex items-center justify-between">
-          <Select value={roleFilter} onValueChange={(value: FilterType) => setRoleFilter(value)}>
-            <SelectTrigger className="w-40">
-              <SelectValue placeholder="角色筛选" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">显示全部消息</SelectItem>
-              <SelectItem value="user">只显示用户消息</SelectItem>
-              <SelectItem value="assistant">只显示AI消息</SelectItem>
-            </SelectContent>
-          </Select>
-          
+        {/* 🔥 简化：只显示消息统计 */}
+        <div className="flex items-center justify-end">
           <div className="text-sm text-muted-foreground">
             显示 {filteredMessages.length} / {allMessages.length} 条消息
           </div>

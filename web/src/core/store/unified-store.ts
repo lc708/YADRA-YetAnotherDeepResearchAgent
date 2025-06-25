@@ -19,7 +19,7 @@ import type { Message, Resource } from "~/core/messages";
 import type { ChatEvent } from "~/core/api";
 import type { Artifact } from "~/lib/supa";
 import { nanoid } from "nanoid";
-import React, { useCallback } from "react";
+import React from "react";
 // 🔥 state-adapter已废弃，artifact转换逻辑待重新设计
 
 // Enable Immer MapSet plugin
@@ -830,31 +830,27 @@ export const useThreadMessages = (threadIdOrUrlParam?: string) => {
 };
 
 export const useThreadArtifacts = (threadIdOrUrlParam?: string) => {
-  const currentThreadId = useUnifiedStore((state) => state.currentThreadId);
-  const threads = useUnifiedStore((state) => state.threads);
-  const getArtifacts = useUnifiedStore((state) => state.getArtifacts);
-  const urlParamToThreadId = useUnifiedStore((state) => state.urlParamToThreadId);
-  
-  // 解析实际的thread_id：可能是URL参数，需要映射
-  const actualThreadId = React.useMemo(() => {
+  // 🔥 修复无限循环：将逻辑移到store层的selector中，避免Map对象依赖
+  return useUnifiedStore((state) => {
+    // 在selector内部解析thread_id，避免Map对象作为依赖项
+    let actualThreadId = threadIdOrUrlParam;
+    
     if (threadIdOrUrlParam) {
       // 首先尝试作为thread_id直接使用
-      if (threads.has(threadIdOrUrlParam)) {
-        return threadIdOrUrlParam;
+      if (!state.threads.has(threadIdOrUrlParam)) {
+        // 然后尝试作为URL参数映射
+        const mappedThreadId = state.urlParamToThreadId.get(threadIdOrUrlParam);
+        if (mappedThreadId && state.threads.has(mappedThreadId)) {
+          actualThreadId = mappedThreadId;
+        }
       }
-      // 然后尝试作为URL参数映射
-      const mappedThreadId = urlParamToThreadId.get(threadIdOrUrlParam);
-      if (mappedThreadId && threads.has(mappedThreadId)) {
-        return mappedThreadId;
-      }
+    } else {
+      actualThreadId = state.currentThreadId || undefined;
     }
-    return currentThreadId;
-  }, [threadIdOrUrlParam, currentThreadId, threads, urlParamToThreadId]);
-  
-  return React.useMemo(() => {
+    
     if (!actualThreadId) return [];
-    return getArtifacts(actualThreadId);
-  }, [actualThreadId, threads, getArtifacts]);
+    return state.getArtifacts(actualThreadId);
+  });
 };
 
 export const useWorkspaceState = () => {
@@ -863,30 +859,25 @@ export const useWorkspaceState = () => {
 
 // 兼容旧 API 的 wrapper
 export const useMessageIds = (threadIdOrUrlParam?: string) => {
-  // 分两步获取，避免 selector 重建
-  const currentThreadId = useUnifiedStore((state) => state.currentThreadId);
-  const threads = useUnifiedStore((state) => state.threads);
-  const urlParamToThreadId = useUnifiedStore((state) => state.urlParamToThreadId);
-  
-  // 解析实际的thread_id：可能是URL参数，需要映射
-  const actualThreadId = React.useMemo(() => {
-    if (threadIdOrUrlParam) {
-      // 首先尝试作为thread_id直接使用
-      if (threads.has(threadIdOrUrlParam)) {
-        return threadIdOrUrlParam;
-      }
-      // 然后尝试作为URL参数映射
-      const mappedThreadId = urlParamToThreadId.get(threadIdOrUrlParam);
-      if (mappedThreadId && threads.has(mappedThreadId)) {
-        return mappedThreadId;
-      }
-    }
-    return currentThreadId;
-  }, [threadIdOrUrlParam, currentThreadId, threads, urlParamToThreadId]);
-  
-  // 使用 useShallow 避免不必要的重渲染
+  // 🔥 修复无限循环：将逻辑移到store层的selector中，避免Map对象依赖
   return useUnifiedStore(
     useShallow((state) => {
+      // 在selector内部解析thread_id，避免Map对象作为依赖项
+      let actualThreadId = threadIdOrUrlParam;
+      
+      if (threadIdOrUrlParam) {
+        // 首先尝试作为thread_id直接使用
+        if (!state.threads.has(threadIdOrUrlParam)) {
+          // 然后尝试作为URL参数映射
+          const mappedThreadId = state.urlParamToThreadId.get(threadIdOrUrlParam);
+          if (mappedThreadId && state.threads.has(mappedThreadId)) {
+            actualThreadId = mappedThreadId;
+          }
+        }
+      } else {
+        actualThreadId = state.currentThreadId || undefined;
+      }
+      
       if (!actualThreadId) return [];
       const thread = state.threads.get(actualThreadId);
       return thread?.messages.map((m) => m.id) || [];
@@ -1012,162 +1003,171 @@ export const useWorkspaceActions = () => {
 
 // 🚀 新增：业务状态Hook接口
 export const useCurrentPlan = (threadIdOrUrlParam?: string) => {
-  const currentThreadId = useUnifiedStore((state) => state.currentThreadId);
-  const threads = useUnifiedStore((state) => state.threads);
-  const urlParamToThreadId = useUnifiedStore((state) => state.urlParamToThreadId);
-  const getCurrentPlan = useUnifiedStore((state) => state.getCurrentPlan);
-  
-  // 解析实际的thread_id：可能是URL参数，需要映射
-  const actualThreadId = React.useMemo(() => {
-    if (threadIdOrUrlParam) {
-      // 首先尝试作为thread_id直接使用
-      if (threads.has(threadIdOrUrlParam)) {
-        return threadIdOrUrlParam;
+  // 🔥 修复无限循环：使用useShallow确保引用稳定性
+  return useUnifiedStore(
+    useShallow((state) => {
+      // 在selector内部解析thread_id，避免Map对象作为依赖项
+      let actualThreadId = threadIdOrUrlParam;
+      
+      if (threadIdOrUrlParam) {
+        // 首先尝试作为thread_id直接使用
+        if (!state.threads.has(threadIdOrUrlParam)) {
+          // 然后尝试作为URL参数映射
+          const mappedThreadId = state.urlParamToThreadId.get(threadIdOrUrlParam);
+          if (mappedThreadId && state.threads.has(mappedThreadId)) {
+            actualThreadId = mappedThreadId;
+          }
+        }
+      } else {
+        actualThreadId = state.currentThreadId || undefined;
       }
-      // 然后尝试作为URL参数映射
-      const mappedThreadId = urlParamToThreadId.get(threadIdOrUrlParam);
-      if (mappedThreadId && threads.has(mappedThreadId)) {
-        return mappedThreadId;
-      }
-    }
-    return currentThreadId;
-  }, [threadIdOrUrlParam, currentThreadId, threads, urlParamToThreadId]);
-  
-  return React.useMemo(() => {
-    if (!actualThreadId) return null;
-    return getCurrentPlan(actualThreadId);
-  }, [actualThreadId, getCurrentPlan]);
+      
+      if (!actualThreadId) return null;
+      
+      // 🔥 直接在selector中查找消息，避免调用getCurrentPlan方法
+      const thread = state.threads.get(actualThreadId);
+      if (!thread) return null;
+      
+      // 查找最新的projectmanager消息
+      const projectmanagerMessages = thread.messages.filter(msg =>
+        msg.langGraphMetadata?.agent === 'projectmanager' && msg.content
+      );
+      
+      if (projectmanagerMessages.length === 0) return null;
+      
+      const latestPlanMessage = projectmanagerMessages[projectmanagerMessages.length - 1];
+      if (!latestPlanMessage) return null;
+      
+      // 🔥 返回稳定的标识信息，让组件自行决定是否需要解析
+      return {
+        messageId: latestPlanMessage.id,
+        content: latestPlanMessage.content,
+        isStreaming: latestPlanMessage.isStreaming || false,
+        timestamp: latestPlanMessage.langGraphMetadata?.timestamp
+      };
+    })
+  );
 };
 
 export const useToolCallResults = (threadIdOrUrlParam?: string, toolName?: string) => {
-  const currentThreadId = useUnifiedStore((state) => state.currentThreadId);
-  const threads = useUnifiedStore((state) => state.threads);
-  const urlParamToThreadId = useUnifiedStore((state) => state.urlParamToThreadId);
-  const getToolCallResults = useUnifiedStore((state) => state.getToolCallResults);
-  
-  // 解析实际的thread_id
-  const actualThreadId = React.useMemo(() => {
+  // 🔥 修复无限循环：将逻辑移到store层的selector中，避免Map对象依赖
+  return useUnifiedStore((state) => {
+    // 在selector内部解析thread_id，避免Map对象作为依赖项
+    let actualThreadId = threadIdOrUrlParam;
+    
     if (threadIdOrUrlParam) {
-      if (threads.has(threadIdOrUrlParam)) {
-        return threadIdOrUrlParam;
+      // 首先尝试作为thread_id直接使用
+      if (!state.threads.has(threadIdOrUrlParam)) {
+        // 然后尝试作为URL参数映射
+        const mappedThreadId = state.urlParamToThreadId.get(threadIdOrUrlParam);
+        if (mappedThreadId && state.threads.has(mappedThreadId)) {
+          actualThreadId = mappedThreadId;
+        }
       }
-      const mappedThreadId = urlParamToThreadId.get(threadIdOrUrlParam);
-      if (mappedThreadId && threads.has(mappedThreadId)) {
-        return mappedThreadId;
-      }
+    } else {
+      actualThreadId = state.currentThreadId || undefined;
     }
-    return currentThreadId;
-  }, [threadIdOrUrlParam, currentThreadId, threads, urlParamToThreadId]);
-  
-  return React.useMemo(() => {
+    
     if (!actualThreadId) return [];
-    return getToolCallResults(actualThreadId, toolName);
-  }, [actualThreadId, toolName, getToolCallResults]);
+    return state.getToolCallResults(actualThreadId, toolName);
+  });
 };
 
 export const useResearchProgress = (threadIdOrUrlParam?: string) => {
-  const currentThreadId = useUnifiedStore((state) => state.currentThreadId);
-  const threads = useUnifiedStore((state) => state.threads);
-  const urlParamToThreadId = useUnifiedStore((state) => state.urlParamToThreadId);
-  const getResearchProgress = useUnifiedStore((state) => state.getResearchProgress);
-  
-  // 解析实际的thread_id
-  const actualThreadId = React.useMemo(() => {
+  // 🔥 修复无限循环：将逻辑移到store层的selector中，避免Map对象依赖
+  return useUnifiedStore((state) => {
+    // 在selector内部解析thread_id，避免Map对象作为依赖项
+    let actualThreadId = threadIdOrUrlParam;
+    
     if (threadIdOrUrlParam) {
-      if (threads.has(threadIdOrUrlParam)) {
-        return threadIdOrUrlParam;
+      // 首先尝试作为thread_id直接使用
+      if (!state.threads.has(threadIdOrUrlParam)) {
+        // 然后尝试作为URL参数映射
+        const mappedThreadId = state.urlParamToThreadId.get(threadIdOrUrlParam);
+        if (mappedThreadId && state.threads.has(mappedThreadId)) {
+          actualThreadId = mappedThreadId;
+        }
       }
-      const mappedThreadId = urlParamToThreadId.get(threadIdOrUrlParam);
-      if (mappedThreadId && threads.has(mappedThreadId)) {
-        return mappedThreadId;
-      }
+    } else {
+      actualThreadId = state.currentThreadId || undefined;
     }
-    return currentThreadId;
-  }, [threadIdOrUrlParam, currentThreadId, threads, urlParamToThreadId]);
-  
-  return React.useMemo(() => {
+    
     if (!actualThreadId) return { stage: 'idle', progress: 0, currentActivity: null };
-    return getResearchProgress(actualThreadId);
-  }, [actualThreadId, getResearchProgress]);
+    return state.getResearchProgress(actualThreadId);
+  });
 };
 
 export const useFinalReport = (threadIdOrUrlParam?: string) => {
-  const currentThreadId = useUnifiedStore((state) => state.currentThreadId);
-  const threads = useUnifiedStore((state) => state.threads);
-  const urlParamToThreadId = useUnifiedStore((state) => state.urlParamToThreadId);
-  const getFinalReport = useUnifiedStore((state) => state.getFinalReport);
-  
-  // 解析实际的thread_id
-  const actualThreadId = React.useMemo(() => {
+  // 🔥 修复无限循环：将逻辑移到store层的selector中，避免Map对象依赖
+  return useUnifiedStore((state) => {
+    // 在selector内部解析thread_id，避免Map对象作为依赖项
+    let actualThreadId = threadIdOrUrlParam;
+    
     if (threadIdOrUrlParam) {
-      if (threads.has(threadIdOrUrlParam)) {
-        return threadIdOrUrlParam;
+      // 首先尝试作为thread_id直接使用
+      if (!state.threads.has(threadIdOrUrlParam)) {
+        // 然后尝试作为URL参数映射
+        const mappedThreadId = state.urlParamToThreadId.get(threadIdOrUrlParam);
+        if (mappedThreadId && state.threads.has(mappedThreadId)) {
+          actualThreadId = mappedThreadId;
+        }
       }
-      const mappedThreadId = urlParamToThreadId.get(threadIdOrUrlParam);
-      if (mappedThreadId && threads.has(mappedThreadId)) {
-        return mappedThreadId;
-      }
+    } else {
+      actualThreadId = state.currentThreadId || undefined;
     }
-    return currentThreadId;
-  }, [threadIdOrUrlParam, currentThreadId, threads, urlParamToThreadId]);
-  
-  return React.useMemo(() => {
+    
     if (!actualThreadId) return null;
-    return getFinalReport(actualThreadId);
-  }, [actualThreadId, getFinalReport]);
+    return state.getFinalReport(actualThreadId);
+  });
 };
 
 export const useResearchActivities = (threadIdOrUrlParam?: string) => {
-  const currentThreadId = useUnifiedStore((state) => state.currentThreadId);
-  const threads = useUnifiedStore((state) => state.threads);
-  const urlParamToThreadId = useUnifiedStore((state) => state.urlParamToThreadId);
-  const getResearchActivities = useUnifiedStore((state) => state.getResearchActivities);
-  
-  // 解析实际的thread_id
-  const actualThreadId = React.useMemo(() => {
+  // 🔥 修复无限循环：将逻辑移到store层的selector中，避免Map对象依赖
+  return useUnifiedStore((state) => {
+    // 在selector内部解析thread_id，避免Map对象作为依赖项
+    let actualThreadId = threadIdOrUrlParam;
+    
     if (threadIdOrUrlParam) {
-      if (threads.has(threadIdOrUrlParam)) {
-        return threadIdOrUrlParam;
+      // 首先尝试作为thread_id直接使用
+      if (!state.threads.has(threadIdOrUrlParam)) {
+        // 然后尝试作为URL参数映射
+        const mappedThreadId = state.urlParamToThreadId.get(threadIdOrUrlParam);
+        if (mappedThreadId && state.threads.has(mappedThreadId)) {
+          actualThreadId = mappedThreadId;
+        }
       }
-      const mappedThreadId = urlParamToThreadId.get(threadIdOrUrlParam);
-      if (mappedThreadId && threads.has(mappedThreadId)) {
-        return mappedThreadId;
-      }
+    } else {
+      actualThreadId = state.currentThreadId || undefined;
     }
-    return currentThreadId;
-  }, [threadIdOrUrlParam, currentThreadId, threads, urlParamToThreadId]);
-  
-  return React.useMemo(() => {
+    
     if (!actualThreadId) return [];
-    return getResearchActivities(actualThreadId);
-  }, [actualThreadId, getResearchActivities]);
+    return state.getResearchActivities(actualThreadId);
+  });
 };
 
 // 🚀 新增：当前interrupt状态Hook
 export const useCurrentInterrupt = (threadIdOrUrlParam?: string) => {
-  const currentThreadId = useUnifiedStore((state) => state.currentThreadId);
-  const threads = useUnifiedStore((state) => state.threads);
-  const urlParamToThreadId = useUnifiedStore((state) => state.urlParamToThreadId);
-  const getCurrentInterrupt = useUnifiedStore((state) => state.getCurrentInterrupt);
-  
-  // 解析实际的thread_id
-  const actualThreadId = React.useMemo(() => {
+  // 🔥 修复无限循环：将逻辑移到store层的selector中，避免Map对象依赖
+  return useUnifiedStore((state) => {
+    // 在selector内部解析thread_id，避免Map对象作为依赖项
+    let actualThreadId = threadIdOrUrlParam;
+    
     if (threadIdOrUrlParam) {
-      if (threads.has(threadIdOrUrlParam)) {
-        return threadIdOrUrlParam;
+      // 首先尝试作为thread_id直接使用
+      if (!state.threads.has(threadIdOrUrlParam)) {
+        // 然后尝试作为URL参数映射
+        const mappedThreadId = state.urlParamToThreadId.get(threadIdOrUrlParam);
+        if (mappedThreadId && state.threads.has(mappedThreadId)) {
+          actualThreadId = mappedThreadId;
+        }
       }
-      const mappedThreadId = urlParamToThreadId.get(threadIdOrUrlParam);
-      if (mappedThreadId && threads.has(mappedThreadId)) {
-        return mappedThreadId;
-      }
+    } else {
+      actualThreadId = state.currentThreadId || undefined;
     }
-    return currentThreadId;
-  }, [threadIdOrUrlParam, currentThreadId, threads, urlParamToThreadId]);
-  
-  return React.useMemo(() => {
+    
     if (!actualThreadId) return null;
-    return getCurrentInterrupt(actualThreadId);
-  }, [actualThreadId, getCurrentInterrupt]);
+    return state.getCurrentInterrupt(actualThreadId);
+  });
 };
 
 // 🚀 新架构：使用ASK API发送研究请求
