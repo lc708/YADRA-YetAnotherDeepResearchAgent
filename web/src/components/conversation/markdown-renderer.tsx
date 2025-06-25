@@ -125,7 +125,7 @@ const renderMarkdown = (content: string, showCopyButton: boolean): React.ReactNo
         parts.push(
           <div 
             key={`text-${keyCounter++}`}
-            className="prose prose-slate max-w-none"
+            className="prose prose-slate max-w-none prose-p:leading-tight prose-p:mb-2 prose-li:leading-tight prose-li:mb-0.5 prose-ul:my-1"
             dangerouslySetInnerHTML={{ 
               __html: processInlineMarkdown(textBefore) 
             }} 
@@ -153,15 +153,15 @@ const renderMarkdown = (content: string, showCopyButton: boolean): React.ReactNo
   if (lastIndex < content.length) {
     const remainingText = content.slice(lastIndex);
     if (remainingText.trim()) {
-      parts.push(
-        <div 
-          key={`text-${keyCounter++}`}
-          className="prose prose-slate max-w-none"
-          dangerouslySetInnerHTML={{ 
-            __html: processInlineMarkdown(remainingText) 
-          }} 
-        />
-      );
+              parts.push(
+          <div 
+            key={`text-${keyCounter++}`}
+            className="prose prose-slate max-w-none prose-p:leading-tight prose-p:mb-2 prose-li:leading-tight prose-li:mb-0.5 prose-ul:my-1"
+            dangerouslySetInnerHTML={{ 
+              __html: processInlineMarkdown(remainingText) 
+            }} 
+          />
+        );
     }
   }
 
@@ -169,7 +169,7 @@ const renderMarkdown = (content: string, showCopyButton: boolean): React.ReactNo
   if (parts.length === 0) {
     return (
       <div 
-        className="prose prose-slate max-w-none"
+        className="prose prose-slate max-w-none prose-p:leading-tight prose-p:mb-2 prose-li:leading-tight prose-li:mb-0.5 prose-ul:my-1"
         dangerouslySetInnerHTML={{ 
           __html: processInlineMarkdown(content) 
         }} 
@@ -206,14 +206,14 @@ const processInlineMarkdown = (text: string): string => {
   text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-primary hover:underline" target="_blank" rel="noopener noreferrer">$1</a>');
   
   // 列表项
-  text = text.replace(/^[\s]*[-*+]\s+(.*$)/gm, '<li class="ml-4 list-disc">$1</li>');
+  text = text.replace(/^[\s]*[-*+]\s+(.*$)/gm, '<li class="ml-4 list-disc leading-tight mb-0.5">$1</li>');
   
   // 引用
   text = text.replace(/^>\s+(.*$)/gm, '<blockquote class="border-l-4 border-primary/30 pl-4 py-2 my-4 bg-muted/30 rounded-r text-muted-foreground">$1</blockquote>');
   
   // 段落
-  text = text.replace(/\n\n/g, '</p><p class="mb-3 leading-relaxed">');
-  text = `<p class="mb-3 leading-relaxed">${text}</p>`;
+  text = text.replace(/\n\n/g, '</p><p class="mb-2 leading-tight">');
+  text = `<p class="mb-2 leading-tight">${text}</p>`;
   
   // 换行
   text = text.replace(/\n/g, '<br>');

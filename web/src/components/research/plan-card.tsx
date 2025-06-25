@@ -26,7 +26,7 @@ import { cn } from "~/lib/utils";
 import { Button } from "~/components/ui/button";
 import { Textarea } from "~/components/ui/textarea";
 import StatusBadge, { type StatusType } from "../conversation/status-badge";
-import MarkdownRenderer from "../conversation/markdown-renderer";
+
 
 export interface PlanStep {
   id: string;
@@ -214,9 +214,8 @@ const PlanStepItem: React.FC<{
               </div>
             </div>
           ) : (
-            <MarkdownRenderer
+            <SimplePlanMarkdown
               content={step.description}
-              variant="compact"
               className="text-sm leading-relaxed"
             />
           )}
@@ -328,6 +327,47 @@ const PlanActions: React.FC<{
   );
 };
 
+// 简单的markdown渲染器，专用于PlanCard
+const SimplePlanMarkdown: React.FC<{ content: string; className?: string }> = ({ content, className }) => {
+  const processSimpleMarkdown = (text: string): string => {
+    // 转义HTML
+    text = text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+
+    // 粗体
+    text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    
+    // 斜体
+    text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
+    
+    // 内联代码
+    text = text.replace(/`(.*?)`/g, '<code class="bg-gray-100 px-1 py-0.5 rounded text-sm font-mono">$1</code>');
+    
+    // 列表项 - 使用更紧凑的样式
+    text = text.replace(/^[\s]*[-*+]\s+(.*$)/gm, '<li class="ml-4 list-disc leading-normal mb-0.5">$1</li>');
+    
+    // 段落
+    text = text.replace(/\n\n/g, '</p><p class="mb-2 leading-normal">');
+    text = `<p class="mb-2 leading-normal">${text}</p>`;
+    
+    // 换行
+    text = text.replace(/\n/g, '<br>');
+
+    return text;
+  };
+
+  return (
+    <div 
+      className={cn("text-sm leading-relaxed", className)}
+      dangerouslySetInnerHTML={{ 
+        __html: processSimpleMarkdown(content) 
+      }} 
+    />
+  );
+};
+
 export const PlanCard: React.FC<PlanCardProps> = ({
   plan,
   variant = "default",
@@ -407,9 +447,8 @@ export const PlanCard: React.FC<PlanCardProps> = ({
               </div>
             </div>
 
-            <MarkdownRenderer
+            <SimplePlanMarkdown
               content={plan.objective}
-              variant="compact"
               className="text-sm leading-relaxed"
             />
           </div>

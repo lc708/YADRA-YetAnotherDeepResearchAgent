@@ -13,7 +13,7 @@ import MessageInput, { type MessageInputRef } from "~/components/yadra/message-i
 import { Tooltip } from "~/components/yadra/tooltip";
 import { enhancePrompt } from "~/core/api/prompt-enhancer";
 import { useSettingsStore, setEnableDeepThinking, setReportStyle } from "~/core/store";
-import { useUnifiedStore, setResponding, setCurrentUrlParam, setUrlParamMapping, setCurrentThreadId } from "~/core/store/unified-store";
+import { useUnifiedStore, useFinalReport, setResponding, setCurrentUrlParam, setUrlParamMapping, setCurrentThreadId } from "~/core/store/unified-store";
 import { fetchStream } from "~/core/sse/fetch-stream";
 import { resolveServiceURL } from "~/core/api/resolve-service-url";
 import { generateInitialQuestionIDs, getVisitorId } from "~/core/utils";
@@ -89,8 +89,13 @@ export function HeroInput({
   // 统一使用responding状态
   const responding = useUnifiedStore((state) => state.responding);
   
-  // 判断是否可以操作
-  const canOperate = currentPrompt.trim() !== "" && !responding;
+  // 获取当前线程ID用于检测任务完成状态
+  const currentThreadId = useUnifiedStore((state) => state.currentThreadId);
+  const finalReport = useFinalReport(currentThreadId || undefined);
+  
+  // 判断是否可以操作：只有任务完全完成（生成报告）后才允许发送新消息
+  const isTaskCompleted = finalReport !== null;
+  const canOperate = currentPrompt.trim() !== "" && !responding && (isTaskCompleted || !currentThreadId);
 
   // 计算上拉框位置
   const calculateDropdownPosition = useCallback(() => {
@@ -402,7 +407,7 @@ export function HeroInput({
                   side="top"
                   sideOffset={8}
                   className="border border-gray-200 bg-white backdrop-blur-sm text-gray-900 shadow-xl"
-                  title={responding ? "停止生成" : (canOperate ? "发送消息" : "请输入消息")}
+                  title={responding ? "停止生成" : (canOperate ? "发送消息" : (!isTaskCompleted && currentThreadId ? "等待当前任务完成" : "请输入消息"))}
                 >
                   <Button
                     onClick={responding ? () => {} : () => handleSubmit()}

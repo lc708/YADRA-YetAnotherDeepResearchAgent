@@ -24,6 +24,7 @@ import {
   Mic,
   MicOff,
   Loader2,
+  X,
 } from "lucide-react";
 
 import { 
@@ -93,10 +94,10 @@ export default function WorkspacePage() {
     })
   );
   
-  // 面板可见性状态 - 默认只显示conversation panel
+  // 面板可见性状态 - 对话和工件面板始终显示
   const [conversationVisible, setConversationVisible] = useState(true);
-  const [artifactVisible, setArtifactVisible] = useState(false);
-  const [historyVisible, setHistoryVisible] = useState(false);
+  const [artifactVisible, setArtifactVisible] = useState(true);
+  const [showOutputDrawer, setShowOutputDrawer] = useState(false);
   const [podcastVisible, setPodcastVisible] = useState(false);
 
   // 任务状态
@@ -128,11 +129,11 @@ export default function WorkspacePage() {
     }
   }, [router]);
   
-  // 🚀 计算布局模式
+  // 🚀 计算布局模式 - 输出流改为弹窗，不影响布局
   const layoutMode = useMemo(() => {
     if (!hasMessages) return LayoutMode.WELCOME;
     
-    const visiblePanels = [conversationVisible, artifactVisible, historyVisible, podcastVisible].filter(Boolean);
+    const visiblePanels = [conversationVisible, artifactVisible].filter(Boolean);
     
     // 如果只有对话面板可见
     if (visiblePanels.length === 1 && conversationVisible) {
@@ -146,17 +147,16 @@ export default function WorkspacePage() {
     
     // 有消息但没有可见面板，默认显示对话
     return LayoutMode.CONVERSATION;
-  }, [hasMessages, conversationVisible, artifactVisible, historyVisible, podcastVisible]);
+  }, [hasMessages, conversationVisible, artifactVisible]);
 
-  // 🚀 计算可见面板和宽度
+  // 🚀 计算可见面板和宽度 - 输出流改为弹窗，不影响布局计算
   const visiblePanels = useMemo(() => {
     return [
       { type: 'conversation', visible: conversationVisible },
       { type: 'artifacts', visible: artifactVisible },
-      { type: 'history', visible: historyVisible },
-      { type: 'podcast', visible: podcastVisible },
+      // 输出流和播客面板暂时不参与宽度计算
     ].filter(panel => panel.visible);
-  }, [conversationVisible, artifactVisible, historyVisible, podcastVisible]);
+  }, [conversationVisible, artifactVisible]);
 
   const panelWidthClass = useMemo(() => {
     const count = visiblePanels.length;
@@ -169,16 +169,14 @@ export default function WorkspacePage() {
   // 面板切换函数
   const toggleConversationPanel = () => setConversationVisible(!conversationVisible);
   const toggleArtifactsPanel = () => setArtifactVisible(!artifactVisible);
-  const toggleHistoryPanel = () => setHistoryVisible(!historyVisible);
+  const toggleOutputDrawer = () => setShowOutputDrawer(!showOutputDrawer);
   const togglePodcastPanel = () => setPodcastVisible(!podcastVisible);
 
-  // 监听消息变化来启动任务面板
+  // 监听消息变化来启动任务面板 - artifact面板已默认显示，输出流和播客面板暂不启用
   useEffect(() => {
     if (hasMessages && !taskStarted) {
       setTaskStarted(true);
-      setArtifactVisible(true);
-      setHistoryVisible(true);
-      setPodcastVisible(true);
+      // 输出流改为手动打开，播客面板暂不自动启用
     }
   }, [hasMessages, taskStarted]);
 
@@ -254,8 +252,9 @@ export default function WorkspacePage() {
       <div className="flex flex-col h-full">
         <div className="flex-1 overflow-hidden">
           <ScrollContainer 
-            className="h-full px-4 py-4"
+            className="h-full px-4 py-4 pb-32"
             autoScrollToBottom={true}
+            data-scroll-container
           >
             <div className="space-y-4 max-w-4xl mx-auto">
               {messages.length === 0 ? (
@@ -565,50 +564,27 @@ export default function WorkspacePage() {
             <h1 className="text-lg font-semibold text-foreground">当前研究</h1>
           </div>
 
-          {/* 面板控制按钮 */}
+          {/* 面板控制按钮 - 移除对话和工件按钮 */}
           <div className="flex items-center gap-1">
             <Button
-              variant={conversationVisible ? "default" : "outline"}
+              variant={showOutputDrawer ? "default" : "outline"}
               size="sm"
-              onClick={toggleConversationPanel}
-              className="gap-1 bg-transparent border-border text-muted-foreground hover:bg-muted"
-            >
-              <MessageSquare className="h-4 w-4" />
-              <span className="hidden lg:inline">对话</span>
-              {conversationVisible ? <Minimize2 className="h-3 w-3 hidden sm:inline" /> : <Maximize2 className="h-3 w-3 hidden sm:inline" />}
-            </Button>
-            
-            <Button
-              variant={artifactVisible ? "default" : "outline"}
-              size="sm"
-              onClick={toggleArtifactsPanel}
-              className="gap-1 bg-transparent border-border text-muted-foreground hover:bg-muted"
-            >
-              <FileText className="h-4 w-4" />
-              <span className="hidden lg:inline">工件</span>
-              {artifactVisible ? <Minimize2 className="h-3 w-3 hidden sm:inline" /> : <Maximize2 className="h-3 w-3 hidden sm:inline" />}
-            </Button>
-            
-            <Button
-              variant={historyVisible ? "default" : "outline"}
-              size="sm"
-              onClick={toggleHistoryPanel}
+              onClick={toggleOutputDrawer}
               className="gap-1 bg-transparent border-border text-muted-foreground hover:bg-muted"
             >
               <Activity className="h-4 w-4" />
-              <span className="hidden lg:inline">输出流</span>
-              {historyVisible ? <Minimize2 className="h-3 w-3 hidden sm:inline" /> : <Maximize2 className="h-3 w-3 hidden sm:inline" />}
+              <span className="hidden lg:inline">原始输出流</span>
             </Button>
             
             <Button
-              variant={podcastVisible ? "default" : "outline"}
+              variant="outline"
               size="sm"
-              onClick={togglePodcastPanel}
-              className="gap-1 bg-transparent border-border text-muted-foreground hover:bg-muted"
+              disabled={true}
+              className="gap-1 bg-transparent border-border text-gray-400 cursor-not-allowed"
             >
               <Headphones className="h-4 w-4" />
               <span className="hidden lg:inline">播客</span>
-              {podcastVisible ? <Minimize2 className="h-3 w-3 hidden sm:inline" /> : <Maximize2 className="h-3 w-3 hidden sm:inline" />}
+              <span className="text-xs text-gray-400">（敬请期待）</span>
             </Button>
           </div>
         </div>
@@ -627,7 +603,11 @@ export default function WorkspacePage() {
               <div className={cn("flex flex-col h-full relative", panelWidthClass, {
                 "border-r border-border": visiblePanels.length > 1
               })}>
-                <ConversationPanel />
+                <div className={cn("flex-1 overflow-hidden", {
+                  "pb-20": layoutMode === LayoutMode.MULTI_PANEL
+                })}>
+                  <ConversationPanel />
+                </div>
                 {/* 在多面板模式下，输入框属于对话面板 */}
                 {layoutMode === LayoutMode.MULTI_PANEL && <PanelInputContainer />}
               </div>
@@ -635,9 +615,7 @@ export default function WorkspacePage() {
 
             {/* 工件面板 */}
             {artifactVisible && (
-              <div className={cn("flex flex-col h-full", panelWidthClass, {
-                "border-r border-border": historyVisible || podcastVisible
-              })}>
+              <div className={cn("flex flex-col h-full", panelWidthClass)}>
                 <div className="flex-shrink-0 px-4 py-3 border-b border-border">
                   <div className="flex items-center justify-between">
                     <h2 className="text-lg font-semibold text-foreground">
@@ -657,32 +635,10 @@ export default function WorkspacePage() {
               </div>
             )}
 
-            {/* 输出流面板 */}
-            {historyVisible && (
-              <div className={cn("flex flex-col h-full", panelWidthClass, {
-                "border-r border-border": podcastVisible
-              })}>
-                <div className="flex-shrink-0 px-4 py-3 border-b border-border">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-lg font-semibold text-foreground">
-                      实时输出流
-                    </h2>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={toggleHistoryPanel}
-                      className="h-8 w-8 p-0 text-muted-foreground hover:bg-muted"
-                    >
-                      <Minimize2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-                <HistoryPanel />
-              </div>
-            )}
+            {/* 输出流面板已改为右侧弹窗显示 */}
 
-            {/* 播客面板 */}
-            {podcastVisible && (
+            {/* 播客面板 - 功能未上线，暂时隐藏 */}
+            {false && (
               <div className={cn("flex flex-col h-full", panelWidthClass)}>
                 <div className="flex-shrink-0 px-4 py-3 border-b border-border">
                   <div className="flex items-center justify-between">
@@ -724,6 +680,35 @@ export default function WorkspacePage() {
       {/* 全局输入框 - 仅在欢迎和单对话模式显示 */}
       {(layoutMode === LayoutMode.WELCOME || layoutMode === LayoutMode.CONVERSATION) && (
         <GlobalInputContainer />
+      )}
+
+      {/* 右侧输出流弹窗 */}
+      {showOutputDrawer && (
+        <div className="fixed inset-0 z-50 bg-black/50" onClick={() => setShowOutputDrawer(false)}>
+          <div 
+            className="fixed right-0 top-0 h-full w-96 bg-background shadow-xl border-l border-border"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex flex-col h-full">
+              <div className="flex-shrink-0 px-4 py-3 border-b border-border">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-lg font-semibold text-foreground">
+                    实时输出流
+                  </h2>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowOutputDrawer(false)}
+                    className="h-8 w-8 p-0 text-muted-foreground hover:bg-muted"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              <HistoryPanel />
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

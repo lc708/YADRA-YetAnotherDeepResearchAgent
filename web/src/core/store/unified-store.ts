@@ -742,10 +742,15 @@ export const useUnifiedStore = create<UnifiedStore>()(
         if (!thread) return null;
         
         // 🔥 修复：使用LangGraph原生字段查找reporter生成的最终报告
-        const reportMessages = thread.messages.filter(m => m.langGraphMetadata?.agent === 'reporter');
+        // 🔥 关键修复：只返回已完成流式传输且内容完整的报告
+        const reportMessages = thread.messages.filter(m => 
+          m.langGraphMetadata?.agent === 'reporter' && 
+          !m.isStreaming &&  // 确保流式传输已完成
+          m.content && m.content.trim().length > 100  // 确保内容完整
+        );
         if (reportMessages.length === 0) return null;
         
-        // 返回最新的报告消息
+        // 返回最新的完整报告消息
         return reportMessages[reportMessages.length - 1] || null;
       },
       
