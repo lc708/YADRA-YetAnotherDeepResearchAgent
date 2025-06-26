@@ -280,6 +280,22 @@ export default function WorkspacePage() {
                   />
                 ))
               )}
+              
+              {/* 🔥 优化点2：显示"YADRA正在工作中……"状态指示 */}
+              {messages.some(msg => msg.isStreaming) && (
+                <div className="flex items-center justify-center py-4 animate-in fade-in-0 slide-in-from-bottom-2 duration-300">
+                  <div className="flex items-center gap-3">
+                    <div className="flex space-x-1">
+                      <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+                      <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+                      <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce"></div>
+                    </div>
+                    <span className="text-sm text-blue-600 font-bold">
+                      YADRA正在努力工作中
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
           </ScrollContainer>
         </div>

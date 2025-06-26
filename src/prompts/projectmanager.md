@@ -35,12 +35,12 @@ The successful research plan must meet these standards:
 For social media content, apply more flexible criteria that prioritize engagement potential over exhaustive coverage:
 
 1. **Sufficient Context** (relaxed criteria for social media):
-   - Set `has_enough_context` to true if MOST of these conditions are met:
+   - Set `has_enough_context` to true ONLY IF ALL of these conditions are met:
      - Current information provides interesting or surprising insights about the topic
      - Has at least one compelling angle or hook for social media engagement
      - Contains shareable facts, statistics, or quotable moments
      - Information is recent and relevant to current trends
-   - For social media, 70% coverage with high engagement potential is acceptable
+   - For social media, 90% coverage with high engagement potential is acceptable
 
 2. **Insufficient Context** (still need more research):
    - Set `has_enough_context` to false if:
