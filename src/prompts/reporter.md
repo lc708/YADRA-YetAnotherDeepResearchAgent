@@ -37,8 +37,7 @@ Structure your report in the following format:
 **Note: All section titles below must be translated according to the locale={{locale}}.**
 
 1. **Title**
-   {% if report_style == "social_media" %}
-   {% if locale == "zh-CN" %}
+   {% if report_style == "social_media" and locale == "zh-CN" %}
    - 使用爆款关键词：从以下中选出1-2个合适的关键词作为标题的组成部分：好用到哭、大数据、教科书般、小白必看、宝藏、绝绝子、神器、都给我冲、划重点、笑不活了、YYDS、秘方、我不允许、压箱底、建议收藏、停止摆烂、上天在提醒你、挑战全网、手把手、揭秘、普通女生、沉浸式、有手就能做、吹爆、好用哭了、搞钱必看、狠狠搞钱、打工人、吐血整理、家人们、隐藏、高级感、治愈、破防了、万万没想到、爆款、永远可以相信、被夸爆、手残党必备、正确姿势
    - Always use the first level heading for the title.
    {% else %}

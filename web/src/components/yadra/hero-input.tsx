@@ -162,16 +162,18 @@ export function HeroInput({
 
   // 🚀 构建研究配置的辅助函数
   const buildResearchConfig = useCallback(() => {
+    const settings = useSettingsStore.getState().general;
+    
     return {
-      autoAcceptedPlan: false, // 确保需要用户确认
-      enableBackgroundInvestigation: true,
-      reportStyle: reportStyle,
-      enableDeepThinking: enableDeepThinking,
-      maxPlanIterations: 3,
-      maxStepNum: 5,
-      maxSearchResults: 5
+      autoAcceptedPlan: settings.autoAcceptedPlan,
+      enableBackgroundInvestigation: settings.enableBackgroundInvestigation,
+      reportStyle: settings.reportStyle,
+      enableDeepThinking: settings.enableDeepThinking,
+      maxPlanIterations: settings.maxPlanIterations,
+      maxStepNum: settings.maxStepNum,
+      maxSearchResults: settings.maxSearchResults
     };
-  }, [reportStyle, enableDeepThinking]);
+  }, []); // 不需要依赖，因为直接从 store 获取最新值
 
   const handleSubmit = useCallback(async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
