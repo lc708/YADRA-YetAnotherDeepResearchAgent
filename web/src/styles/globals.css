@@ -248,3 +248,47 @@ strong:not(.text-white):not(.text-muted-foreground),
 b:not(.text-white):not(.text-muted-foreground) {
   color: #111827 !important; /* text-gray-900 */
 }
+
+/* 🔧 修复列表行距问题 - 使用最高优先级覆盖@tailwindcss/typography插件 */
+.prose li,
+.prose-slate li,
+.prose ul > li,
+.prose ol > li,
+.prose-slate ul > li,
+.prose-slate ol > li {
+  margin-top: 0 !important;
+  margin-bottom: 0.125rem !important; /* mb-0.5 = 2px */
+  line-height: 1.25 !important; /* leading-tight */
+}
+
+.prose ul,
+.prose ol,
+.prose-slate ul,
+.prose-slate ol {
+  margin-top: 0.25rem !important; /* my-1 = 4px */
+  margin-bottom: 0.25rem !important;
+}
+
+/* 🔧 针对MessageContainer中的列表特别处理 */
+.prose.prose-slate.max-w-none li {
+  margin-top: 0 !important;
+  margin-bottom: 0.125rem !important;
+  line-height: 1.25 !important;
+}
+
+.prose.prose-slate.max-w-none ul {
+  margin-top: 0.25rem !important;
+  margin-bottom: 0.25rem !important;
+}
+
+/* 🔧 最强优先级 - 直接覆盖所有可能的typography样式 */
+[class*="prose"] li {
+  margin-top: 0 !important;
+}
+
+/* 🔧 针对手动生成的li标签 */
+li.ml-4.list-disc {
+  margin-top: 0 !important;
+  margin-bottom: 0.125rem !important;
+  line-height: 1.25 !important;
+}

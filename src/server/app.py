@@ -203,18 +203,18 @@ async def _astream_workflow_generator(
             resume_msg += f" {messages[-1]['content']}"
         input_ = Command(resume=resume_msg)
 
-    # Use configurable for thread_id
+    # Use configurable for thread_id and all other parameters
     config = {
         "configurable": {
             "thread_id": thread_id,
-        },
-        "resources": resources,
-        "max_plan_iterations": max_plan_iterations,
-        "max_step_num": max_step_num,
-        "max_search_results": max_search_results,
-        "mcp_settings": mcp_settings,
-        "report_style": report_style.value,
-        "enable_deep_thinking": enable_deep_thinking,
+            "resources": resources,
+            "max_plan_iterations": max_plan_iterations,
+            "max_step_num": max_step_num,
+            "max_search_results": max_search_results,
+            "mcp_settings": mcp_settings,
+            "report_style": report_style.value,
+            "enable_deep_thinking": enable_deep_thinking,
+        }
     }
 
     async for agent, _, event_data in graph_instance.astream(

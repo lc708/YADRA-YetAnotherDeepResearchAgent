@@ -237,7 +237,37 @@ class ResearchStreamService:
             })
 
             # 执行LangGraph工作流 - 完全参考app.py实现
-            config = {"configurable": {"thread_id": thread_id}}
+            # 解析配置参数 - 与app.py保持一致
+            if "research_config" in request.config:
+                research_config = request.config["research_config"]
+            else:
+                # 从扁平化的config中提取research相关配置
+                research_config = {
+                    "auto_accepted_plan": request.config.get("auto_accepted_plan", False),
+                    "enable_background_investigation": request.config.get("enableBackgroundInvestigation", True),
+                    "report_style": request.config.get("reportStyle", "academic"),
+                    "enable_deep_thinking": request.config.get("enableDeepThinking", False),
+                    "max_plan_iterations": request.config.get("maxPlanIterations", 3),
+                    "max_step_num": request.config.get("maxStepNum", 5),
+                    "max_search_results": request.config.get("maxSearchResults", 5),
+                }
+
+            model_config = request.config.get("model_config", {})
+            mcp_settings = request.config.get("mcp_settings", {})
+
+            # 构建完整的config - 与app.py结构一致
+            config = {
+                "configurable": {
+                    "thread_id": thread_id,
+                    "resources": [],  # TODO: 从session中获取resources
+                    "max_plan_iterations": research_config.get("max_plan_iterations", 3),
+                    "max_step_num": research_config.get("max_step_num", 5),
+                    "max_search_results": research_config.get("max_search_results", 5),
+                    "mcp_settings": mcp_settings,
+                    "report_style": research_config.get("report_style", "academic"),
+                    "enable_deep_thinking": research_config.get("enable_deep_thinking", False),
+                }
+            }
 
             async for agent, _, event_data in graph.astream(
                 initial_state,

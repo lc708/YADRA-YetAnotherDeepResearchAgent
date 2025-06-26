@@ -205,8 +205,8 @@ const processInlineMarkdown = (text: string): string => {
   // 链接
   text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-primary hover:underline" target="_blank" rel="noopener noreferrer">$1</a>');
   
-  // 列表项
-  text = text.replace(/^[\s]*[-*+]\s+(.*$)/gm, '<li class="ml-4 list-disc leading-tight mb-0.5">$1</li>');
+  // 列表项 - 移除margin-top，使用CSS控制
+  text = text.replace(/^[\s]*[-*+]\s+(.*$)/gm, '<li class="ml-4 list-disc">$1</li>');
   
   // 引用
   text = text.replace(/^>\s+(.*$)/gm, '<blockquote class="border-l-4 border-primary/30 pl-4 py-2 my-4 bg-muted/30 rounded-r text-muted-foreground">$1</blockquote>');

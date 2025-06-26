@@ -16,14 +16,6 @@ import {
   FileText,
   Activity,
   Headphones,
-  Minimize2,
-  Maximize2,
-  Search,
-  Send,
-  Plus,
-  Mic,
-  MicOff,
-  Loader2,
   X,
 } from "lucide-react";
 
@@ -36,7 +28,7 @@ import {
   useFinalReport
 } from "~/core/store";
 import type { ResearchRequest, BusinessPlan, BusinessPlanStep } from "~/core/store";
-import { PodcastPanel } from "~/app/workspace/components/podcast-panel";
+
 import { OutputStream } from "~/app/workspace/components/output-stream";
 import { PlanCard } from "~/components/research/plan-card";
 import type { ResearchPlan } from "~/components/research/plan-card";
@@ -58,8 +50,8 @@ interface Message {
 // 布局模式枚举
 enum LayoutMode {
   WELCOME = 'welcome',
-  CONVERSATION = 'conversation', 
-  MULTI_PANEL = 'multi_panel'
+  CHAT_ONLY = 'chat_only',      // 新增：仅聊天模式
+  CHAT_WITH_ARTIFACTS = 'chat_with_artifacts'  // 新增：聊天+工件模式
 }
 
 // 🔥 稳定的空数组引用，避免useShallow无限循环
@@ -94,15 +86,9 @@ export default function WorkspacePage() {
     })
   );
   
-  // 面板可见性状态 - 对话和工件面板始终显示
-  const [conversationVisible, setConversationVisible] = useState(true);
-  const [artifactVisible, setArtifactVisible] = useState(true);
+  // 输出流弹窗状态
   const [showOutputDrawer, setShowOutputDrawer] = useState(false);
-  const [podcastVisible, setPodcastVisible] = useState(false);
 
-  // 任务状态
-  const [taskStarted, setTaskStarted] = useState(false);
-  
   // 🚀 ASK API研究请求处理
   const handleResearchSubmit = useCallback(async (request: ResearchRequest) => {
     try {
@@ -129,56 +115,44 @@ export default function WorkspacePage() {
     }
   }, [router]);
   
-  // 🚀 计算布局模式 - 输出流改为弹窗，不影响布局
+  // 🚀 获取计划状态 - Hook必须在组件顶层调用
+  const currentPlanData = useCurrentPlan(currentThreadId || undefined);
+  
+  // 🚀 计算布局模式 - 基于计划状态自动切换，使用稳定的依赖
   const layoutMode = useMemo(() => {
     if (!hasMessages) return LayoutMode.WELCOME;
     
-    const visiblePanels = [conversationVisible, artifactVisible].filter(Boolean);
-    
-    // 如果只有对话面板可见
-    if (visiblePanels.length === 1 && conversationVisible) {
-      return LayoutMode.CONVERSATION;
+    // 检测是否有计划数据来决定布局，使用稳定的判断条件
+    const hasPlan = currentPlanData && !currentPlanData.isStreaming;
+    if (hasPlan) {
+      return LayoutMode.CHAT_WITH_ARTIFACTS;
     }
     
-    // 如果有多个面板可见
-    if (visiblePanels.length > 1) {
-      return LayoutMode.MULTI_PANEL;
-    }
-    
-    // 有消息但没有可见面板，默认显示对话
-    return LayoutMode.CONVERSATION;
-  }, [hasMessages, conversationVisible, artifactVisible]);
+    return LayoutMode.CHAT_ONLY;
+  }, [hasMessages, currentPlanData?.messageId, currentPlanData?.isStreaming]);
 
-  // 🚀 计算可见面板和宽度 - 输出流改为弹窗，不影响布局计算
-  const visiblePanels = useMemo(() => {
-    return [
-      { type: 'conversation', visible: conversationVisible },
-      { type: 'artifacts', visible: artifactVisible },
-      // 输出流和播客面板暂时不参与宽度计算
-    ].filter(panel => panel.visible);
-  }, [conversationVisible, artifactVisible]);
-
+  // 🚀 计算面板宽度 - 基于布局模式
   const panelWidthClass = useMemo(() => {
-    const count = visiblePanels.length;
-    if (count === 1) return "w-full";
-    if (count === 2) return "w-1/2"; 
-    if (count === 3) return "w-1/3";
-    return "w-1/4";
-  }, [visiblePanels.length]);
-
-  // 面板切换函数
-  const toggleConversationPanel = () => setConversationVisible(!conversationVisible);
-  const toggleArtifactsPanel = () => setArtifactVisible(!artifactVisible);
-  const toggleOutputDrawer = () => setShowOutputDrawer(!showOutputDrawer);
-  const togglePodcastPanel = () => setPodcastVisible(!podcastVisible);
-
-  // 监听消息变化来启动任务面板 - artifact面板已默认显示，输出流和播客面板暂不启用
-  useEffect(() => {
-    if (hasMessages && !taskStarted) {
-      setTaskStarted(true);
-      // 输出流改为手动打开，播客面板暂不自动启用
+    if (layoutMode === LayoutMode.CHAT_ONLY) {
+      return "w-1/2 mx-auto";
     }
-  }, [hasMessages, taskStarted]);
+    if (layoutMode === LayoutMode.CHAT_WITH_ARTIFACTS) {
+      return "w-1/3"; // 聊天面板1/3宽度
+    }
+    return "w-full";
+  }, [layoutMode]);
+
+  const artifactPanelWidthClass = useMemo(() => {
+    if (layoutMode === LayoutMode.CHAT_WITH_ARTIFACTS) {
+      return "w-1/2"; // 工件面板1/2宽度
+    }
+    return "w-full";
+  }, [layoutMode]);
+
+  // 输出流弹窗切换函数
+  const toggleOutputDrawer = () => setShowOutputDrawer(!showOutputDrawer);
+
+
 
   // 🚀 欢迎内容组件
   const WelcomeContent = () => (
@@ -225,7 +199,7 @@ export default function WorkspacePage() {
   );
 
   // 🚀 对话面板组件 - 自己获取messages，避免父组件重新渲染
-  const ConversationPanel = () => {
+  const ConversationPanel = useCallback(() => {
     // 🔥 ConversationPanel自己获取messages，避免父组件过度订阅
     const storeMessages = useThreadMessages(currentThreadId || undefined);
     
@@ -278,22 +252,21 @@ export default function WorkspacePage() {
         </div>
       </div>
     );
-  };
+  }, [currentThreadId]);
 
-  // 🚀 工件面板组件
-  const ArtifactsPanel = () => {
+  // 🚀 工件面板组件 - 复用顶层的计划数据，避免重复Hook调用
+  const ArtifactsPanel = useCallback(() => {
     // 🚀 使用Store层的Hook接口获取计划和报告
     const currentInterrupt = useCurrentInterrupt(currentThreadId || undefined);
-    const planData = useCurrentPlan(currentThreadId || undefined);
     const finalReport = useFinalReport(currentThreadId || undefined); // 🔥 添加最终报告
     
-    // 🔥 解析计划数据
+    // 🔥 解析计划数据 - 使用顶层传入的计划数据，避免在每次渲染时重新计算
     const currentPlan = useMemo(() => {
-      if (!planData || planData.isStreaming) return null;
+      if (!currentPlanData || currentPlanData.isStreaming) return null;
       
       try {
-        // 🔥 从planData.content中解析BusinessPlan
-        let jsonContent = planData.content.trim();
+        // 🔥 从currentPlanData.content中解析BusinessPlan
+        let jsonContent = currentPlanData.content.trim();
         
         // 查找JSON的开始和结束位置
         const jsonStart = jsonContent.indexOf('{');
@@ -335,7 +308,7 @@ export default function WorkspacePage() {
         }));
         
         return {
-          id: `plan-${planData.messageId}`,
+          id: `plan-${currentPlanData.messageId}`,
           title: backendPlan.title || '研究计划',
           objective: backendPlan.thought || '研究目标',
           steps: steps,
@@ -344,7 +317,7 @@ export default function WorkspacePage() {
           complexity: steps.length <= 2 ? 'simple' as const : 
                      steps.length <= 4 ? 'moderate' as const : 'complex' as const,
           confidence: backendPlan.has_enough_context ? 0.9 : 0.7,
-          createdAt: new Date(planData.timestamp || Date.now()),
+          createdAt: new Date(currentPlanData.timestamp || Date.now()),
           metadata: {
             sources: 0,
             tools: ['tavily_search'],
@@ -356,7 +329,7 @@ export default function WorkspacePage() {
         console.warn('Failed to parse plan:', error);
         return null;
       }
-    }, [planData]);
+    }, [currentPlanData]);
     
     // 🚀 简化：直接判断是否显示操作按钮
     const shouldShowActions = (): boolean => {
@@ -541,18 +514,13 @@ export default function WorkspacePage() {
         </div>
       </div>
     );
-  };
+  }, [currentPlanData, currentThreadId]);
 
   // 🚀 输出流面板组件 - 使用OutputStream组件
   const HistoryPanel = () => (
     <div className="flex flex-col h-full">
       <OutputStream className="flex-1" />
     </div>
-  );
-
-  // 🚀 播客面板组件 - 导入迁移后的组件
-  const PodcastPanelWrapper = () => (
-    <PodcastPanel className="flex-1" />
   );
 
   return (
@@ -596,81 +564,32 @@ export default function WorkspacePage() {
           // 🚀 欢迎模式：居中显示欢迎内容
           <WelcomeContent />
         ) : (
-          // 🚀 对话和多面板模式：显示面板系统
+          // 🚀 基于布局模式显示面板系统
           <div className="flex h-full">
-            {/* 对话面板 */}
-            {conversationVisible && (
-              <div className={cn("flex flex-col h-full relative", panelWidthClass, {
-                "border-r border-border": visiblePanels.length > 1
+            {/* 对话面板 - 始终显示 */}
+            <div className={cn("flex flex-col h-full relative", panelWidthClass, {
+              "border-r border-border": layoutMode === LayoutMode.CHAT_WITH_ARTIFACTS
+            })}>
+              <div className={cn("flex-1 overflow-hidden", {
+                "pb-20": layoutMode === LayoutMode.CHAT_WITH_ARTIFACTS
               })}>
-                <div className={cn("flex-1 overflow-hidden", {
-                  "pb-20": layoutMode === LayoutMode.MULTI_PANEL
-                })}>
-                  <ConversationPanel />
-                </div>
-                {/* 在多面板模式下，输入框属于对话面板 */}
-                {layoutMode === LayoutMode.MULTI_PANEL && <PanelInputContainer />}
+                <ConversationPanel />
               </div>
-            )}
+              {/* 在双面板模式下，输入框属于对话面板 */}
+              {layoutMode === LayoutMode.CHAT_WITH_ARTIFACTS && <PanelInputContainer />}
+            </div>
 
-            {/* 工件面板 */}
-            {artifactVisible && (
-              <div className={cn("flex flex-col h-full", panelWidthClass)}>
+            {/* 工件面板 - 仅在双面板模式显示 */}
+            {layoutMode === LayoutMode.CHAT_WITH_ARTIFACTS && (
+              <div className={cn("flex flex-col h-full", artifactPanelWidthClass)}>
                 <div className="flex-shrink-0 px-4 py-3 border-b border-border">
                   <div className="flex items-center justify-between">
                     <h2 className="text-lg font-semibold text-foreground">
                       研究工件
                     </h2>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={toggleArtifactsPanel}
-                      className="h-8 w-8 p-0 text-muted-foreground hover:bg-muted"
-                    >
-                      <Minimize2 className="h-4 w-4" />
-                    </Button>
                   </div>
                 </div>
                 <ArtifactsPanel />
-              </div>
-            )}
-
-            {/* 输出流面板已改为右侧弹窗显示 */}
-
-            {/* 播客面板 - 功能未上线，暂时隐藏 */}
-            {false && (
-              <div className={cn("flex flex-col h-full", panelWidthClass)}>
-                <div className="flex-shrink-0 px-4 py-3 border-b border-border">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-lg font-semibold text-foreground">
-                      播客内容
-                    </h2>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={togglePodcastPanel}
-                      className="h-8 w-8 p-0 text-muted-foreground hover:bg-muted"
-                    >
-                      <Minimize2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-                <PodcastPanelWrapper />
-              </div>
-            )}
-
-            {/* 当有对话但所有面板都隐藏时显示提示 */}
-            {hasMessages && visiblePanels.length === 0 && (
-              <div className="flex flex-1 items-center justify-center">
-                <div className="text-center">
-                  <MessageSquare className="mx-auto h-12 w-12 text-gray-400" />
-                  <h3 className="mt-4 text-lg font-medium text-foreground">
-                    选择要查看的面板
-                  </h3>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    使用右上角的按钮开启对话、工件或其他面板
-                  </p>
-                </div>
               </div>
             )}
           </div>
@@ -678,7 +597,7 @@ export default function WorkspacePage() {
       </div>
 
       {/* 全局输入框 - 仅在欢迎和单对话模式显示 */}
-      {(layoutMode === LayoutMode.WELCOME || layoutMode === LayoutMode.CONVERSATION) && (
+      {(layoutMode === LayoutMode.WELCOME || layoutMode === LayoutMode.CHAT_ONLY) && (
         <GlobalInputContainer />
       )}
 

@@ -37,8 +37,14 @@ Structure your report in the following format:
 **Note: All section titles below must be translated according to the locale={{locale}}.**
 
 1. **Title**
+   {% if report_style == "social_media" %}
+   {% if locale == "zh-CN" %}
+   - 使用爆款关键词：从以下中选出1-2个合适的关键词作为标题的组成部分：好用到哭、大数据、教科书般、小白必看、宝藏、绝绝子、神器、都给我冲、划重点、笑不活了、YYDS、秘方、我不允许、压箱底、建议收藏、停止摆烂、上天在提醒你、挑战全网、手把手、揭秘、普通女生、沉浸式、有手就能做、吹爆、好用哭了、搞钱必看、狠狠搞钱、打工人、吐血整理、家人们、隐藏、高级感、治愈、破防了、万万没想到、爆款、永远可以相信、被夸爆、手残党必备、正确姿势
+   - Always use the first level heading for the title.
+   {% else %}
    - Always use the first level heading for the title.
    - A concise title for the report.
+   {% endif %}
 
 2. **Key Points**
    - A bulleted list of the most important findings (4-6 points).
@@ -92,10 +98,12 @@ Structure your report in the following format:
    - This section is optional for shorter reports.
    {% endif %}
 
+{% if report_style == "academic" %}
 6. **Key Citations**
    - List all references at the end in link reference format.
    - Include an empty line between each citation for better readability.
    - Format: `- [Source Title](URL)`
+{% endif %}
 
 # Writing Guidelines
 

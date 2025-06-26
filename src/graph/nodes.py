@@ -205,7 +205,7 @@ def human_feedback_node(
         ]
 
         feedback = interrupt(
-            value={"message": "Please Review the Plan.", "options": options}
+            value={"message": "请审查研究计划.", "options": options}
         )
 
         # if the feedback is not accepted, return the projectmanager node
