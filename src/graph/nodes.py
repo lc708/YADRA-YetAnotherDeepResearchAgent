@@ -151,7 +151,10 @@ def projectmanager_node(
         return Command(goto="reporter")
 
     full_response = ""
-    if AGENT_LLM_MAP["projectmanager"] == "basic" and not configurable.enable_deep_thinking:
+    if (
+        AGENT_LLM_MAP["projectmanager"] == "basic"
+        and not configurable.enable_deep_thinking
+    ):
         response = llm.invoke(messages)
         full_response = response.model_dump_json(indent=4, exclude_none=True)
     else:
@@ -190,7 +193,9 @@ def projectmanager_node(
 
 def human_feedback_node(
     state,
-) -> Command[Literal["projectmanager", "research_team", "reporter", "__end__", "reask"]]:
+) -> Command[
+    Literal["projectmanager", "research_team", "reporter", "__end__", "reask"]
+]:
     current_plan = state.get("current_plan", "")
     # check if the plan is auto accepted
     auto_accepted_plan = state.get("auto_accepted_plan", False)
@@ -204,9 +209,7 @@ def human_feedback_node(
             {"text": "重新提问", "value": "reask"},
         ]
 
-        feedback = interrupt(
-            value={"message": "请审查研究计划.", "options": options}
-        )
+        feedback = interrupt(value={"message": "请审查研究计划.", "options": options})
 
         # if the feedback is not accepted, return the projectmanager node
         if feedback and str(feedback).upper().startswith("[EDIT_PLAN]"):

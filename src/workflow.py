@@ -24,6 +24,7 @@ graph = build_graph()
 # 异步图管理
 _async_graph = None
 
+
 async def get_async_graph():
     """获取或创建异步图实例"""
     global _async_graph
@@ -58,10 +59,10 @@ async def run_agent_workflow_async(
         enable_debug_logging()
 
     logger.info(f"Starting async workflow with user input: {user_input}")
-    
+
     # 获取异步图（带checkpointer）
     async_graph = await get_async_graph()
-    
+
     initial_state = {
         # Runtime Variables
         "messages": [{"role": "user", "content": user_input}],

@@ -89,40 +89,41 @@ class ResearchStreamService:
         """构造研究事件 - 完全参考app.py的_make_event实现"""
         if data.get("content") == "":
             data.pop("content")
-        return {
-            "event": event_type,
-            "data": safe_json_dumps(data)
-        }
+        return {"event": event_type, "data": safe_json_dumps(data)}
 
-    def _create_message_chunk_event(self, message: AIMessageChunk, agent: str, thread_id: str, execution_id: str):
+    def _create_message_chunk_event(
+        self, message: AIMessageChunk, agent: str, thread_id: str, execution_id: str
+    ):
         """基于LangGraph原生AIMessageChunk创建消息事件"""
         data = {
             "thread_id": thread_id,
             "agent": agent[0].split(":")[0],  # 提取节点名
             "id": message.id,
-            "role": "assistant", 
+            "role": "assistant",
             "content": message.content,
             "execution_id": execution_id,
             "timestamp": self._get_current_timestamp(),
         }
-        
+
         # 🔥 完全对齐app.py：添加reasoning_content处理
         if message.additional_kwargs.get("reasoning_content"):
             data["reasoning_content"] = message.additional_kwargs["reasoning_content"]
-        
+
         # 🔥 完全对齐app.py：添加finish_reason处理
         if message.response_metadata.get("finish_reason"):
             data["finish_reason"] = message.response_metadata.get("finish_reason")
-        
+
         # 🔥 完全对齐app.py：添加metadata处理
         data["metadata"] = {
             "additional_kwargs": message.additional_kwargs,
             "response_metadata": message.response_metadata,
         }
-        
+
         return self._make_research_event("message_chunk", data)
 
-    def _create_tool_calls_event(self, message: AIMessageChunk, agent: str, thread_id: str, execution_id: str):
+    def _create_tool_calls_event(
+        self, message: AIMessageChunk, agent: str, thread_id: str, execution_id: str
+    ):
         """创建工具调用事件"""
         data = {
             "thread_id": thread_id,
@@ -135,18 +136,20 @@ class ResearchStreamService:
             "execution_id": execution_id,
             "timestamp": self._get_current_timestamp(),
         }
-        
+
         # 🔥 完全对齐app.py：添加reasoning_content处理
         if message.additional_kwargs.get("reasoning_content"):
             data["reasoning_content"] = message.additional_kwargs["reasoning_content"]
-        
+
         # 🔥 完全对齐app.py：添加finish_reason处理
         if message.response_metadata.get("finish_reason"):
             data["finish_reason"] = message.response_metadata.get("finish_reason")
-        
+
         return self._make_research_event("tool_calls", data)
 
-    def _create_tool_call_chunks_event(self, message: AIMessageChunk, agent: str, thread_id: str, execution_id: str):
+    def _create_tool_call_chunks_event(
+        self, message: AIMessageChunk, agent: str, thread_id: str, execution_id: str
+    ):
         """创建工具调用片段事件 - 新增：完全对齐app.py"""
         data = {
             "thread_id": thread_id,
@@ -158,18 +161,20 @@ class ResearchStreamService:
             "execution_id": execution_id,
             "timestamp": self._get_current_timestamp(),
         }
-        
+
         # 🔥 完全对齐app.py：添加reasoning_content处理
         if message.additional_kwargs.get("reasoning_content"):
             data["reasoning_content"] = message.additional_kwargs["reasoning_content"]
-        
+
         # 🔥 完全对齐app.py：添加finish_reason处理
         if message.response_metadata.get("finish_reason"):
             data["finish_reason"] = message.response_metadata.get("finish_reason")
-        
+
         return self._make_research_event("tool_call_chunks", data)
 
-    def _create_tool_message_event(self, message: ToolMessage, agent: str, thread_id: str, execution_id: str):
+    def _create_tool_message_event(
+        self, message: ToolMessage, agent: str, thread_id: str, execution_id: str
+    ):
         """创建工具结果事件"""
         data = {
             "thread_id": thread_id,
@@ -181,11 +186,13 @@ class ResearchStreamService:
             "execution_id": execution_id,
             "timestamp": self._get_current_timestamp(),
         }
-        
+
         # 🔥 完全对齐app.py：添加finish_reason处理（虽然ToolMessage通常没有response_metadata，但保持一致性）
-        if hasattr(message, 'response_metadata') and message.response_metadata.get("finish_reason"):
+        if hasattr(message, "response_metadata") and message.response_metadata.get(
+            "finish_reason"
+        ):
             data["finish_reason"] = message.response_metadata.get("finish_reason")
-        
+
         return self._make_research_event("tool_call_result", data)
 
     async def _process_langgraph_stream(
@@ -208,33 +215,36 @@ class ResearchStreamService:
 
         try:
             # 发送开始事件
-            yield self._make_research_event("metadata", {
-                "execution_id": execution_id,
-                "thread_id": thread_id,
-                "session_id": session.id,
-                "frontend_uuid": request.frontend_uuid,
-                "frontend_context_uuid": request.frontend_context_uuid,
-                "visitor_id": request.visitor_id,
-                "user_id": request.user_id,
-                "config_used": request.config,
-                "model_info": {
-                    "model_name": (
-                        request.config.get("model_config", {}).get(
-                            "model_name", "claude-3-5-sonnet-20241022"
-                        )
-                    ),
-                    "provider": (
-                        request.config.get("model_config", {}).get(
-                            "provider", "anthropic"
-                        )
-                    ),
-                    "version": "20241022",
+            yield self._make_research_event(
+                "metadata",
+                {
+                    "execution_id": execution_id,
+                    "thread_id": thread_id,
+                    "session_id": session.id,
+                    "frontend_uuid": request.frontend_uuid,
+                    "frontend_context_uuid": request.frontend_context_uuid,
+                    "visitor_id": request.visitor_id,
+                    "user_id": request.user_id,
+                    "config_used": request.config,
+                    "model_info": {
+                        "model_name": (
+                            request.config.get("model_config", {}).get(
+                                "model_name", "claude-3-5-sonnet-20241022"
+                            )
+                        ),
+                        "provider": (
+                            request.config.get("model_config", {}).get(
+                                "provider", "anthropic"
+                            )
+                        ),
+                        "version": "20241022",
+                    },
+                    "estimated_duration": 120,
+                    "start_time": start_time.isoformat() + "Z",
+                    "execution_type": execution_type,
+                    "timestamp": self._get_current_timestamp(),
                 },
-                "estimated_duration": 120,
-                "start_time": start_time.isoformat() + "Z",
-                "execution_type": execution_type,
-                "timestamp": self._get_current_timestamp(),
-            })
+            )
 
             # 执行LangGraph工作流 - 完全参考app.py实现
             # 解析配置参数 - 与app.py保持一致
@@ -243,10 +253,16 @@ class ResearchStreamService:
             else:
                 # 从扁平化的config中提取research相关配置
                 research_config = {
-                    "auto_accepted_plan": request.config.get("auto_accepted_plan", False),
-                    "enable_background_investigation": request.config.get("enableBackgroundInvestigation", True),
+                    "auto_accepted_plan": request.config.get(
+                        "auto_accepted_plan", False
+                    ),
+                    "enable_background_investigation": request.config.get(
+                        "enableBackgroundInvestigation", True
+                    ),
                     "report_style": request.config.get("reportStyle", "academic"),
-                    "enable_deep_thinking": request.config.get("enableDeepThinking", False),
+                    "enable_deep_thinking": request.config.get(
+                        "enableDeepThinking", False
+                    ),
                     "max_plan_iterations": request.config.get("maxPlanIterations", 3),
                     "max_step_num": request.config.get("maxStepNum", 5),
                     "max_search_results": request.config.get("maxSearchResults", 5),
@@ -260,12 +276,16 @@ class ResearchStreamService:
                 "configurable": {
                     "thread_id": thread_id,
                     "resources": [],  # TODO: 从session中获取resources
-                    "max_plan_iterations": research_config.get("max_plan_iterations", 3),
+                    "max_plan_iterations": research_config.get(
+                        "max_plan_iterations", 3
+                    ),
                     "max_step_num": research_config.get("max_step_num", 5),
                     "max_search_results": research_config.get("max_search_results", 5),
                     "mcp_settings": mcp_settings,
                     "report_style": research_config.get("report_style", "academic"),
-                    "enable_deep_thinking": research_config.get("enable_deep_thinking", False),
+                    "enable_deep_thinking": research_config.get(
+                        "enable_deep_thinking", False
+                    ),
                 }
             }
 
@@ -277,25 +297,35 @@ class ResearchStreamService:
             ):
                 # 处理LangGraph原生消息事件 - 完全对齐app.py逻辑
                 if not isinstance(event_data, dict):
-                    message_chunk, message_metadata = cast(tuple[BaseMessage, dict], event_data)
-                    
+                    message_chunk, message_metadata = cast(
+                        tuple[BaseMessage, dict], event_data
+                    )
+
                     # 🔥 完全对齐app.py：使用LangGraph原生类型判断
                     if isinstance(message_chunk, ToolMessage):
                         # Tool Message - Return the result of the tool call
-                        yield self._create_tool_message_event(message_chunk, agent, thread_id, execution_id)
+                        yield self._create_tool_message_event(
+                            message_chunk, agent, thread_id, execution_id
+                        )
                     elif isinstance(message_chunk, AIMessageChunk):
                         # AI Message - Raw message tokens
                         if message_chunk.tool_calls:
                             # AI Message - Tool Call
-                            yield self._create_tool_calls_event(message_chunk, agent, thread_id, execution_id)
+                            yield self._create_tool_calls_event(
+                                message_chunk, agent, thread_id, execution_id
+                            )
                         elif message_chunk.tool_call_chunks:
                             # AI Message - Tool Call Chunks
-                            yield self._create_tool_call_chunks_event(message_chunk, agent, thread_id, execution_id)
+                            yield self._create_tool_call_chunks_event(
+                                message_chunk, agent, thread_id, execution_id
+                            )
                         else:
                             # AI Message - Raw message tokens
-                            yield self._create_message_chunk_event(message_chunk, agent, thread_id, execution_id)
+                            yield self._create_message_chunk_event(
+                                message_chunk, agent, thread_id, execution_id
+                            )
                     continue
-                
+
                 # 处理updates事件（interrupt等）
                 if isinstance(event_data, dict):
                     if "__interrupt__" in event_data:
@@ -313,14 +343,17 @@ class ResearchStreamService:
                         ):
                             # 处理reask interrupt
                             original_input = interrupt_value[1]
-                            yield self._make_research_event("reask", {
-                                "thread_id": thread_id,
-                                "id": interrupt_data.ns[0],
-                                "role": "assistant",
-                                "content": "正在恢复原始输入状态...",
-                                "finish_reason": "reask",
-                                "original_input": original_input,
-                            })
+                            yield self._make_research_event(
+                                "reask",
+                                {
+                                    "thread_id": thread_id,
+                                    "id": interrupt_data.ns[0],
+                                    "role": "assistant",
+                                    "content": "正在恢复原始输入状态...",
+                                    "finish_reason": "reask",
+                                    "original_input": original_input,
+                                },
+                            )
                         else:
                             # 处理标准interrupt
                             if (
@@ -341,14 +374,17 @@ class ResearchStreamService:
                                     {"text": "重新提问", "value": "reask"},
                                 ]
 
-                            yield self._make_research_event("interrupt", {
-                                "thread_id": thread_id,
-                                "id": interrupt_data.ns[0],
-                                "role": "assistant",
-                                "content": message_content,
-                                "finish_reason": "interrupt",
-                                "options": options,
-                            })
+                            yield self._make_research_event(
+                                "interrupt",
+                                {
+                                    "thread_id": thread_id,
+                                    "id": interrupt_data.ns[0],
+                                    "role": "assistant",
+                                    "content": message_content,
+                                    "finish_reason": "interrupt",
+                                    "options": options,
+                                },
+                            )
 
                         # interrupt后不发送complete事件，等待用户反馈
                         logger.info(f"🔄 Interrupt发送完成，等待用户反馈")
@@ -357,37 +393,45 @@ class ResearchStreamService:
             # 检查是否真正完成
             try:
                 current_state = await graph.aget_state(config)
-                duration_ms = int((datetime.utcnow() - start_time).total_seconds() * 1000)
+                duration_ms = int(
+                    (datetime.utcnow() - start_time).total_seconds() * 1000
+                )
 
                 # 发送完成事件
-                yield self._make_research_event("complete", {
-                    "execution_id": execution_id,
+                yield self._make_research_event(
+                    "complete",
+                    {
+                        "execution_id": execution_id,
                         "thread_id": thread_id,
-                    "total_duration_ms": duration_ms,
-                    "tokens_consumed": {"input": 0, "output": 0},
-                    "total_cost": 0.0,
-                    "artifacts_generated": [],
-                    "final_status": "completed",
-                    "completion_time": self._get_current_timestamp(),
-                    "summary": {"nodes_completed": []},
-                    "timestamp": self._get_current_timestamp(),
-                })
+                        "total_duration_ms": duration_ms,
+                        "tokens_consumed": {"input": 0, "output": 0},
+                        "total_cost": 0.0,
+                        "artifacts_generated": [],
+                        "final_status": "completed",
+                        "completion_time": self._get_current_timestamp(),
+                        "summary": {"nodes_completed": []},
+                        "timestamp": self._get_current_timestamp(),
+                    },
+                )
 
             except Exception as state_error:
                 logger.warning(f"⚠️ 无法获取LangGraph状态: {state_error}")
 
         except Exception as e:
             logger.error(f"LangGraph执行错误: {e}")
-            yield self._make_research_event("error", {
-                "error_code": "LANGGRAPH_EXECUTION_ERROR",
-                "error_message": str(e),
-                "error_details": {"traceback": str(e)},
-                "thread_id": thread_id,
-                "execution_id": execution_id,
-                "retry_after": None,
-                "suggestions": ["检查配置", "重试请求"],
-                "timestamp": self._get_current_timestamp(),
-            })
+            yield self._make_research_event(
+                "error",
+                {
+                    "error_code": "LANGGRAPH_EXECUTION_ERROR",
+                    "error_message": str(e),
+                    "error_details": {"traceback": str(e)},
+                    "thread_id": thread_id,
+                    "execution_id": execution_id,
+                    "retry_after": None,
+                    "suggestions": ["检查配置", "重试请求"],
+                    "timestamp": self._get_current_timestamp(),
+                },
+            )
 
     async def create_research_stream(
         self,
@@ -502,16 +546,19 @@ class ResearchStreamService:
 
         except Exception as e:
             logger.error(f"创建研究流失败: {e}")
-            yield self._make_research_event("error", {
-                "error_code": "CREATE_STREAM_ERROR",
-                "error_message": str(e),
-                "error_details": {"error_type": type(e).__name__},
-                "thread_id": "",
-                "execution_id": "",
-                "retry_after": 30,
-                "suggestions": ["检查请求参数", "稍后重试"],
-                "timestamp": self._get_current_timestamp(),
-            })
+            yield self._make_research_event(
+                "error",
+                {
+                    "error_code": "CREATE_STREAM_ERROR",
+                    "error_message": str(e),
+                    "error_details": {"error_type": type(e).__name__},
+                    "thread_id": "",
+                    "execution_id": "",
+                    "retry_after": 30,
+                    "suggestions": ["检查请求参数", "稍后重试"],
+                    "timestamp": self._get_current_timestamp(),
+                },
+            )
 
     async def continue_research_stream(
         self, request: ResearchStreamRequest
@@ -521,13 +568,17 @@ class ResearchStreamService:
             # 获取thread_id
             thread_id = request.thread_id
             if not thread_id and request.url_param:
-                session = await self.session_repo.get_session_by_url_param(request.url_param)
+                session = await self.session_repo.get_session_by_url_param(
+                    request.url_param
+                )
                 if not session:
                     raise HTTPException(status_code=404, detail="会话不存在")
                 thread_id = session.thread_id
 
             if not thread_id:
-                raise HTTPException(status_code=400, detail="必须提供thread_id或url_param")
+                raise HTTPException(
+                    status_code=400, detail="必须提供thread_id或url_param"
+                )
 
             logger.info(f"🔍 Continue research stream for thread_id: {thread_id}")
 
@@ -548,24 +599,46 @@ class ResearchStreamService:
             session_config = await self.session_repo.get_session_config(session.id)
             if session_config and session_config.research_config:
                 # 使用数据库中保存的配置
-                logger.info(f"📋 Using saved config from database: {session_config.research_config}")
+                logger.info(
+                    f"📋 Using saved config from database: {session_config.research_config}"
+                )
                 # 将保存的配置合并到请求配置中
                 request.config["research_config"] = session_config.research_config
                 request.config["model_config"] = session_config.model_config or {}
                 request.config["output_config"] = session_config.output_config or {}
                 # 同时设置扁平化的配置（兼容旧格式）
                 if session_config.research_config:
-                    request.config.update({
-                        "auto_accepted_plan": session_config.research_config.get("auto_accepted_plan", False),
-                        "enableBackgroundInvestigation": session_config.research_config.get("enable_background_investigation", True),
-                        "reportStyle": session_config.research_config.get("report_style", "academic"),
-                        "enableDeepThinking": session_config.research_config.get("enable_deep_thinking", False),
-                        "maxPlanIterations": session_config.research_config.get("max_plan_iterations", 3),
-                        "maxStepNum": session_config.research_config.get("max_step_num", 5),
-                        "maxSearchResults": session_config.research_config.get("max_search_results", 5),
-                    })
+                    request.config.update(
+                        {
+                            "auto_accepted_plan": session_config.research_config.get(
+                                "auto_accepted_plan", False
+                            ),
+                            "enableBackgroundInvestigation": (
+                                session_config.research_config.get(
+                                    "enable_background_investigation", True
+                                )
+                            ),
+                            "reportStyle": session_config.research_config.get(
+                                "report_style", "academic"
+                            ),
+                            "enableDeepThinking": session_config.research_config.get(
+                                "enable_deep_thinking", False
+                            ),
+                            "maxPlanIterations": session_config.research_config.get(
+                                "max_plan_iterations", 3
+                            ),
+                            "maxStepNum": session_config.research_config.get(
+                                "max_step_num", 5
+                            ),
+                            "maxSearchResults": session_config.research_config.get(
+                                "max_search_results", 5
+                            ),
+                        }
+                    )
             else:
-                logger.warning(f"⚠️ No saved config found for session {session.id}, using defaults")
+                logger.warning(
+                    f"⚠️ No saved config found for session {session.id}, using defaults"
+                )
 
             # 获取LangGraph实例
             graph = await self._get_graph()
@@ -575,22 +648,25 @@ class ResearchStreamService:
             interrupt_feedback = None
             if request.context and "interrupt_feedback" in request.context:
                 interrupt_feedback = request.context["interrupt_feedback"]
-            
+
             # 构造continue状态
             initial_state = {
                 "messages": [{"role": "user", "content": request.message}],
                 "research_topic": request.message,
                 "auto_accepted_plan": False,  # continue场景默认需要用户确认
             }
-            
+
             # 🔥 关键修复：如果有interrupt_feedback，使用Command(resume=...)而不是普通状态
             if interrupt_feedback:
                 resume_msg = f"[{interrupt_feedback}]"
                 if request.message:
                     resume_msg += f" {request.message}"
                 from langgraph.types import Command
+
                 initial_state = Command(resume=resume_msg)
-                logger.info(f"🔄 Resume with interrupt_feedback: {interrupt_feedback}, resume_msg: {resume_msg}")
+                logger.info(
+                    f"🔄 Resume with interrupt_feedback: {interrupt_feedback}, resume_msg: {resume_msg}"
+                )
 
             # 处理LangGraph流式执行
             async for event in self._process_langgraph_stream(
@@ -605,16 +681,19 @@ class ResearchStreamService:
 
         except Exception as e:
             logger.error(f"Continue research stream failed: {e}")
-            yield self._make_research_event("error", {
-                "error_code": "CONTINUE_STREAM_ERROR",
-                "error_message": str(e),
-                "error_details": {"error_type": type(e).__name__},
-                "thread_id": request.thread_id or "",
-                "execution_id": "",
-                "retry_after": 30,
-                "suggestions": ["检查thread_id", "确认会话存在", "稍后重试"],
-                "timestamp": self._get_current_timestamp(),
-            })
+            yield self._make_research_event(
+                "error",
+                {
+                    "error_code": "CONTINUE_STREAM_ERROR",
+                    "error_message": str(e),
+                    "error_details": {"error_type": type(e).__name__},
+                    "thread_id": request.thread_id or "",
+                    "execution_id": "",
+                    "retry_after": 30,
+                    "suggestions": ["检查thread_id", "确认会话存在", "稍后重试"],
+                    "timestamp": self._get_current_timestamp(),
+                },
+            )
 
 
 # 依赖注入
