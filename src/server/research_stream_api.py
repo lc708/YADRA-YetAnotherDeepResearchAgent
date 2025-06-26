@@ -544,6 +544,29 @@ class ResearchStreamService:
             )
             execution_id = execution_record.execution_id
 
+            # 🔥 关键修复：获取已保存的配置，而不是使用请求中的空配置
+            session_config = await self.session_repo.get_session_config(session.id)
+            if session_config and session_config.research_config:
+                # 使用数据库中保存的配置
+                logger.info(f"📋 Using saved config from database: {session_config.research_config}")
+                # 将保存的配置合并到请求配置中
+                request.config["research_config"] = session_config.research_config
+                request.config["model_config"] = session_config.model_config or {}
+                request.config["output_config"] = session_config.output_config or {}
+                # 同时设置扁平化的配置（兼容旧格式）
+                if session_config.research_config:
+                    request.config.update({
+                        "auto_accepted_plan": session_config.research_config.get("auto_accepted_plan", False),
+                        "enableBackgroundInvestigation": session_config.research_config.get("enable_background_investigation", True),
+                        "reportStyle": session_config.research_config.get("report_style", "academic"),
+                        "enableDeepThinking": session_config.research_config.get("enable_deep_thinking", False),
+                        "maxPlanIterations": session_config.research_config.get("max_plan_iterations", 3),
+                        "maxStepNum": session_config.research_config.get("max_step_num", 5),
+                        "maxSearchResults": session_config.research_config.get("max_search_results", 5),
+                    })
+            else:
+                logger.warning(f"⚠️ No saved config found for session {session.id}, using defaults")
+
             # 获取LangGraph实例
             graph = await self._get_graph()
 
