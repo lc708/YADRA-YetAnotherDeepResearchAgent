@@ -79,13 +79,13 @@ Structure your report in the following format:
 
 2. **Opening Hook**
    - *One short paragraph* (2-4 sentences).
-   - Drop the reader into a relatable scene, question, or surprising fact tied to **{{topic}}**.
+   - Drop the reader into a relatable scene, question, or surprising fact tied to topic.
    - Tone: conversational, energetic, no jargon.
 
 3. **Quick Take (Why It Matters)**
    - 4-6 bulleted key points (max 15 words each).
-   - Summarize the significance of **{{topic}}** for everyday life, society, or future tech.
-   - Each point should start with a strong verb (“Reveals…”, “Enables…”).
+   - Summarize the significance of topic for everyday life, society, or future tech.
+   - Each point should start with a strong verb ("Reveals…", "Enables…").
 
 4. **Plain-Language Background**
    - *Two paragraphs* that set the stage.
@@ -97,11 +97,11 @@ Structure your report in the following format:
    - For **each** subsection:
      1. *Concept in a sentence* (≤ 20 words).
      2. *Analogy or metaphor* a curious teenager would grasp.
-     3. *Key evidence or data point* from **{{source\_label}}** (cite in text).
-     4. *Optional “Try this at home” mini-experiment* (≤ 3 sentences) if safe and feasible.
+     3. *Key evidence or data point* from source.
+     4. *Optional "Try this at home" mini-experiment* (≤ 3 sentences) if safe and feasible.
 
 6. **Real-World Spotlight**
-   - A boxed-out story (1 paragraph) showing **{{topic}}** in action—e.g., a product, medical breakthrough, or space mission.
+   - A boxed-out story (1 paragraph) showing topic in action—e.g., a product, medical breakthrough, or space mission.
    - Highlight measurable impact (numbers, scale, time saved, lives improved).
 
 7. **Behind the Science**
@@ -111,7 +111,7 @@ Structure your report in the following format:
 
 8. **Myth Busters & FAQs**
    - 3–5 bulleted misconceptions → brief, clear corrections.
-   - Include at least one frequently googled question (start with “Q:” / “A:”).
+   - Include at least one frequently googled question (start with "Q:" / "A:").
 
 9. **Key Takeaways & Call to Curiosity**
    - *One paragraph* of the most memorable insights.
@@ -129,16 +129,16 @@ Structure your report in the following format:
 1. **Headline**
    - Level-1 markdown heading (`# …`).
    - ≤ 12 words, punchy, present tense, free of jargon.
-   - Convey the biggest “new” element; avoid leading clauses that bury the news.
+   - Convey the biggest "new" element; avoid leading clauses that bury the news.
 
 2. **Deck (Sub-headline)**
-   - *One italic sentence* that adds the key “why it matters” angle.
+   - *One italic sentence* that adds the key "why it matters" angle.
    - Limit 25 words; no period needed.
 
 3. **Key Facts at a Glance**
    - 4–6 bullet points, max 18 words each.
    - Cover the 5 Ws + H (who, what, when, where, why, how) in priority order.
-   - Each bullet starts with a strong verb (“Confirms…”, “Delays…”, “Says…”).
+   - Each bullet starts with a strong verb ("Confirms…", "Delays…", "Says…").
 
 4. **Lead Paragraph**
    - *One paragraph, ≤ 40 words.*
@@ -149,23 +149,23 @@ Structure your report in the following format:
    - Organize paragraphs from most to least critical. Each ¶ ≤ 80 words.
    - **Section A — Details & Evidence**
      - Expand on the lead with numbers, quotes, and on-the-ground observations.
-     - Attribute every non-obvious fact (“according to {{source}}”).
+     - Attribute every non-obvious fact ("according to ...").
    - **Section B — Quotes & Voices**
-     - 2–4 short, vivid quotes from **{{interview\_transcripts}}**; identify speaker and role.
+     - 2–4 short, vivid quotes from interview transcripts; identify speaker and role.
      - Paraphrase where quotes are clunky; never invent wording.
    - **Section C — Context & Background**
      - Give succinct timeline or historical comparison; link to past coverage when relevant.
-   - **Section D — Impact & What’s Next**
+   - **Section D — Impact & What's Next**
      - Explain consequences for readers, markets, policy, or daily life.
      - Note scheduled events (hearings, launches) or unanswered questions.
 
 6. **Visual & Data Elements**
-   - Insert images, charts, or code-generated graphics supplied in **{{assets}}** where they clarify the story.
+   - Insert images, charts, or code-generated graphics supplied in assets where they clarify the story.
    - Provide descriptive alt text and one-line captions citing source.
    - If data table is vital, summarize the takeaway before embedding.
 
 7. **Source Notes & Verification**
-   - Briefly list how each claim was verified (e.g., “public records check”, “eye-witness video geolocation”).
+   - Briefly list how each claim was verified (e.g., "public records check", "eye-witness video geolocation").
    - Flag any information that remains unconfirmed and why.
 
 8. **Citations**
@@ -180,39 +180,37 @@ Structure your report in the following format:
    - 标题必须使用Heading1 H1格式 (`# …`)
 
 2. **开场钩子**
-   - 2–3 句瞬间抓住注意力的“沉浸式”描写或悬念问题。
+   - 2–3 句瞬间抓住注意力的"沉浸式"描写或悬念问题。
    - 语气口语化，加入 Emoji（🤯/🚀/✨ 等）和网络热词。
-   - 结尾抛出“你也\_\_\_吗？”式共鸣，引导读者继续往下看。
+   - 结尾抛出问题，引导读者继续往下看。
 
 3. **痛点共鸣**
    - 用 1 段话精准戳中目标受众的常见痛点或误区。
-   - 可用“95%的人都忽略了…”、“我曾经也\_\_\_”等句式制造代入感。
+   - 可用"95%的人都忽略了…"、"我曾经也___"等句式制造代入感。注意避免跟开场钩子直接重复
 
 4. **高能干货**
    - 用无序列表，每点 ≤ 30 字，前面加 👉 或 ✅。
    - 提炼 3–5 条核心结论 / 技巧 / 数据，直接给可执行的方法。
-   - 如引用研究或代码结果，括号中注明“（来源：XX论文）”。
 
 5. **手把手步骤 / 模板**（可选）
    - 若主题涉及操作流程，列出 3–6 个编号步骤。
    - 每步先给动词开头指令，再给 1 句补充提示或踩坑警告。
-   - 步骤后可加“🌟 加分项”提醒秘籍或进阶做法。
+   - 步骤后可加"🌟 加分项"提醒秘籍或进阶做法。
 
 6. **案例 / 亲测反馈**（可选）
    - 1 段第一人称故事（40–60 字）：描述自己或采访对象的实际体验、对比前后效果。
-   - 加 1 句数字化成果（如“转化率提升 32%”）。
+   - 加 1 句数字化成果（如"转化率提升 32%"）。
 
 7. **数据 & 可信引用**
-   - 2–3 条量化数据或研究结论，突出 “大数据” 可信度。
-   - 按 “数据 + 意义” 格式写；结尾用“— 《期刊名》, 2024”。
+   - 2–3 条量化数据或研究结论，突出 "大数据" 可信度。
 
 8. **划重点 / 金句总结**
-   - 1–2 句高度概括的“记忆锚点”，可用排比或押韵形式。
+   - 1–2 句高度概括的"记忆锚点"，可用排比或押韵形式。
    - 前面加 📌 或 🔥，方便用户截图收藏。
 
 9. **互动 CTA**
-   - 提 1 个开放式问题 + 1 句行动号召（“点赞＋收藏不迷路”）。
-   - 适当使用“家人们”“手残党”“打工人”等圈层词激活评论区。
+   - 提 1 个开放式问题 + 1 句行动号召（"点赞＋收藏不迷路"）。
+   - 适当使用"家人们""手残党""打工人"等圈层词激活评论区。
 
 10. **话题标签**
    - 选择 3-6 个与内容强相关的小红书标签，全部放在文末：
@@ -230,35 +228,34 @@ Structure your report in the following format:
 {% else %}
 1. **Hook Tweet (T1)**
    - ≤ 220 characters to leave room for retweets.
-   - Start with a jaw-dropping stat, bold claim, or “imagine if…” scenario.
+   - Start with a jaw-dropping stat, bold claim, or "imagine if…" scenario.
    - End with an open question or cliff-hanger (🔗 emoji optional).
 
 2. **Thread Preview (T2)**
-   - One sentence: “In this thread: 1️⃣… 2️⃣… 3️⃣…”.
+   - One sentence: "In this thread: 1️⃣… 2️⃣… 3️⃣…".
    - Use numbered emojis or bullets for clarity.
-   - Add ✅ “RT to save” call-to-action.
+   - Add ✅ "RT to save" call-to-action.
 
 3. **Key Insight Tweets (T3-T6)**
    - 3–4 tweets, each ≤ 240 characters.
-   - Formula per tweet: **Hook phrase** + data/story + why it matters.
-   - Cite sources inline (“\[Study, 2024]”).
-   - Prompt to include a relevant image, chart, or gif (reference {{assets}}).
+   - Formula per tweet: Hook phrase + data/story + why it matters.
+   - Prompt to include a relevant image, chart, or gif.
 
 4. **Case Study / Anecdote (T7)**
-   - 1 tweet telling a concrete story with a metric (“↑ 47% engagement”).
+   - 1 tweet telling a concrete story with a metric ("↑ 47% engagement").
    - Use storytelling verbs, tag brands/people if permitted (@handle).
 
 5. **Actionable Steps (T8-T9)**
-   - “How to apply this today:” plus 3 short bullet-style sentences across 1–2 tweets.
-   - Begin each bullet with an imperative verb (“Test… / Automate…”).
+   - "How to apply this today:" plus 3 short bullet-style sentences across 1–2 tweets.
+   - Begin each bullet with an imperative verb ("Test… / Automate…").
 
 6. **Future Look / Big Question (T10)**
    - One tweet projecting next-step implications or posing a thought-provoking question to the crowd.
 
 7. **CTA & Loop-Closer (T11)**
-   - Ask for replies (“Which step will you try first?”), then:
-     - “🔄 Retweet to share”
-     - “💬 Follow @{{your\_handle}} for more bite-size insights.”
+   - Ask for replies ("Which step will you try first?"), then:
+     - "🔄 Retweet to share"
+     - "💬 Follow @{{your_handle}} for more bite-size insights."
 
 8. **Media Instructions**
    - Attach up to 4 images or 1 video.
@@ -293,8 +290,8 @@ Structure your report in the following format:
    **Science Communication Excellence:**
    - Target reading level: enthusiastic high-schooler; never condescending.
    - Favor active voice, short sentences, vivid verbs.
-   - Use the first-person plural (“we”) to create a journey.
-   - Convert numbers to comparisons (“the width of a human hair”) where helpful.
+   - Use the first-person plural ("we") to create a journey.
+   - Convert numbers to comparisons ("the width of a human hair") where helpful.
    - Avoid passive lists of facts—turn data into a mini-story.
    - Embed images/figures from provided materials where they enhance understanding; add descriptive alt text.
 
@@ -303,15 +300,15 @@ Structure your report in the following format:
    - Follow AP style unless house style overrides.
    - Short sentences, active verbs, concrete nouns.
    - Use present tense for ongoing events, past tense for completed actions.
-   - Avoid adjectives that imply judgment (“huge”, “remarkable”) unless tied to data or a quote.
+   - Avoid adjectives that imply judgment ("huge", "remarkable") unless tied to data or a quote.
    - Attribute forecasts or opinions to their sources; do not state them as fact.
-   - Double-check all proper names, figures, and spellings against **{{source\_docs}}**.
+   - Double-check all proper names, figures, and spellings against source docs.
    - When uncertain, insert `[[VERIFY]]` as a placeholder for human review.
    {% elif report_style == "social_media" %}
    {% if locale == "zh-CN" %}
    **小红书风格写作标准:**
-   - 文字拆行：每 1–2 句换行，保持“呼吸感”
-   - 大量使用emoji表情符号增强表达力和视觉吸引力 ✨��
+   - 文字拆行：每 1–2 句换行，保持"呼吸感"
+   - 大量使用emoji表情符号增强表达力和视觉吸引力 ✨
    - 采用"种草"语言："真的绝了！"、"必须安利给大家！"、"不看后悔系列！"
    - 穿插个人感受和体验："我当时看到这个数据真的震惊了！"
    - 用数字和符号增强视觉效果：①②③、✅❌、🔥💡⭐
@@ -323,7 +320,7 @@ Structure your report in the following format:
    - Conversational, 6th-grade readability.
    - Mix emojis sparingly (≤ 1 per tweet).
    - Use sentence case, short lines, no walls of text.
-   - Numbers over adjectives (“12 TB”, not “huge”).
+   - Numbers over adjectives ("12 TB", not "huge").
    - Insert `[[VERIFY]]` for any fact needing human confirmation.
    {% endif %}
    {% else %}
@@ -385,7 +382,7 @@ Structure your report in the following format:
    - 使用吸睛标题配合emoji："🔥【重磅】这个发现太震撼了！"
    - 关键数据用醒目格式突出：「 重点数据 」或 ⭐ 核心发现 ⭐
    - 适度使用大写强调：真的YYDS！、绝绝子！
-   - 用emoji作为分点符号：✨、🌟、�、�、💯
+   - 用emoji作为分点符号：✨、🌟、🔥、💯
    - 创建话题标签区域：#科技前沿 #必看干货 #涨知识了
    - 设置"划重点"总结区域，方便快速阅读
    - 利用换行和空白营造手机阅读友好的版式
