@@ -107,7 +107,7 @@ export function OutputStream({ className }: OutputStreamProps) {
           id: msg.id,
           role: msg.role,
           agent: msg.langGraphMetadata?.agent,
-          source: msg.source,
+          origin: msg.origin,
           content: msg.content,
           isStreaming: msg.isStreaming,
           eventType: getEventType(msg),
@@ -202,9 +202,10 @@ export function OutputStream({ className }: OutputStreamProps) {
 
   const getMessageIcon = (message: Message) => {
     if (message.role === "user") {
-      return message.source === "button" ? <Settings className="h-4 w-4" /> : <User className="h-4 w-4" />;
+      return message.origin === "user_button" ? <Settings className="h-4 w-4" /> : <User className="h-4 w-4" />;
     }
-    if (message.role === "tool") {
+    // 工具调用消息：role是assistant但有toolCalls
+    if (message.role === "assistant" && (message.toolCalls?.length ?? 0) > 0) {
       return <Settings className="h-4 w-4" />;
     }
     if (message.isStreaming) {
@@ -288,8 +289,8 @@ export function OutputStream({ className }: OutputStreamProps) {
     
     if (message.role === "user") {
       badges.push(
-        <Badge key="role" variant={message.source === "button" ? "secondary" : "default"}>
-          {message.source === "button" ? "指令" : "查询"}
+        <Badge key="role" variant={message.origin === "user_button" ? "secondary" : "default"}>
+          {message.origin === "user_button" ? "指令" : "查询"}
         </Badge>
       );
     } else if (message.langGraphMetadata?.agent) {
@@ -424,7 +425,7 @@ export function OutputStream({ className }: OutputStreamProps) {
                       {getEventIcon(message)}
                       <CardTitle className="text-sm">
                         {message.role === "user" 
-                          ? (message.source === "button" ? "用户指令" : "用户查询")
+                          ? (message.origin === "user_button" ? "用户指令" : "用户查询")
                           : message.langGraphMetadata?.agent || message.role
                         }
                       </CardTitle>

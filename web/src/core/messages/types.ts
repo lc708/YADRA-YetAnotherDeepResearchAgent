@@ -1,8 +1,8 @@
 // Copyright (c) 2025 YADRA
 
-export type MessageRole = "user" | "assistant" | "tool";
+export type MessageRole = "user" | "assistant"; //此处用来区分后端的llm消息。后端system角色仅在内部system prompt中使用，前端无需考虑。
 
-export type MessageSource = "input" | "button" | "system";
+export type MessageOrigin = "user_input" | "user_button" | "ai_response"; //此处存在技术债务：此处设计思路是反映消息来源是前端交互还是后端，在store层创建消息时未区分、在前端UI层也未真正使用和区分消息来源。
 
 export interface Message {
   id: string;
@@ -26,7 +26,7 @@ export interface Message {
   finishReason?: "stop" | "interrupt" | "tool_calls" | "reask";
   interruptFeedback?: string;
   resources?: Array<Resource>;
-  source?: MessageSource;
+  origin?: MessageOrigin;  // 新字段，预留，用于区分消息来源是前端交互还是后端。
   originalInput?: {
     text: string;
     locale: string;

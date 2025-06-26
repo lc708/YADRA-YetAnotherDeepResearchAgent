@@ -52,6 +52,11 @@ export interface Message {
   timestamp: Date;
   status?: StatusType;
   isStreaming?: boolean;
+  toolCalls?: Array<{
+    id: string;
+    name: string;
+    args: Record<string, unknown>;
+  }>;
   metadata?: {
     model?: string;
     tokens?: number;

@@ -45,6 +45,19 @@ interface Message {
   content: string;
   role: 'user' | 'assistant';
   timestamp: Date;
+  status: 'pending' | 'completed';
+  isStreaming: boolean;
+  toolCalls?: Array<{
+    id: string;
+    name: string;
+    args: Record<string, unknown>;
+  }>;
+  metadata?: {
+    model?: string;
+    tokens?: number;
+    reasoning?: string;
+    artifacts?: string[];
+  };
 }
 
 // 布局模式枚举
@@ -160,10 +173,24 @@ export default function WorkspacePage() {
       <div className="text-center max-w-2xl mx-auto px-4">
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            你好，我能帮你什么？
+            Hi，我是YADRA，又一个深度研究助手
+            <br />
+            <br />
+          </h1>
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">
+            马上输入问题，开始让AI为你打工吧
           </h1>
           <p className="text-xl text-gray-300">
-            开始您的深度研究之旅
+            <br />
+            深度研究报告
+            <br />
+            科普文章
+            <br />
+            新闻稿
+            <br />
+            小红书文案
+            <br />
+            ……
           </p>
         </div>
         
@@ -191,7 +218,7 @@ export default function WorkspacePage() {
   const PanelInputContainer = () => (
     <div className="absolute bottom-0 left-0 right-0 backdrop-blur-sm bg-black/0 p-4 z-10">
       <HeroInput 
-        placeholder="继续研究对话..."
+        placeholder="开启新的研究对话...（需要等待当前任务结束或中断）"
         className="w-full"
         onSubmitResearch={handleResearchSubmit}
       />
@@ -204,19 +231,25 @@ export default function WorkspacePage() {
     const storeMessages = useThreadMessages(currentThreadId || undefined);
     
     // 🔥 转换store消息格式为MessageContainer期望的格式
-    const messages = storeMessages.map((msg): import("~/components/conversation/message-container").Message => ({
+    const messages = storeMessages.map((msg): Message => ({
       id: msg.id,
-      role: msg.role as "user" | "assistant" | "system",
-      content: msg.content,
+      role: msg.role, // 直接使用原始role，后端只会发送user/assistant
+      content: ((msg.toolCalls?.length ?? 0) > 0 || msg.isToolCallsMessage) && !msg.content ? '正在协调Agent并使用工具' : msg.content,
       timestamp: msg.originalInput?.timestamp 
         ? new Date(msg.originalInput.timestamp) 
         : msg.langGraphMetadata?.timestamp 
           ? new Date(msg.langGraphMetadata.timestamp)
           : new Date(),
       status: msg.isStreaming ? "pending" : "completed",
-      isStreaming: msg.isStreaming,
+      isStreaming: msg.isStreaming || false,
+      toolCalls: msg.toolCalls?.map(tc => ({
+        id: tc.id,
+        name: tc.name,
+        args: tc.args
+      })),
       metadata: {
         model: msg.agent,
+        tokens: msg.metadata?.tokens,
         reasoning: msg.reasoningContent,
         artifacts: msg.resources?.map(r => r.title) || []
       }
