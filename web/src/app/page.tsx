@@ -38,7 +38,10 @@ const Hero = () => {
             <RainbowGradientText animated={true}>输入研究主题 - 确认执行计划 - 等待3-5分钟 - 实时在线编辑 - 下载复制保存</RainbowGradientText>
           </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center items-center animate-fade-in-delay-2">
-          <button className="px-8 py-3 bg-primary text-primary-foreground font-medium rounded-lg hover:bg-primary/90 transition-all duration-300 shadow-sm hover:shadow-md hover:scale-105 transform">
+          <button 
+            onClick={() => window.location.href = '/workspace'}
+            className="px-8 py-3 bg-primary text-primary-foreground font-medium rounded-lg hover:bg-primary/90 transition-all duration-300 shadow-sm hover:shadow-md hover:scale-105 transform"
+          >
             登录后马上开始体验
           </button>
           <button className="px-8 py-3 bg-secondary text-secondary-foreground font-medium rounded-lg hover:bg-secondary/80 transition-all duration-300 border border-border hover:scale-105 transform">
@@ -63,15 +66,15 @@ const SearchSection = () => {
   };
 
   return (
-    <section className="py-16 bg-card rounded-2xl shadow-sm border border-border mb-20 animate-slide-up">
-      <div className="max-w-3xl mx-auto px-6">
+    <section onClick={() => window.location.href = '/workspace'} className="py-16 bg-card rounded-2xl shadow-sm border border-border mb-20 animate-slide-up">
+      <div className="max-w-4xl mx-auto px-6">
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2 mb-4">
             <span className="w-6 h-6 text-primary animate-pulse">✨</span>
-            <span className="text-lg font-semibold text-card-foreground">输入您感兴趣的话题</span>
+            <span className="text-lg font-semibold text-card-foreground">请登录/注册后使用</span>
           </div>
           <p className="text-muted-foreground">
-           <SubtleGradientText intensity='light'>特别感谢开源项目 DeerFlow / local-deep-researcher / Open Deep Research 的提示词模板，帮助良多</SubtleGradientText>
+           <SubtleGradientText intensity='light'>特别感谢开源项目 DeerFlow / local-deep-researcher / OpenDeepResearch 的提示词模板，帮助良多</SubtleGradientText>
           </p>
         </div>
         
@@ -82,7 +85,7 @@ const SearchSection = () => {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="需要我为您写些什么？"
+              placeholder=""
               className="w-full pl-12 pr-32 py-4 text-base border border-input rounded-xl focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-ring transition-all duration-200 bg-muted hover:bg-card focus:scale-105 transform"
             />
             <button
