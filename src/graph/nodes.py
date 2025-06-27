@@ -57,31 +57,22 @@ def background_investigation_node(state: State, config: RunnableConfig):
     if SELECTED_SEARCH_ENGINE == SearchEngine.TAVILY.value:
         logger.info("Using Tavily search engine")
         try:
-            searched_content = LoggedTavilySearch(
+            background_investigation_results = LoggedTavilySearch(
                 max_results=configurable.max_search_results
             ).invoke(query)
             logger.info(
-                f"Tavily search returned: {type(searched_content)}, length: {len(searched_content) if isinstance(searched_content, list) else 'N/A'}"
+                f"Tavily search completed, result type: {type(background_investigation_results)}"
             )
 
-            if isinstance(searched_content, list):
-                background_investigation_results = [
-                    f"## {elem['title']}\n\n{elem['content']}"
-                    for elem in searched_content
-                ]
-                result = {
-                    "background_investigation_results": "\n\n".join(
-                        background_investigation_results
-                    )
-                }
-                logger.info(
-                    f"Background investigation completed successfully, result length: {len(result['background_investigation_results'])}"
+            result = {
+                "background_investigation_results": json.dumps(
+                    background_investigation_results, ensure_ascii=False
                 )
-                return result
-            else:
-                logger.error(
-                    f"Tavily search returned malformed response: {searched_content}"
-                )
+            }
+            logger.info(
+                f"Background investigation completed successfully, result length: {len(result['background_investigation_results'])}"
+            )
+            return result
         except Exception as e:
             logger.error(f"Error in Tavily search: {e}")
             logger.exception("Full traceback:")

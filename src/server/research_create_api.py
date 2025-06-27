@@ -25,6 +25,7 @@ from src.server.repositories.session_repository import (
     ActionType,
     ExecutionStatus,
 )
+from src.server.supabase_auth_api import get_current_user
 from src.utils.logger import get_logger
 
 logger = get_logger("research_ask_api")
@@ -790,6 +791,7 @@ async def ask_research(
     payload: ResearchAskRequest,
     http_request: Request,  # 🔥 添加Request参数用于断线检测
     stream: bool = Query(False, description="是否启用流式响应"),
+    current_user: dict = Depends(get_current_user),  # 👈 添加强制认证
     service: ResearchAskService = Depends(get_research_ask_service),
 ):
     """
@@ -801,8 +803,11 @@ async def ask_research(
     - stream=false（默认）：返回JSON响应，后台启动任务
     - stream=true：直接返回SSE流，包含完整的研究过程
     """
+    # 👈 注入用户ID到payload
+    payload.user_id = current_user["user_id"]
+
     logger.info(
-        f"Received {payload.ask_type} ask request: {payload.question[:50]}... (stream={stream})"
+        f"Received {payload.ask_type} ask request: {payload.question[:50]}... (stream={stream}) for user: {current_user['user_id']}"
     )
 
     try:

@@ -1247,14 +1247,25 @@ export const sendAskMessage = async (
       config: request.config
     });
     
+    // 🔥 获取认证信息
+    const { supabase } = await import('~/lib/supa');
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    // 🔥 准备请求头（包含认证）
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    
+    if (session?.access_token) {
+      headers['Authorization'] = `Bearer ${session.access_token}`;
+    }
+    
     // 🔥 发起SSE流请求
     const sseStream = fetchStream(
       resolveServiceURL('research/ask?stream=true'),
       {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify(requestData),
       }
     );

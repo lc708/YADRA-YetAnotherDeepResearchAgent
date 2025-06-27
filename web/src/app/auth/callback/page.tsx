@@ -2,11 +2,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '~/lib/supa';
 
 export default function AuthCallback() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [message, setMessage] = useState('处理登录中...');
 
@@ -27,8 +28,12 @@ export default function AuthCallback() {
           setStatus('success');
           setMessage('登录成功，正在跳转...');
           
+          // 检查是否有返回URL
+          const returnTo = searchParams.get('returnTo');
+          const redirectUrl = returnTo || '/workspace';
+          
           setTimeout(() => {
-            router.push('/');
+            router.push(redirectUrl);
           }, 1500);
         } else {
           setStatus('error');
@@ -78,10 +83,10 @@ export default function AuthCallback() {
               <h2 className="text-lg font-medium text-gray-900 mb-2">登录失败</h2>
               <p className="text-gray-600 mb-4">{message}</p>
               <button
-                onClick={() => router.push('/')}
+                onClick={() => router.push('/workspace')}
                 className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
               >
-                返回首页
+                重新登录
               </button>
             </div>
           )}

@@ -21,8 +21,8 @@ def crawl_tool(
     try:
         crawler = Crawler()
         article = crawler.crawl(url)
-        return {"url": url, "crawled_content": article.to_markdown()[:1000]}
+        return article.to_markdown()
     except BaseException as e:
-        error_msg = f"Failed to crawl. Error: {repr(e)}"
+        error_msg = f"Failed to crawl {url}. Error: {repr(e)}"
         logger.error(error_msg)
         return error_msg

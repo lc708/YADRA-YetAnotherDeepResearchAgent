@@ -6,6 +6,10 @@ import { cn } from "~/lib/utils";
 import { useShallow } from "zustand/react/shallow";
 import { toast } from "sonner";
 
+// 🔥 添加认证相关导入
+import { useAuth } from "~/hooks/useAuth";
+import { LoginScreen } from "~/components/auth/LoginScreen";
+
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
@@ -73,6 +77,9 @@ const EMPTY_MESSAGES: any[] = [];
 export default function WorkspacePage() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  
+  // 🔥 认证检查
+  const { isAuthenticated, loading: authLoading, user } = useAuth();
   
   // 🔥 获取URL参数
   const urlParam = searchParams.get('id');
@@ -173,24 +180,20 @@ export default function WorkspacePage() {
       <div className="text-center max-w-2xl mx-auto px-4">
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            Hi，我是YADRA，又一个深度研究助手
+            Hi 你好
             <br />
             <br />
           </h1>
           <h1 className="text-2xl font-bold text-gray-900 mb-4">
-            马上输入问题，开始让AI为你打工吧
+            今天需要我做点什么？
           </h1>
-          <p className="text-xl text-gray-300">
+          <p className="text-xl text-gray-300 mb-4">
             <br />
-            深度研究报告
+            我现在能写：研究报告 科普文章 新闻稿件 社媒文案
             <br />
-            科普文章
-            <br />
-            新闻稿
-            <br />
-            小红书文案
-            <br />
-            ……
+          </p>
+          <p className="text-l italic">
+          （PPT/网页/知识库/图片/音频开发中 敬请期待）
           </p>
         </div>
         
@@ -205,7 +208,7 @@ export default function WorkspacePage() {
       <div className="max-w-4xl mx-auto">
         <div className="backdrop-blur-sm bg-black/0 rounded-lg p-4">
           <HeroInput 
-            placeholder={hasMessages ? "继续研究对话..." : "开始您的研究之旅..."}
+            placeholder={hasMessages ? "继续研究对话..." : "给我一个任务，我来帮你完成..."}
             className="w-full"
             onSubmitResearch={handleResearchSubmit}
           />
@@ -571,6 +574,30 @@ export default function WorkspacePage() {
       <OutputStream className="flex-1" />
     </div>
   );
+
+  // 🔥 认证检查：优先级最高
+  if (authLoading) {
+    return (
+      <div className="h-full w-full flex items-center justify-center bg-app-background">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">正在验证身份...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <LoginScreen 
+        onLoginSuccess={() => {
+          // 登录成功后，组件会自动重新渲染，因为useAuth会更新状态
+          console.log("用户登录成功:", user);
+        }}
+        returnUrl={`/workspace${urlParam ? `?id=${urlParam}` : ''}`}
+      />
+    );
+  }
 
   return (
           <div className="h-full w-full flex flex-col bg-app-background relative">

@@ -67,9 +67,16 @@ Structure your report in the following format:
    - This section is optional for shorter reports.
 
 6. **Key Citations**
-   - List all references at the end in link reference format.
-   - Include an empty line between each citation for better readability.
-   - Format: `- [Source Title](URL)`
+   - **CRITICAL CITATION RULES**: 
+     - Only include citations that were EXPLICITLY provided in your input data
+     - Copy URLs and titles EXACTLY as they appear - NO modifications, corrections, or improvements
+     - If a URL looks malformed or a title seems incomplete, exclude it entirely
+     - NEVER generate, guess, or "fix" URLs based on your knowledge
+     - NEVER create citations from memory or general knowledge
+     - Each citation must be traceable to specific content in the research findings
+   - Format: `- [Exact Title from Source](exact-url-from-source)`
+   - Include an empty line between each citation for better readability
+   - If no 100% valid citations with complete URL+title pairs are available, state "No verifiable citations available"
 
 {% elif report_style == "popular_science" %}
 1. **Title**
@@ -121,10 +128,18 @@ Structure your report in the following format:
    - 3–5 recommended links or activities (podcasts, documentaries, interactive demos, citizen-science projects).
 
 11. **Citations & Credits**
-   - List all references in link reference format, one per line, blank line between items.
-   - Format: `- [Source Title](URL)`
-   - Ensure every in-text citation matches an entry here.
- 
+   - **CRITICAL CITATION RULES**: 
+     - Only include citations that were EXPLICITLY provided in your input data
+     - Copy URLs and titles EXACTLY as they appear - NO modifications, corrections, or improvements
+     - If a URL looks malformed or a title seems incomplete, exclude it entirely
+     - NEVER generate, guess, or "fix" URLs based on your knowledge
+     - NEVER create citations from memory or general knowledge
+     - Each citation must be traceable to specific content in the research findings
+   - Format: `- [Exact Title from Source](exact-url-from-source)`
+   - Include an empty line between each citation
+   - Ensure every in-text citation matches an entry here
+   - If no 100% valid citations with complete URL+title pairs are available, DON'T WRITE THIS ENTIRE SECTION!
+
 {% elif report_style == "news" %}
 1. **Headline**
    - Level-1 markdown heading (`# …`).
@@ -169,9 +184,17 @@ Structure your report in the following format:
    - Flag any information that remains unconfirmed and why.
 
 8. **Citations**
-    - Reference list in link-reference format, blank line between items.
-    - Format: `- [Title or Outlet](URL)`
-    - Ensure every citation is used in-text and vice-versa.
+    - **CRITICAL CITATION RULES**: 
+      - Only include citations that were EXPLICITLY provided in your input data
+      - Copy URLs and titles EXACTLY as they appear - NO modifications, corrections, or improvements
+      - If a URL looks malformed or a title seems incomplete, include it AS IS or exclude it entirely
+      - NEVER generate, guess, or "fix" URLs based on your knowledge
+      - NEVER create citations from memory or general knowledge
+      - Each citation must be traceable to specific content in the research findings
+    - Format: `- [Title or Outlet](exact-url-from-source)`
+    - Include an empty line between each citation
+    - Ensure every citation is used in-text and vice-versa
+    - If no valid citations with complete URL+title pairs are available, DON'T WRITE THIS ENTIRE SECTION!
 
 {% elif report_style == "social_media" %}
 {% if locale == "zh-CN" %}
@@ -203,6 +226,13 @@ Structure your report in the following format:
 
 7. **数据 & 可信引用**
    - 2–3 条量化数据或研究结论，突出 "大数据" 可信度。
+   - **引用处理规则**：
+     - 不要URL，只要标题！用
+     - 只包含输入数据中明确提供的引用
+     - 精确复制标题 - 不做任何修改或"优化"，绝不基于记忆生成或"修复"标题
+     - 如果标题对应的URL看起来有问题或标题不完整，必须完全排除
+     - 每个引用必须能追溯到研究内容中的具体信息
+   - 如无有效的引用，直接不写这整个章节！
 
 8. **划重点 / 金句总结**
    - 1–2 句高度概括的"记忆锚点"，可用排比或押韵形式。
@@ -265,6 +295,18 @@ Structure your report in the following format:
 9. **Hashtags & Keywords**
    - Add 1–3 niche-specific hashtags at end of T2 or T11 (#AI #DataViz).
    - Avoid generic high-traffic tags (#news) that dilute reach.
+
+10. **Sources & References**
+   - **CRITICAL CITATION RULES**: 
+     - Only include citations that were EXPLICITLY provided in your input data
+     - Copy URLs and titles EXACTLY as they appear - NO modifications or URL shorteners
+     - If a URL looks malformed or a title seems incomplete, exclude it entirely
+     - NEVER generate, guess, or "fix" URLs based on your knowledge
+     - NEVER create citations from memory or general knowledge
+     - Each citation must be traceable to specific content in the thread
+   - Format in final tweet: "Sources: [Title](URL)"
+   - For multiple sources, use separate tweets or thread them
+   - If no valid citations with complete URL+title pairs are available, DON'T WRITE THIS ENTIRE SECTION!
 
 {% endif %}
 {% else %}
