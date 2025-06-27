@@ -138,6 +138,9 @@ export default function WorkspacePage() {
   // 🚀 获取计划状态 - Hook必须在组件顶层调用
   const currentPlanData = useCurrentPlan(currentThreadId || undefined);
   
+  // 🚀 获取responding状态 - 用于按钮显示控制
+  const responding = useUnifiedStore((state) => state.responding);
+  
   // 🚀 计算布局模式 - 基于计划状态自动切换，使用稳定的依赖
   const layoutMode = useMemo(() => {
     if (!hasMessages) return LayoutMode.WELCOME;
@@ -187,14 +190,7 @@ export default function WorkspacePage() {
           <h1 className="text-2xl font-bold text-gray-900 mb-4">
             今天需要我做点什么？
           </h1>
-          <p className="text-xl text-gray-300 mb-4">
-            <br />
-            我现在能写：研究报告 科普文章 新闻稿件 社媒文案
-            <br />
-          </p>
-          <p className="text-l italic">
-          （PPT/网页/知识库/图片/音频开发中 敬请期待）
-          </p>
+
         </div>
         
 
@@ -285,7 +281,7 @@ export default function WorkspacePage() {
               )}
               
               {/* 🔥 优化点2：显示"YADRA正在工作中……"状态指示 */}
-              {messages.some(msg => msg.isStreaming) && (
+              {responding && (
                 <div className="flex items-center justify-center py-4 animate-in fade-in-0 slide-in-from-bottom-2 duration-300">
                   <div className="flex items-center gap-3">
                     <div className="flex space-x-1">
@@ -385,7 +381,24 @@ export default function WorkspacePage() {
     
     // 🚀 简化：直接判断是否显示操作按钮
     const shouldShowActions = (): boolean => {
-      return currentInterrupt !== null && currentPlan !== null;
+      // 🔥 修复：直接获取最新的responding状态，避免闭包问题
+      const currentResponding = useUnifiedStore.getState().responding;
+      const result = currentInterrupt !== null && currentPlan !== null && !currentResponding;
+      
+      // 🔍 调试日志：记录所有状态值和判断结果
+      console.log('🔍 [shouldShowActions] State check:', {
+        currentInterrupt: currentInterrupt,
+        currentInterruptExists: currentInterrupt !== null,
+        currentPlan: currentPlan ? { id: currentPlan.id, title: currentPlan.title } : null,
+        currentPlanExists: currentPlan !== null,
+        responding_from_closure: responding,
+        responding_from_store: currentResponding,
+        notResponding: !currentResponding,
+        finalResult: result,
+        timestamp: new Date().toISOString()
+      });
+      
+      return result;
     };
 
     // 🚀 简化：处理PlanCard回调函数

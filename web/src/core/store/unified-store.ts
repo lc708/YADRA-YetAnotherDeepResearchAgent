@@ -1478,6 +1478,12 @@ export const sendAskMessage = async (
                
                // 🔥 特殊处理：interrupt事件时设置currentInterrupt状态
                if (event.event === 'interrupt') {
+                 console.log('🔍 [Interrupt Event] Before state updates:', {
+                   responding: state.responding,
+                   threadId: currentThreadId,
+                   eventId: eventData.id
+                 });
+                 
                  const interruptData = {
                    interruptId: eventData.id || nanoid(),
                    message: eventData.content || "Please Review the Plan.",
@@ -1488,7 +1494,14 @@ export const sendAskMessage = async (
                    timestamp: new Date().toISOString(),
                    messageId: messageId  // 使用动态messageId
                  };
+                 
                  state.setCurrentInterrupt(currentThreadId, interruptData);
+                 state.setResponding(false);
+                 
+                 console.log('🔍 [Interrupt Event] After state updates:', {
+                   responding: useUnifiedStore.getState().responding,
+                   currentInterrupt: useUnifiedStore.getState().getCurrentInterrupt(currentThreadId)
+                 });
                }
                
                // 特殊处理：complete事件时停止流式状态和清除interrupt
