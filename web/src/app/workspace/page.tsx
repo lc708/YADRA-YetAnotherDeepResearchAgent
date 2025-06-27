@@ -9,6 +9,10 @@ import { toast } from "sonner";
 // 🔥 添加认证相关导入
 import { useAuth } from "~/hooks/useAuth";
 import { LoginScreen } from "~/components/auth/LoginScreen";
+import { 
+  PrimaryGradientText,
+  RainbowGradientText,
+  } from "~/components/ui/gradient-text";
 
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
@@ -182,13 +186,18 @@ export default function WorkspacePage() {
     <div className="flex flex-1 items-center justify-center">
       <div className="text-center max-w-2xl mx-auto px-4">
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            Hi 你好
+          <h1 className="text-4xl font-bold mb-4">
+            <PrimaryGradientText>
+              你好，
+            </PrimaryGradientText>
+            {user?.email?.split('@')[0] || '尊敬的用户'}
             <br />
             <br />
           </h1>
           <h1 className="text-2xl font-bold text-gray-900 mb-4">
-            今天需要我做点什么？
+            <RainbowGradientText>
+              今天需要我做点什么？
+            </RainbowGradientText>
           </h1>
 
         </div>

@@ -263,7 +263,7 @@ export function HeroInput({
                                   className="w-full resize-none bg-transparent text-sm text-foreground placeholder-muted-foreground outline-none border-none"
                 rows={2}
                 style={{ 
-                  minHeight: '56px', // 2行的最小高度
+                  minHeight: '48px', // 2行的最小高度
                   maxHeight: '168px', // 7行的最大高度 (24px * 7)
                   lineHeight: '24px',
                   overflowY: currentPrompt.split('\n').length > 7 || currentPrompt.length > 280 ? 'auto' : 'hidden'
@@ -331,8 +331,8 @@ export function HeroInput({
                       </p>
                       <p className="text-xs text-gray-600 leading-relaxed">
                         {enableDeepThinking 
-                          ? "AI将进行深度思考和推理，生成更加深思熟虑的研究计划"
-                          : "AI将以常规模式处理您的问题，快速生成研究计划"
+                          ? "使用DeepSeek R1，生成更加深思熟虑的研究计划"
+                          : "使用Gemini 2.5 Flash，快速生成研究计划"
                         }
                       </p>
                     </div>
@@ -374,7 +374,7 @@ export function HeroInput({
                   side="top"
                   sideOffset={8}
                   className="border border-gray-200 bg-white backdrop-blur-sm text-gray-900 shadow-xl"
-                  title="AI增强提示 - 让AI优化您的问题描述"
+                  title="AI增强提示 - 让AI帮您优化提示词"
                 >
                   <Button
                     variant="ghost"
