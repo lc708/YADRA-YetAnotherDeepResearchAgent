@@ -120,7 +120,7 @@ export function HeroInput({
   useEffect(() => {
     const reaskText = searchParams.get('reask');
     if (reaskText && inputRef.current) {
-      console.log("检测到reask参数:", reaskText);
+  
       inputRef.current.setContent(reaskText);
       setCurrentPrompt(reaskText);
       
@@ -188,10 +188,7 @@ export function HeroInput({
           config: buildResearchConfig()
         };
         
-        console.log("[HeroInput] Submitting research request:", {
-          question: currentPrompt.substring(0, 50) + '...',
-          config: researchRequest.config
-        });
+
         
         await onSubmitResearch(researchRequest);
         
@@ -206,7 +203,7 @@ export function HeroInput({
       }
     } else {
       // 🔥 如果没有回调，显示提示
-      console.warn("[HeroInput] No callback provided for message submission");
+
     }
   }, [currentPrompt, canOperate, responding, onSubmitResearch, buildResearchConfig]);
 

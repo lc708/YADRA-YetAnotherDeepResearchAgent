@@ -324,16 +324,7 @@ export const useUnifiedStore = create<UnifiedStore>()(
       
       // 会话状态管理 - 新增方法
       setSessionState: (sessionState: UnifiedStore['sessionState']) => {
-        // 🔍 调试每次sessionState更新
-        const currentState = get().sessionState;
-        console.log('🔍 [setSessionState] Updating sessionState:', {
-          from: currentState,
-          to: sessionState,
-          session_id_before: currentState?.sessionMetadata?.session_id,
-          session_id_after: sessionState?.sessionMetadata?.session_id,
-          timestamp: new Date().toISOString(),
-          stack: new Error().stack?.split('\n').slice(1, 6) // 获取调用栈前5行
-        });
+
         
         set((state) => {
           state.sessionState = sessionState;

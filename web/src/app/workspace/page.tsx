@@ -112,12 +112,12 @@ export default function WorkspacePage() {
   // 🚀 ASK API研究请求处理
   const handleResearchSubmit = useCallback(async (request: ResearchRequest) => {
     try {
-      console.log("[WorkspacePage] Handling research request:", request);
+
       
       // 🚀 重构：使用简化的sendAskMessage调用，所有事件处理已在Store层统一处理
       const result = await sendAskMessage(request, {
         onNavigate: async (workspaceUrl: string) => {
-          console.log("[WorkspacePage] Navigating to:", workspaceUrl);
+
           // 提取URL参数
           const urlMatch = workspaceUrl.match(/\/workspace\?id=([^&]+)/);
           if (urlMatch && urlMatch[1]) {
@@ -127,7 +127,7 @@ export default function WorkspacePage() {
         }
       });
       
-      console.log("[WorkspacePage] Research request completed:", result as any);
+      
       
     } catch (error) {
       console.error("[WorkspacePage] Research request failed:", error);
@@ -386,17 +386,7 @@ export default function WorkspacePage() {
       const result = currentInterrupt !== null && currentPlan !== null && !currentResponding;
       
       // 🔍 调试日志：记录所有状态值和判断结果
-      console.log('🔍 [shouldShowActions] State check:', {
-        currentInterrupt: currentInterrupt,
-        currentInterruptExists: currentInterrupt !== null,
-        currentPlan: currentPlan ? { id: currentPlan.id, title: currentPlan.title } : null,
-        currentPlanExists: currentPlan !== null,
-        responding_from_closure: responding,
-        responding_from_store: currentResponding,
-        notResponding: !currentResponding,
-        finalResult: result,
-        timestamp: new Date().toISOString()
-      });
+      
       
       return result;
     };
@@ -605,7 +595,7 @@ export default function WorkspacePage() {
       <LoginScreen 
         onLoginSuccess={() => {
           // 登录成功后，组件会自动重新渲染，因为useAuth会更新状态
-          console.log("用户登录成功:", user);
+  
         }}
         returnUrl={`/workspace${urlParam ? `?id=${urlParam}` : ''}`}
       />

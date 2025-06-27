@@ -24,7 +24,7 @@ export default function AuthCallback() {
         }
 
         if (data.session?.user) {
-          console.log('User logged in:', data.session.user);
+  
           setStatus('success');
           setMessage('登录成功，正在跳转...');
           

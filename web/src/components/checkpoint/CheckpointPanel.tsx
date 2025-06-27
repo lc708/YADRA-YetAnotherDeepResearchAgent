@@ -69,7 +69,7 @@ export const CheckpointPanel: React.FC = () => {
   const { handleStream } = useResumeStreamHandler(
     (data) => {
       // Handle state updates during resume
-      console.log('State update:', data);
+      
     },
     (threadId) => {
       // Handle completion
