@@ -69,12 +69,13 @@ Structure your report in the following format:
 6. **Key Citations**
    - **CRITICAL CITATION RULES**: 
      - Only include citations that were EXPLICITLY provided in your input data
+     - Look for Research References section with ID format: [R1] [Title](URL), [R2] [Title](URL), etc.
      - Copy URLs and titles EXACTLY as they appear - NO modifications, corrections, or improvements
      - If a URL looks malformed or a title seems incomplete, exclude it entirely
      - NEVER generate, guess, or "fix" URLs based on your knowledge
      - NEVER create citations from memory or general knowledge
      - Each citation must be traceable to specific content in the research findings
-   - Format: `- [Exact Title from Source](exact-url-from-source)`
+   - Format: `- [Exact Title from Source](exact-url-from-source)` (remove the [R#] ID in final output)
    - Include an empty line between each citation for better readability
    - If no 100% valid citations with complete URL+title pairs are available, state "No verifiable citations available"
 
@@ -130,12 +131,13 @@ Structure your report in the following format:
 11. **Citations & Credits**
    - **CRITICAL CITATION RULES**: 
      - Only include citations that were EXPLICITLY provided in your input data
+     - Look for Research References section with ID format: [R1] [Title](URL), [R2] [Title](URL), etc.
      - Copy URLs and titles EXACTLY as they appear - NO modifications, corrections, or improvements
      - If a URL looks malformed or a title seems incomplete, exclude it entirely
      - NEVER generate, guess, or "fix" URLs based on your knowledge
      - NEVER create citations from memory or general knowledge
      - Each citation must be traceable to specific content in the research findings
-   - Format: `- [Exact Title from Source](exact-url-from-source)`
+   - Format: `- [Exact Title from Source](exact-url-from-source)` (remove the [R#] ID in final output)
    - Include an empty line between each citation
    - Ensure every in-text citation matches an entry here
    - If no 100% valid citations with complete URL+title pairs are available, DON'T WRITE THIS ENTIRE SECTION!
@@ -186,12 +188,13 @@ Structure your report in the following format:
 8. **Citations**
     - **CRITICAL CITATION RULES**: 
       - Only include citations that were EXPLICITLY provided in your input data
+      - Look for Research References section with ID format: [R1] [Title](URL), [R2] [Title](URL), etc.
       - Copy URLs and titles EXACTLY as they appear - NO modifications, corrections, or improvements
       - If a URL looks malformed or a title seems incomplete, include it AS IS or exclude it entirely
       - NEVER generate, guess, or "fix" URLs based on your knowledge
       - NEVER create citations from memory or general knowledge
       - Each citation must be traceable to specific content in the research findings
-    - Format: `- [Title or Outlet](exact-url-from-source)`
+    - Format: `- [Title or Outlet](exact-url-from-source)` (remove the [R#] ID in final output)
     - Include an empty line between each citation
     - Ensure every citation is used in-text and vice-versa
     - If no valid citations with complete URL+title pairs are available, DON'T WRITE THIS ENTIRE SECTION!
@@ -227,7 +230,8 @@ Structure your report in the following format:
 7. **数据 & 可信引用**
    - 2–3 条量化数据或研究结论，突出 "大数据" 可信度。
    - **引用处理规则**：
-     - 不要URL，只要标题！用
+     - 不要URL，只要标题！
+     - 从Research References部分提取：[R1] [Title](URL) → 只使用Title部分
      - 只包含输入数据中明确提供的引用
      - 精确复制标题 - 不做任何修改或"优化"，绝不基于记忆生成或"修复"标题
      - 如果标题对应的URL看起来有问题或标题不完整，必须完全排除
@@ -299,12 +303,13 @@ Structure your report in the following format:
 10. **Sources & References**
    - **CRITICAL CITATION RULES**: 
      - Only include citations that were EXPLICITLY provided in your input data
+     - Look for Research References section with ID format: [R1] [Title](URL), [R2] [Title](URL), etc.
      - Copy URLs and titles EXACTLY as they appear - NO modifications or URL shorteners
      - If a URL looks malformed or a title seems incomplete, exclude it entirely
      - NEVER generate, guess, or "fix" URLs based on your knowledge
      - NEVER create citations from memory or general knowledge
      - Each citation must be traceable to specific content in the thread
-   - Format in final tweet: "Sources: [Title](URL)"
+   - Format in final tweet: "Sources: [Title](URL)" (remove the [R#] ID in final output)
    - For multiple sources, use separate tweets or thread them
    - If no valid citations with complete URL+title pairs are available, DON'T WRITE THIS ENTIRE SECTION!
 

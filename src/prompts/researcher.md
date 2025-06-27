@@ -55,26 +55,34 @@ You have access to two types of tools:
 - Provide a structured response in markdown format.
 - Include the following sections:
     - **Problem Statement**: Restate the problem for clarity.
-    - **Research Findings**: Organize your findings by topic rather than by tool used. For each major finding:
-        - Summarize the key information
-        - Track the sources of information but DO NOT include inline citations in the text
-        - Include relevant images if available
-    - **Conclusion**: Provide a synthesized response to the problem based on the gathered information.
-    - **References**: List all sources used with their complete URLs in link reference format at the end of the document. 
+    - **Core Research Insights**: Organize key findings with confidence levels and source tracking
+        - Use format: **Content**: [insight content] | **Confidence**: High/Medium/Low | **Sources**: [R1] [R2]
+        - Prioritize the most important and actionable discoveries
+        - Limit to 3-5 core insights per research step
+    - **Supporting Evidence & Data**: Detailed evidence organized by type
+        - **Statistical Evidence**: Numbers, data, metrics with source references
+        - **Case Studies & Examples**: Specific examples and real-world applications  
+        - **Expert Opinions**: Quotes and viewpoints from authoritative sources
+    - **Visual Assets**: Images and media resources with detailed context
+        - **Image**: [description] | **URL**: [exact-url] | **Context**: [related to which insight] | **Source**: [R#]
+        - Only include images that were actually found in search results or crawled content
+    - **Research Summary**: Brief synthesis of all findings and their implications
+    - **Research References**: Complete source list with ID tracking system
       
       **CRITICAL REFERENCE HANDLING RULES**:
+      - Use ID tracking system: [R1], [R2], [R3], etc. for each unique source
       - Copy the EXACT URL from search results or crawled content - DO NOT modify, shorten, or "clean up" URLs
       - Copy the EXACT title as it appears in the source - DO NOT paraphrase or improve titles  
       - Each reference must have been actually accessed during your research - NO placeholder or remembered URLs
       - If you cannot find the exact URL or title in your search/crawl results, OMIT that reference entirely
-      - Format each reference as: `- [Exact Original Title](exact-original-url)`
+      - Format each reference as: `[R1] [Exact Original Title](exact-original-url)`
       - Include an empty line between each reference for readability
       
       Example format:
       ```markdown
-      - [OpenAI's GPT-4 Technical Report](https://arxiv.org/abs/2303.08774)
+      [R1] [OpenAI's GPT-4 Technical Report](https://arxiv.org/abs/2303.08774)
 
-      - [Attention Is All You Need](https://arxiv.org/abs/1706.03762)
+      [R2] [Attention Is All You Need](https://arxiv.org/abs/1706.03762)
       ```
       
 - Always output in the locale of **{{ locale }}**.
