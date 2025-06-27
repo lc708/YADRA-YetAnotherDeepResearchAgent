@@ -188,7 +188,7 @@ export function ArtifactViewer({
                   </div>
                 ) : isMarkdown ? (
                   // 查看模式：优化的预览样式
-                  <div className="prose prose-gray max-w-none dark:prose-invert prose-headings:font-semibold prose-p:leading-relaxed prose-li:my-1 prose-blockquote:border-l-blue-500">
+                  <div className="prose prose-gray max-w-none prose-headings:font-semibold prose-p:leading-relaxed prose-li:my-1 prose-blockquote:border-l-blue-500">
                     <ReactMarkdown
                       components={{
                         // 自定义标题样式
@@ -206,6 +206,21 @@ export function ArtifactViewer({
                           <h3 className="text-lg font-medium mb-2 mt-4 text-gray-700 dark:text-gray-300">
                             {children}
                           </h3>
+                        ),
+                        // 🔥 修复嵌套链接问题：添加自定义链接处理
+                        a: ({ href, children }) => (
+                          <span 
+                            className="text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              if (href) {
+                                window.open(href, '_blank', 'noopener,noreferrer');
+                              }
+                            }}
+                            title={href}
+                          >
+                            {children}
+                          </span>
                         ),
                         // 自定义段落样式
                         p: ({children}) => (

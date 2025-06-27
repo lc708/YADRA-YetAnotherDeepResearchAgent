@@ -11,7 +11,7 @@
  * - ~/app/chat/components/research-block（废弃版本）
  * 
  * 🎯 核心功能特性：
- * - 节点类型映射：后端节点（coordinator、researcher等）→ 前端类别（coordination、execution等）
+ * - 节点类型映射：后端节点（generalmanager、researcher等）→ 前端类别（coordination、execution等）
  * - 内容智能分析：根据描述文本自动推断动作类型
  * - SSE事件适配：将后端事件转换为前端可用的数据结构
  * - 输出类型识别：自动检测和分类各种输出物类型
@@ -44,7 +44,7 @@ export class DefaultNodeCategorizer implements NodeCategorizer {
     icon: string;
   }> = {
     // 协调类
-    "coordinator": {
+    "generalmanager": {
       category: "coordination" as NodeCategory,
       displayName: "任务协调",
       description: "协调研究任务，分析用户需求",
@@ -60,7 +60,7 @@ export class DefaultNodeCategorizer implements NodeCategorizer {
     },
     
     // 规划类
-    "planner": {
+    "projectmanager": {
       category: "planning" as NodeCategory,
       displayName: "研究规划",
       description: "制定详细的研究计划和执行步骤",
@@ -256,7 +256,7 @@ export class DefaultContentAnalyzer implements ContentAnalyzer {
   private getActionTypeByNode(nodeName: string): ActionCategory {
     const mapping: Record<string, ActionCategory> = {
       "background_investigator": "searching",
-      "planner": "generating", 
+      "projectmanager": "generating", 
       "researcher": "analyzing",
       "coder": "processing",
       "reporter": "generating",
@@ -403,7 +403,7 @@ export class DefaultSSEEventAdapter implements SSEEventAdapter {
 
 export const defaultAdaptationConfig: AdaptationConfig = {
   nodeMapping: {
-    "coordinator": {
+    "generalmanager": {
       category: "coordination",
       displayName: "任务协调",
       description: "协调研究任务，分析用户需求",
@@ -415,7 +415,7 @@ export const defaultAdaptationConfig: AdaptationConfig = {
       description: "进行背景信息搜集和初步调研", 
       icon: "Search"
     },
-    "planner": {
+    "projectmanager": {
       category: "planning",
       displayName: "研究规划",
       description: "制定详细的研究计划和执行步骤",

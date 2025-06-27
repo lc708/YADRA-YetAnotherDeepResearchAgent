@@ -254,7 +254,7 @@ export const ScrollContainer = forwardRef<ScrollContainerRef, ScrollContainerPro
           exit={{ opacity: 0, scale: 0.8 }}
           onClick={() => scrollToBottom(true)}
           className={cn(
-            "absolute bottom-4 right-4 z-20",
+            "absolute bottom-4 left-1/2 transform -translate-x-1/2 z-20",
             "bg-primary text-primary-foreground",
             "rounded-full p-2 shadow-lg",
             "hover:bg-primary/90 transition-colors",

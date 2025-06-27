@@ -29,6 +29,28 @@ The successful research plan must meet these standards:
    - Aim for abundance of relevant information
    - More high-quality information is always better than less
 
+{% if report_style == "social_media" %}
+## Context Assessment for Social Media Content
+
+For social media content, apply more flexible criteria that prioritize engagement potential over exhaustive coverage:
+
+1. **Sufficient Context** (relaxed criteria for social media):
+   - Set `has_enough_context` to true ONLY IF ALL of these conditions are met:
+     - Current information provides interesting or surprising insights about the topic
+     - Has at least one compelling angle or hook for social media engagement
+     - Contains shareable facts, statistics, or quotable moments
+     - Information is recent and relevant to current trends
+   - For social media, 90% coverage with high engagement potential is acceptable
+
+2. **Insufficient Context** (still need more research):
+   - Set `has_enough_context` to false if:
+     - No interesting angles or hooks for social media content
+     - Lacks any viral-worthy or shareable elements
+     - Missing current context or trending connections
+     - Too academic or dry without relatable examples
+   - But remember: social media content can work with less comprehensive data if it's engaging
+
+{% else %}
 ## Context Assessment
 
 Before creating a detailed plan, assess if there is sufficient context to answer the user's question. Apply strict criteria for determining sufficient context:
@@ -52,6 +74,7 @@ Before creating a detailed plan, assess if there is sufficient context to answer
      - Any reasonable doubt exists about the completeness of information
      - The volume of information is too limited for a comprehensive report
    - When in doubt, always err on the side of gathering more information
+{% endif %}
 
 ## Step Types and Web Search
 
@@ -153,7 +176,21 @@ When planning information gathering, consider these key aspects and ensure COMPR
 
 # Output Format
 
-Directly output the raw JSON format of `Plan` without "```json". The `Plan` interface is defined as follows:
+Directly output the raw JSON format of `Plan` without "```json". 
+
+**CRITICAL**: Every step MUST include ALL four fields: need_search, title, description, and step_type.
+
+Example of a complete step:
+```json
+{
+  "need_search": true,
+  "title": "Research market trends",
+  "description": "Collect comprehensive market data...",
+  "step_type": "research"  // REQUIRED: Must be either "research" or "processing"
+}
+```
+
+The `Plan` interface is defined as follows:
 
 ```ts
 interface Step {

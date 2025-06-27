@@ -28,7 +28,22 @@ import { Button } from "~/components/ui/button";
 import StatusBadge, { type StatusType } from "./status-badge";
 import LoadingAnimation from "./loading-animation";
 import MarkdownRenderer from "./markdown-renderer";
-import { User, Bot } from "lucide-react";
+import { User, Bot, ChevronDown, ChevronUp } from "lucide-react";
+
+// Agent类型到中文显示名称的映射
+const getAgentDisplayName = (agent?: string): string => {
+  if (!agent) return "YADRA";
+  
+  const agentMapping: Record<string, string> = {
+    "generalmanager": "YADRA CEO",
+    "projectmanager": "项目经理", 
+    "researcher": "高级分析师",
+    "coder": "开发工程师",
+    "reporter": "资深编辑"
+  };
+  
+  return agentMapping[agent] || `【Agent：${agent}】`;
+};
 
 export interface Message {
   id: string;
@@ -37,6 +52,11 @@ export interface Message {
   timestamp: Date;
   status?: StatusType;
   isStreaming?: boolean;
+  toolCalls?: Array<{
+    id: string;
+    name: string;
+    args: Record<string, unknown>;
+  }>;
   metadata?: {
     model?: string;
     tokens?: number;
@@ -73,7 +93,7 @@ const MessageAvatar: React.FC<{ role: Message["role"] }> = ({ role }) => {
     },
     system: {
       fallback: "SYS",
-      bgColor: "bg-gray-500",
+      bgColor: "bg-muted-foreground",
       icon: "⚙️"
     }
   };
@@ -82,7 +102,7 @@ const MessageAvatar: React.FC<{ role: Message["role"] }> = ({ role }) => {
 
   return (
     <div className={cn(
-      "h-8 w-8 shrink-0 rounded-full flex items-center justify-center text-white text-xs font-medium bg-gray-700",
+      "h-8 w-8 shrink-0 rounded-full flex items-center justify-center text-white text-xs font-medium",
       config.bgColor
     )}>
       {config.fallback}
@@ -180,6 +200,8 @@ const MessageActions: React.FC<{
                 <span className="text-xs">✏️</span>
               </Button>
             )}
+
+
           </motion.div>
         )}
       </AnimatePresence>
@@ -193,11 +215,6 @@ const MessageMetadata: React.FC<{ message: Message }> = ({ message }) => {
 
   return (
     <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
-      {message.metadata.model && (
-        <span className="bg-muted/50 px-2 py-1 rounded">
-          模型: {message.metadata.model}
-        </span>
-      )}
       {message.metadata.tokens && (
         <span className="bg-muted/50 px-2 py-1 rounded">
           Token: {message.metadata.tokens}
@@ -226,6 +243,7 @@ export const MessageContainer: React.FC<MessageContainerProps> = ({
 }) => {
   const contentRef = useRef<HTMLDivElement>(null);
   const [isContentVisible, setIsContentVisible] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   // 检测内容是否可见（用于动画触发）
   useEffect(() => {
@@ -249,6 +267,29 @@ export const MessageContainer: React.FC<MessageContainerProps> = ({
   const isUserMessage = message.role === "user";
   const isStreamingOrLoading = message.isStreaming || message.status === "loading" || message.status === "processing";
 
+  // 自动折叠逻辑：当AI消息流式传输完成后自动折叠
+  useEffect(() => {
+    if (!isUserMessage && !isStreamingOrLoading && message.content.length > 200) {
+      const timer = setTimeout(() => {
+        setIsCollapsed(true);
+      }, 2000); // 2秒后自动折叠
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isUserMessage, isStreamingOrLoading, message.content.length]);
+
+  // 折叠状态变化时触发滚动更新
+  const handleToggleCollapse = useCallback(() => {
+    setIsCollapsed(prev => !prev);
+    // 延迟触发滚动，确保DOM更新完成
+    setTimeout(() => {
+      const scrollContainer = document.querySelector('[data-scroll-container]');
+      if (scrollContainer) {
+        scrollContainer.scrollTop = scrollContainer.scrollHeight;
+      }
+    }, 100);
+  }, []);
+
   return (
     <motion.div
       ref={contentRef}
@@ -268,7 +309,7 @@ export const MessageContainer: React.FC<MessageContainerProps> = ({
           animate={{ scale: 1 }}
           transition={{ delay: 0.2 }}
         >
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-800 text-white">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-white">
             {message.role === 'user' ? (
               <User className="h-4 w-4" />
             ) : (
@@ -288,23 +329,28 @@ export const MessageContainer: React.FC<MessageContainerProps> = ({
           "flex items-center gap-2 mb-2",
           isUserMessage ? "justify-end" : "justify-start"
         )}>
-          <span className="text-sm font-medium text-gray-900">
-            {message.role === 'user' ? '你' : 'YADRA'}
-          </span>
-
-          {showTimestamp && (
-            <span className="text-xs text-gray-500">
-              {message.timestamp.toLocaleTimeString()}
+          <div className={cn(
+            "flex items-center gap-2",
+            isUserMessage && "order-2"
+          )}>
+            <span className="text-sm font-medium text-foreground">
+              {message.role === 'user' ? '你' : getAgentDisplayName(message.metadata?.model)}
             </span>
-          )}
 
-          {showStatus && message.status && (
-            <StatusBadge 
-              status={message.status} 
-              size="sm"
-              showPulse={isStreamingOrLoading}
-            />
-          )}
+            {showTimestamp && (
+              <span className="text-xs text-muted-foreground">
+                {message.timestamp.toLocaleTimeString()}
+              </span>
+            )}
+
+            {showStatus && message.status && (
+              <StatusBadge 
+                status={message.status} 
+                size="sm"
+                showPulse={isStreamingOrLoading}
+              />
+            )}
+          </div>
         </div>
 
         {/* 消息内容 */}
@@ -315,10 +361,25 @@ export const MessageContainer: React.FC<MessageContainerProps> = ({
           className={cn(
             "relative",
             isUserMessage 
-              ? "bg-primary text-primary-foreground rounded-2xl rounded-tr-md px-4 py-3 max-w-[80%] ml-auto"
-              : "bg-muted/50 rounded-2xl rounded-tl-md px-4 py-3 max-w-[90%]"
+              ? "bg-white border border-blue-500 text-foreground rounded-2xl rounded-tr-md px-4 py-3 max-w-fit ml-auto"
+              : "bg-white border border-gray-300 text-foreground rounded-2xl rounded-tl-md px-4 py-3 max-w-[90%]"
           )}
         >
+          {/* 折叠按钮 - 位于AI聊天泡泡右上角 */}
+          {!isUserMessage && !isStreamingOrLoading && message.content.length > 200 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleToggleCollapse}
+              className="absolute -top-2 -right-2 h-6 w-6 p-0 hover:bg-muted/80 text-muted-foreground bg-white border border-gray-300 rounded-full shadow-sm z-10"
+            >
+              {isCollapsed ? (
+                <ChevronDown className="h-3 w-3" />
+              ) : (
+                <ChevronUp className="h-3 w-3" />
+              )}
+            </Button>
+          )}
           {/* 加载状态 */}
           {isStreamingOrLoading && message.content.length === 0 ? (
             <LoadingAnimation 
@@ -328,8 +389,19 @@ export const MessageContainer: React.FC<MessageContainerProps> = ({
               showText={false}
             />
           ) : (
-            <div className="prose prose-sm max-w-none text-gray-700">
-              <MarkdownRenderer content={message.content} />
+            <div className={cn(
+              "prose prose-sm max-w-none text-foreground text-sm leading-tight relative"
+            )}>
+              <MarkdownRenderer 
+                content={message.content}
+                className={cn(
+                  isCollapsed && !isUserMessage && "line-clamp-2 overflow-hidden"
+                )}
+              />
+              {/* 渐变遮罩（折叠状态下） */}
+              {isCollapsed && !isUserMessage && (
+                <div className="absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-white to-transparent pointer-events-none" />
+              )}
             </div>
           )}
 

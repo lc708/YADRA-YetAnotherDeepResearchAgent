@@ -11,7 +11,7 @@
  * - ~/app/chat/components/research-block（废弃版本）
  * 
  * 🎯 核心功能特性：
- * - 动态节点映射：自动适配后端实际节点类型（coordinator、planner、researcher等）
+ * - 动态节点映射：自动适配后端实际节点类型（generalmanager、projectmanager、researcher等）
  * - SSE事件驱动：实时响应研究进度更新
  * - 智能分类系统：将后端节点归类到前端功能类别
  * - 配置驱动适配：通过适配器模式支持自定义映射规则

@@ -182,3 +182,113 @@ textarea {
 button {
   cursor: pointer;
 }
+
+/* 🎨 修复prose文字颜色过浅的问题 - 强制覆盖Tailwind默认样式 */
+.prose p,
+.prose div,
+.prose span,
+.prose li,
+.prose blockquote {
+  color: #1f2937 !important; /* text-gray-800 */
+}
+
+.prose h1,
+.prose h2, 
+.prose h3,
+.prose h4,
+.prose h5,
+.prose h6 {
+  color: #111827 !important; /* text-gray-900 */
+}
+
+/* 🎨 修复strong标签的颜色问题 - 确保粗体文字不会显示为白色 */
+.prose strong,
+.prose b {
+  color: #111827 !important; /* text-gray-900 - 深色粗体 */
+  font-weight: 600; /* 确保粗体效果 */
+}
+
+/* 🎨 针对PlanCard中的文字进行特殊处理 */
+.plan-card-content .prose p,
+.plan-card-content .prose div,
+.plan-card-content .prose span {
+  color: #1f2937 !important; /* text-gray-800 */
+}
+
+.plan-card-content .prose strong,
+.plan-card-content .prose b {
+  color: #111827 !important; /* text-gray-900 */
+}
+
+/* 🎨 修复所有可能的浅色文字问题 */
+.prose-slate p,
+.prose-slate div,
+.prose-slate span,
+.prose-slate li {
+  color: #1f2937 !important; /* text-gray-800 */
+}
+
+.prose-slate strong,
+.prose-slate b {
+  color: #111827 !important; /* text-gray-900 */
+}
+
+/* 🎨 确保标题文字足够深 */
+h1, h2, h3, h4, h5, h6 {
+  color: #111827 !important; /* text-gray-900 */
+}
+
+/* 🎨 修复可能的全局文字颜色问题 */
+p:not(.text-muted-foreground):not(.text-gray-400):not(.text-gray-500) {
+  color: #1f2937 !important; /* text-gray-800 */
+}
+
+/* 🎨 全局strong标签颜色修复 */
+strong:not(.text-white):not(.text-muted-foreground),
+b:not(.text-white):not(.text-muted-foreground) {
+  color: #111827 !important; /* text-gray-900 */
+}
+
+/* 🔧 修复列表行距问题 - 使用最高优先级覆盖@tailwindcss/typography插件 */
+.prose li,
+.prose-slate li,
+.prose ul > li,
+.prose ol > li,
+.prose-slate ul > li,
+.prose-slate ol > li {
+  margin-top: 0 !important;
+  margin-bottom: 0.125rem !important; /* mb-0.5 = 2px */
+  line-height: 1.25 !important; /* leading-tight */
+}
+
+.prose ul,
+.prose ol,
+.prose-slate ul,
+.prose-slate ol {
+  margin-top: 0.25rem !important; /* my-1 = 4px */
+  margin-bottom: 0.25rem !important;
+}
+
+/* 🔧 针对MessageContainer中的列表特别处理 */
+.prose.prose-slate.max-w-none li {
+  margin-top: 0 !important;
+  margin-bottom: 0.125rem !important;
+  line-height: 1.25 !important;
+}
+
+.prose.prose-slate.max-w-none ul {
+  margin-top: 0.25rem !important;
+  margin-bottom: 0.25rem !important;
+}
+
+/* 🔧 最强优先级 - 直接覆盖所有可能的typography样式 */
+[class*="prose"] li {
+  margin-top: 0 !important;
+}
+
+/* 🔧 针对手动生成的li标签 */
+li.ml-4.list-disc {
+  margin-top: 0 !important;
+  margin-bottom: 0.125rem !important;
+  line-height: 1.25 !important;
+}

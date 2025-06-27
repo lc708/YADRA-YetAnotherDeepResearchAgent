@@ -81,7 +81,9 @@ def test_apply_prompt_template_with_special_chars():
     assert messages[1]["content"] == "test\nmessage\"with'special{chars}"
 
 
-@pytest.mark.parametrize("prompt_name", ["coder", "coder", "coordinator", "planner"])
+@pytest.mark.parametrize(
+    "prompt_name", ["coder", "coder", "generalmanager", "projectmanager"]
+)
 def test_multiple_template_types(prompt_name):
     """Test loading different types of templates"""
     template = get_prompt_template(prompt_name)

@@ -33,10 +33,10 @@ export function PodcastPanel({ className }: PodcastPanelProps) {
   // 使用unified-store获取当前线程的消息
   const messages = useThreadMessages();
   
-  // 过滤出播客消息
+  // 🔥 修复：使用LangGraph原生字段过滤出播客消息
   const podcastMessages = useMemo(() => {
     return messages.filter((message): message is Message => 
-        message !== undefined && message.agent === "podcast"
+        message !== undefined && message.langGraphMetadata?.agent === "podcast"
       );
   }, [messages]);
   

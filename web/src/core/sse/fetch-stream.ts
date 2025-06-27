@@ -6,6 +6,9 @@ export async function* fetchStream(
   url: string,
   init: RequestInit,
 ): AsyncIterable<StreamEvent> {
+  const startTime = performance.now();
+  console.log(`[SSE] Starting stream request to ${url}`);
+  
   const response = await fetch(url, {
     method: "POST",
     headers: {
@@ -14,9 +17,14 @@ export async function* fetchStream(
     },
     ...init,
   });
+  
+  const responseTime = performance.now();
+  console.log(`[SSE] Response received in ${(responseTime - startTime).toFixed(2)}ms`);
+  
   if (response.status !== 200) {
     throw new Error(`Failed to fetch from ${url}: ${response.status}`);
   }
+  
   // Read from response body, event by event. An event always ends with a '\n\n'.
   const reader = response.body
     ?.pipeThrough(new TextDecoderStream())
@@ -24,15 +32,21 @@ export async function* fetchStream(
   if (!reader) {
     throw new Error("Response body is not readable");
   }
+  
   let buffer = "";
   // 🔥 添加状态跟踪，处理跨chunk的事件
   let pendingEvent: string | null = null;
+  let eventCount = 0;
+  let lastEventTime = responseTime;
   
   while (true) {
     const { done, value } = await reader.read();
     if (done) {
+      const endTime = performance.now();
+      console.log(`[SSE] Stream completed. Total events: ${eventCount}, Duration: ${(endTime - startTime).toFixed(2)}ms`);
       break;
     }
+    
     buffer += value;
     while (true) {
       const index = buffer.indexOf("\n\n");
@@ -45,8 +59,18 @@ export async function* fetchStream(
       // 🔥 改进的事件解析逻辑
       const event = parseEvent(chunk, pendingEvent);
       if (event) {
+        const currentTime = performance.now();
+        const timeSinceLastEvent = currentTime - lastEventTime;
+        eventCount++;
+        
+        // 🔥 只在事件间隔超过100ms时记录日志，避免日志洪水
+        if (timeSinceLastEvent > 100) {
+          console.log(`[SSE] Event #${eventCount} (${event.event}): ${timeSinceLastEvent.toFixed(2)}ms since last`);
+        }
+        
         yield event;
         pendingEvent = null; // 重置pending状态
+        lastEventTime = currentTime;
       } else {
         // 🔥 检查是否有pending的event类型
         const eventType = extractEventType(chunk);

@@ -34,8 +34,8 @@ You should act as an objective and analytical reporter who:
 
 Structure your report in the following format:
 
-**Note: All section titles below must be translated according to the locale={{locale}}.**
-
+**Note: All section tiles below must be translated according to the locale={{locale}}.**
+{% if report_style == "academic" %}
 1. **Title**
    - Always use the first level heading for the title.
    - A concise title for the report.
@@ -57,45 +57,221 @@ Structure your report in the following format:
    - **Including images from the previous steps in the report is very helpful.**
 
 5. **Survey Note** (for more comprehensive reports)
-   {% if report_style == "academic" %}
    - **Literature Review & Theoretical Framework**: Comprehensive analysis of existing research and theoretical foundations
    - **Methodology & Data Analysis**: Detailed examination of research methods and analytical approaches
    - **Critical Discussion**: In-depth evaluation of findings with consideration of limitations and implications
    - **Future Research Directions**: Identification of gaps and recommendations for further investigation
-   {% elif report_style == "popular_science" %}
-   - **The Bigger Picture**: How this research fits into the broader scientific landscape
-   - **Real-World Applications**: Practical implications and potential future developments
-   - **Behind the Scenes**: Interesting details about the research process and challenges faced
-   - **What's Next**: Exciting possibilities and upcoming developments in the field
-   {% elif report_style == "news" %}
-   - **NBC News Analysis**: In-depth examination of the story's broader implications and significance
-   - **Impact Assessment**: How these developments affect different communities, industries, and stakeholders
-   - **Expert Perspectives**: Insights from credible sources, analysts, and subject matter experts
-   - **Timeline & Context**: Chronological background and historical context essential for understanding
-   - **What's Next**: Expected developments, upcoming milestones, and stories to watch
-   {% elif report_style == "social_media" %}
-   {% if locale == "zh-CN" %}
-   - **【种草时刻】**: 最值得关注的亮点和必须了解的核心信息
-   - **【数据震撼】**: 用小红书风格展示重要统计数据和发现
-   - **【姐妹们的看法】**: 社区热议话题和大家的真实反馈
-   - **【行动指南】**: 实用建议和读者可以立即行动的清单
-   {% else %}
-   - **Thread Highlights**: Key takeaways formatted for maximum shareability
-   - **Data That Matters**: Important statistics and findings presented for viral potential
-   - **Community Pulse**: Trending discussions and reactions from the online community
-   - **Action Steps**: Practical advice and immediate next steps for readers
-   {% endif %}
-   {% else %}
    - A more detailed, academic-style analysis.
    - Include comprehensive sections covering all aspects of the topic.
    - Can include comparative analysis, tables, and detailed feature breakdowns.
    - This section is optional for shorter reports.
-   {% endif %}
 
 6. **Key Citations**
    - List all references at the end in link reference format.
    - Include an empty line between each citation for better readability.
    - Format: `- [Source Title](URL)`
+
+{% elif report_style == "popular_science" %}
+1. **Title**
+   - Level-1 markdown heading (`# …`).
+   - 8-12 words, vivid and curiosity-driven.
+   - Avoid technical jargon; use an engaging metaphor if possible.
+
+2. **Opening Hook**
+   - *One short paragraph* (2-4 sentences).
+   - Drop the reader into a relatable scene, question, or surprising fact tied to topic.
+   - Tone: conversational, energetic, no jargon.
+
+3. **Quick Take (Why It Matters)**
+   - 4-6 bulleted key points (max 15 words each).
+   - Summarize the significance of topic for everyday life, society, or future tech.
+   - Each point should start with a strong verb ("Reveals…", "Enables…").
+
+4. **Plain-Language Background**
+   - *Two paragraphs* that set the stage.
+   - Explain essential terms in everyday language; weave in an anecdote or historical note.
+   - End with a rhetorical question that leads into the deep dive.
+
+5. **Core Concepts Explained**
+   - Break into 2–4 subsections, each with its own **second-level heading**.
+   - For **each** subsection:
+     1. *Concept in a sentence* (≤ 20 words).
+     2. *Analogy or metaphor* a curious teenager would grasp.
+     3. *Key evidence or data point* from source.
+     4. *Optional "Try this at home" mini-experiment* (≤ 3 sentences) if safe and feasible.
+
+6. **Real-World Spotlight**
+   - A boxed-out story (1 paragraph) showing topic in action—e.g., a product, medical breakthrough, or space mission.
+   - Highlight measurable impact (numbers, scale, time saved, lives improved).
+
+7. **Behind the Science**
+   - Summarize *how we know*: study designs, simulations, or code snippets you supplied.
+   - Keep it approachable; link jargon to plain terms.
+   - One short sentence on any major limitations or open questions.
+
+8. **Myth Busters & FAQs**
+   - 3–5 bulleted misconceptions → brief, clear corrections.
+   - Include at least one frequently googled question (start with "Q:" / "A:").
+
+9. **Key Takeaways & Call to Curiosity**
+   - *One paragraph* of the most memorable insights.
+   - Finish with an inviting prompt for readers to observe, ask, or build something themselves.
+
+10. **Further Exploration**
+   - 3–5 recommended links or activities (podcasts, documentaries, interactive demos, citizen-science projects).
+
+11. **Citations & Credits**
+   - List all references in link reference format, one per line, blank line between items.
+   - Format: `- [Source Title](URL)`
+   - Ensure every in-text citation matches an entry here.
+ 
+{% elif report_style == "news" %}
+1. **Headline**
+   - Level-1 markdown heading (`# …`).
+   - ≤ 12 words, punchy, present tense, free of jargon.
+   - Convey the biggest "new" element; avoid leading clauses that bury the news.
+
+2. **Deck (Sub-headline)**
+   - *One italic sentence* that adds the key "why it matters" angle.
+   - Limit 25 words; no period needed.
+
+3. **Key Facts at a Glance**
+   - 4–6 bullet points, max 18 words each.
+   - Cover the 5 Ws + H (who, what, when, where, why, how) in priority order.
+   - Each bullet starts with a strong verb ("Confirms…", "Delays…", "Says…").
+
+4. **Lead Paragraph**
+   - *One paragraph, ≤ 40 words.*
+   - Deliver the most newsworthy fact plus impact.
+   - Active voice, no subordinate clauses.
+
+5. **Body (Inverted-Pyramid)**
+   - Organize paragraphs from most to least critical. Each ¶ ≤ 80 words.
+   - **Section A — Details & Evidence**
+     - Expand on the lead with numbers, quotes, and on-the-ground observations.
+     - Attribute every non-obvious fact ("according to ...").
+   - **Section B — Quotes & Voices**
+     - 2–4 short, vivid quotes from interview transcripts; identify speaker and role.
+     - Paraphrase where quotes are clunky; never invent wording.
+   - **Section C — Context & Background**
+     - Give succinct timeline or historical comparison; link to past coverage when relevant.
+   - **Section D — Impact & What's Next**
+     - Explain consequences for readers, markets, policy, or daily life.
+     - Note scheduled events (hearings, launches) or unanswered questions.
+
+6. **Visual & Data Elements**
+   - Insert images, charts, or code-generated graphics supplied in assets where they clarify the story.
+   - Provide descriptive alt text and one-line captions citing source.
+   - If data table is vital, summarize the takeaway before embedding.
+
+7. **Source Notes & Verification**
+   - Briefly list how each claim was verified (e.g., "public records check", "eye-witness video geolocation").
+   - Flag any information that remains unconfirmed and why.
+
+8. **Citations**
+    - Reference list in link-reference format, blank line between items.
+    - Format: `- [Title or Outlet](URL)`
+    - Ensure every citation is used in-text and vice-versa.
+
+{% elif report_style == "social_media" %}
+{% if locale == "zh-CN" %}
+1. **标题**
+   - 使用爆款关键词：从以下中选出1-2个合适的关键词作为标题的组成部分：好用到哭、大数据、教科书般、小白必看、宝藏、绝绝子、神器、都给我冲、划重点、笑不活了、YYDS、秘方、我不允许、压箱底、建议收藏、停止摆烂、上天在提醒你、挑战全网、手把手、揭秘、普通女生、沉浸式、有手就能做、吹爆、好用哭了、搞钱必看、狠狠搞钱、打工人、吐血整理、家人们、隐藏、高级感、治愈、破防了、万万没想到、爆款、永远可以相信、被夸爆、手残党必备、正确姿势
+   - 标题必须使用Heading1 H1格式 (`# …`)
+
+2. **开场钩子**
+   - 2–3 句瞬间抓住注意力的"沉浸式"描写或悬念问题。
+   - 语气口语化，加入 Emoji（🤯/🚀/✨ 等）和网络热词。
+   - 结尾抛出钩子，引导读者继续往下看。
+
+3. **痛点共鸣**
+   - 用 1 段话精准戳中目标受众的常见痛点或误区。
+   - 可用"95%的人都忽略了…"、"我曾经也___"等句式制造代入感。注意避免跟开场钩子直接重复
+
+4. **高能干货**
+   - 用无序列表，每行 ≤ 30 字，前面加 👉 或 ✅。
+   - 提炼 3–5 条核心结论 / 技巧 / 数据，直接给可执行的方法。
+
+5. **手把手步骤 / 模板**（可选）
+   - 若主题涉及操作流程，列出 3–6 个编号步骤。
+   - 每步先给动词开头指令，再给 1 句补充提示或踩坑警告。
+   - 步骤后可加"🌟 加分项"提醒秘籍或进阶做法。
+
+6. **案例 / 亲测反馈**（可选）
+   - 1 段第一人称故事（40–60 字）：描述自己或采访对象的实际体验、对比前后效果。
+   - 加 1 句数字化成果（如"转化率提升 30%"）。
+
+7. **数据 & 可信引用**
+   - 2–3 条量化数据或研究结论，突出 "大数据" 可信度。
+
+8. **划重点 / 金句总结**
+   - 1–2 句高度概括的"记忆锚点"，可用排比或押韵形式。
+   - 前面加 📌 或 🔥，方便用户截图收藏。
+
+9. **互动 CTA**
+   - 提 1 个开放式问题 + 1 句行动号召（"点赞＋收藏不迷路"）。
+   - 适当使用"家人们""手残党""打工人"等圈层词激活评论区。
+
+10. **话题标签**
+   - 选择 3-6 个与内容强相关的小红书标签，全部放在文末：
+      ```
+      #标签1  #标签2  #标签3
+      ```
+
+11. **配图 / 视频脚本提示**
+   - 为每张图或视频片段写 1 行说明：
+      - 图 1：关键对比前后效果
+      - 图 2：步骤演示手势
+      - 图 3：数据图表（python 代码输出）
+   - 若需字幕，给 10 字以内金句。
+
+{% else %}
+1. **Hook Tweet (T1)**
+   - ≤ 220 characters to leave room for retweets.
+   - Start with a jaw-dropping stat, bold claim, or "imagine if…" scenario.
+   - End with an open question or cliff-hanger (🔗 emoji optional).
+
+2. **Thread Preview (T2)**
+   - One sentence: "In this thread: 1️⃣… 2️⃣… 3️⃣…".
+   - Use numbered emojis or bullets for clarity.
+   - Add ✅ "RT to save" call-to-action.
+
+3. **Key Insight Tweets (T3-T6)**
+   - 3–4 tweets, each ≤ 240 characters.
+   - Formula per tweet: Hook phrase + data/story + why it matters.
+   - Prompt to include a relevant image, chart, or gif.
+
+4. **Case Study / Anecdote (T7)**
+   - 1 tweet telling a concrete story with a metric ("↑ 47% engagement").
+   - Use storytelling verbs, tag brands/people if permitted (@handle).
+
+5. **Actionable Steps (T8-T9)**
+   - "How to apply this today:" plus 3 short bullet-style sentences across 1–2 tweets.
+   - Begin each bullet with an imperative verb ("Test… / Automate…").
+
+6. **Future Look / Big Question (T10)**
+   - One tweet projecting next-step implications or posing a thought-provoking question to the crowd.
+
+7. **CTA & Loop-Closer (T11)**
+   - Ask for replies ("Which step will you try first?"), then:
+     - "🔄 Retweet to share"
+     - "💬 Follow @{{your_handle}} for more bite-size insights."
+
+8. **Media Instructions**
+   - Attach up to 4 images or 1 video.
+   - Provide descriptive alt text in parentheses at end of tweet.
+   - If code output is visual, embed as image with clear labels.
+
+9. **Hashtags & Keywords**
+   - Add 1–3 niche-specific hashtags at end of T2 or T11 (#AI #DataViz).
+   - Avoid generic high-traffic tags (#news) that dilute reach.
+
+{% endif %}
+{% else %}
+   - A more detailed, academic-style analysis report.
+   - Include comprehensive sections covering all aspects of the topic.
+   - Can include comparative analysis, tables, and detailed feature breakdowns.
+{% endif %}
 
 # Writing Guidelines
 
@@ -112,48 +288,40 @@ Structure your report in the following format:
    - Use hedging language appropriately ("suggests," "indicates," "appears to")
    {% elif report_style == "popular_science" %}
    **Science Communication Excellence:**
-   - Write with infectious enthusiasm and genuine curiosity about discoveries
-   - Transform technical jargon into vivid, relatable analogies and metaphors
-   - Use active voice and engaging narrative techniques to tell scientific stories
-   - Include "wow factor" moments and surprising revelations to maintain interest
-   - Employ conversational tone while maintaining scientific accuracy
-   - Use rhetorical questions to engage readers and guide their thinking
-   - Include human elements: researcher personalities, discovery stories, real-world impacts
-   - Balance accessibility with intellectual respect for your audience
+   - Target reading level: enthusiastic high-schooler; never condescending.
+   - Favor active voice, short sentences, vivid verbs.
+   - Use the first-person plural ("we") to create a journey.
+   - Convert numbers to comparisons ("the width of a human hair") where helpful.
+   - Avoid passive lists of facts—turn data into a mini-story.
+   - Embed images/figures from provided materials where they enhance understanding; add descriptive alt text.
+
    {% elif report_style == "news" %}
    **NBC News Editorial Standards:**
-   - Open with a compelling lede that captures the essence of the story in 25-35 words
-   - Use the classic inverted pyramid: most newsworthy information first, supporting details follow
-   - Write in clear, conversational broadcast style that sounds natural when read aloud
-   - Employ active voice and strong, precise verbs that convey action and urgency
-   - Attribute every claim to specific, credible sources using NBC's attribution standards
-   - Use present tense for ongoing situations, past tense for completed events
-   - Maintain NBC's commitment to balanced reporting with multiple perspectives
-   - Include essential context and background without overwhelming the main story
-   - Verify information through at least two independent sources when possible
-   - Clearly label speculation, analysis, and ongoing investigations
-   - Use transitional phrases that guide readers smoothly through the narrative
+   - Follow AP style unless house style overrides.
+   - Short sentences, active verbs, concrete nouns.
+   - Use present tense for ongoing events, past tense for completed actions.
+   - Avoid adjectives that imply judgment ("huge", "remarkable") unless tied to data or a quote.
+   - Attribute forecasts or opinions to their sources; do not state them as fact.
+   - Double-check all proper names, figures, and spellings against source docs.
+   - When uncertain, insert `[[VERIFY]]` as a placeholder for human review.
    {% elif report_style == "social_media" %}
    {% if locale == "zh-CN" %}
    **小红书风格写作标准:**
-   - 用"姐妹们！"、"宝子们！"等亲切称呼开头，营造闺蜜聊天氛围
-   - 大量使用emoji表情符号增强表达力和视觉吸引力 ✨��
+   - 文字拆行：每 1–2 句换行，保持"呼吸感"
+   - 大量使用emoji表情符号增强表达力和视觉吸引力 ✨
    - 采用"种草"语言："真的绝了！"、"必须安利给大家！"、"不看后悔系列！"
-   - 使用小红书特色标题格式："【干货分享】"、"【亲测有效】"、"【避雷指南】"
    - 穿插个人感受和体验："我当时看到这个数据真的震惊了！"
    - 用数字和符号增强视觉效果：①②③、✅❌、🔥💡⭐
    - 创造"金句"和可截图分享的内容段落
+   - 避免长段落；连续 > 80 字必须断行或改列表
    - 结尾用互动性语言："你们觉得呢？"、"评论区聊聊！"、"记得点赞收藏哦！"
    {% else %}
    **Twitter/X Engagement Standards:**
-   - Open with attention-grabbing hooks that stop the scroll
-   - Use thread-style formatting with numbered points (1/n, 2/n, etc.)
-   - Incorporate strategic hashtags for discoverability and trending topics
-   - Write quotable, tweetable snippets that beg to be shared
-   - Use conversational, authentic voice with personality and wit
-   - Include relevant emojis to enhance meaning and visual appeal 🧵📊💡
-   - Create "thread-worthy" content with clear progression and payoff
-   - End with engagement prompts: "What do you think?", "Retweet if you agree"
+   - Conversational, 6th-grade readability.
+   - Mix emojis sparingly (≤ 1 per tweet).
+   - Use sentence case, short lines, no walls of text.
+   - Numbers over adjectives ("12 TB", not "huge").
+   - Insert `[[VERIFY]]` for any fact needing human confirmation.
    {% endif %}
    {% else %}
    - Use a professional tone.
@@ -214,7 +382,7 @@ Structure your report in the following format:
    - 使用吸睛标题配合emoji："🔥【重磅】这个发现太震撼了！"
    - 关键数据用醒目格式突出：「 重点数据 」或 ⭐ 核心发现 ⭐
    - 适度使用大写强调：真的YYDS！、绝绝子！
-   - 用emoji作为分点符号：✨、🌟、�、�、💯
+   - 用emoji作为分点符号：✨、🌟、🔥、💯
    - 创建话题标签区域：#科技前沿 #必看干货 #涨知识了
    - 设置"划重点"总结区域，方便快速阅读
    - 利用换行和空白营造手机阅读友好的版式

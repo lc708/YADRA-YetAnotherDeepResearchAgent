@@ -13,7 +13,7 @@ import MessageInput, { type MessageInputRef } from "~/components/yadra/message-i
 import { Tooltip } from "~/components/yadra/tooltip";
 import { enhancePrompt } from "~/core/api/prompt-enhancer";
 import { useSettingsStore, setEnableDeepThinking, setReportStyle } from "~/core/store";
-import { useUnifiedStore, setResponding, setCurrentUrlParam, setUrlParamMapping, setCurrentThreadId } from "~/core/store/unified-store";
+import { useUnifiedStore, useFinalReport, setResponding, setCurrentUrlParam, setUrlParamMapping, setCurrentThreadId } from "~/core/store/unified-store";
 import { fetchStream } from "~/core/sse/fetch-stream";
 import { resolveServiceURL } from "~/core/api/resolve-service-url";
 import { generateInitialQuestionIDs, getVisitorId } from "~/core/utils";
@@ -62,15 +62,13 @@ const REPORT_STYLES = [
 interface HeroInputProps {
   className?: string;
   placeholder?: string;
-  onSendMessage?: (message: string) => void;
-  // 🚀 新增：ASK API研究请求回调
+  // 🚀 ASK API研究请求回调
   onSubmitResearch?: (request: import("~/core/store/unified-store").ResearchRequest) => Promise<void>;
 }
 
 export function HeroInput({ 
   className, 
   placeholder: customPlaceholder, 
-  onSendMessage,
   onSubmitResearch
 }: HeroInputProps) {
   const router = useRouter();
@@ -91,8 +89,13 @@ export function HeroInput({
   // 统一使用responding状态
   const responding = useUnifiedStore((state) => state.responding);
   
-  // 判断是否可以操作
-  const canOperate = currentPrompt.trim() !== "" && !responding;
+  // 获取当前线程ID用于检测任务完成状态
+  const currentThreadId = useUnifiedStore((state) => state.currentThreadId);
+  const finalReport = useFinalReport(currentThreadId || undefined);
+  
+  // 判断是否可以操作：只有任务完全完成（生成报告）后才允许发送新消息
+  const isTaskCompleted = finalReport !== null;
+  const canOperate = currentPrompt.trim() !== "" && !responding && (isTaskCompleted || !currentThreadId);
 
   // 计算上拉框位置
   const calculateDropdownPosition = useCallback(() => {
@@ -159,34 +162,25 @@ export function HeroInput({
 
   // 🚀 构建研究配置的辅助函数
   const buildResearchConfig = useCallback(() => {
+    const settings = useSettingsStore.getState().general;
+    
     return {
-      autoAcceptedPlan: false, // 确保需要用户确认
-      enableBackgroundInvestigation: true,
-      reportStyle: reportStyle,
-      enableDeepThinking: enableDeepThinking,
-      maxPlanIterations: 3,
-      maxStepNum: 5,
-      maxSearchResults: 5
+      autoAcceptedPlan: settings.autoAcceptedPlan,
+      enableBackgroundInvestigation: settings.enableBackgroundInvestigation,
+      reportStyle: settings.reportStyle,
+      enableDeepThinking: settings.enableDeepThinking,
+      maxPlanIterations: settings.maxPlanIterations,
+      maxStepNum: settings.maxStepNum,
+      maxSearchResults: settings.maxSearchResults
     };
-  }, [reportStyle, enableDeepThinking]);
+  }, []); // 不需要依赖，因为直接从 store 获取最新值
 
   const handleSubmit = useCallback(async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!currentPrompt.trim() || !canOperate || responding) return;
 
-    if (onSendMessage) {
-      // 🔥 传统消息发送回调（用于followup场景）
-      try {
-        await onSendMessage(currentPrompt);
-        setCurrentPrompt("");
-        if (inputRef.current) {
-          inputRef.current.setContent("");
-        }
-      } catch (error) {
-        console.error("Failed to send message:", error);
-      }
-    } else if (onSubmitResearch) {
-      // 🚀 新架构：ASK API研究请求回调
+    if (onSubmitResearch) {
+      // 🚀 ASK API研究请求回调
       try {
         const researchRequest = {
           question: currentPrompt,
@@ -211,10 +205,10 @@ export function HeroInput({
         console.error("[HeroInput] Research request failed:", error);
       }
     } else {
-      // 🔥 兜底：如果没有任何回调，显示提示
+      // 🔥 如果没有回调，显示提示
       console.warn("[HeroInput] No callback provided for message submission");
     }
-  }, [currentPrompt, canOperate, responding, onSendMessage, onSubmitResearch, buildResearchConfig]);
+  }, [currentPrompt, canOperate, responding, onSubmitResearch, buildResearchConfig]);
 
   const handleEnhancePrompt = useCallback(async () => {
     if (currentPrompt.trim() === "" || isEnhancing) {
@@ -256,9 +250,9 @@ export function HeroInput({
     <div className={cn("mx-auto w-full max-w-4xl", className)}>
       <div className="relative">
         <div className="relative w-full">
-          <div className="relative w-full overflow-hidden rounded-xl border border-gray-200 bg-white/90 backdrop-blur-sm shadow-sm transition-all duration-300 focus-within:border-blue-300 focus-within:shadow-md">
+          <div className="relative w-full overflow-hidden rounded-xl border border-border bg-transparent shadow-sm transition-all duration-300 focus-within:border-primary focus-within:shadow-md">
             {/* 文字输入区域 */}
-            <div className="p-4">
+            <div className="p-4 bg-white">
               <textarea
                 value={currentPrompt}
                 onChange={(e) => setCurrentPrompt(e.target.value)}
@@ -269,7 +263,7 @@ export function HeroInput({
                   }
                 }}
                 placeholder={customPlaceholder || PLACEHOLDER_TEXTS[currentPlaceholder]}
-                className="w-full resize-none bg-transparent text-sm text-gray-900 placeholder-gray-500 outline-none border-none"
+                                  className="w-full resize-none bg-transparent text-sm text-foreground placeholder-muted-foreground outline-none border-none"
                 rows={2}
                 style={{ 
                   minHeight: '56px', // 2行的最小高度
@@ -286,7 +280,7 @@ export function HeroInput({
             </div>
             
             {/* 控制按钮行 - 始终在底部 */}
-            <div className="flex items-center justify-between px-4 pb-4 border-t border-gray-100">
+                          <div className="flex items-center justify-between px-4 pb-4 border-t border-border/40 bg-white">
               {/* 左侧控制组 */}
               <div className="flex items-center gap-2">
                 {/* 写作风格选择器 */}
@@ -309,7 +303,7 @@ export function HeroInput({
                       "backdrop-blur-sm flex items-center gap-2",
                       showStyleDropdown
                         ? "bg-blue-50 text-blue-700"
-                        : "bg-gray-50 text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+                        : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
                     )}
                   >
                     <CurrentStyleIcon className={cn(
@@ -415,7 +409,7 @@ export function HeroInput({
                   side="top"
                   sideOffset={8}
                   className="border border-gray-200 bg-white backdrop-blur-sm text-gray-900 shadow-xl"
-                  title={responding ? "停止生成" : (canOperate ? "发送消息" : "请输入消息")}
+                  title={responding ? "停止生成" : (canOperate ? "发送消息" : (!isTaskCompleted && currentThreadId ? "等待当前任务完成" : "请输入消息"))}
                 >
                   <Button
                     onClick={responding ? () => {} : () => handleSubmit()}

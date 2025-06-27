@@ -28,6 +28,7 @@ import { Badge } from "~/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
 import { Markdown } from "~/components/yadra/markdown";
+import { parseJSON } from "~/core/utils/json";
 import { ScrollContainer, type ScrollContainerRef } from "~/components/conversation/scroll-container";
 import { cn } from "~/lib/utils";
 
@@ -43,8 +44,7 @@ interface OutputStreamProps {
   className?: string;
 }
 
-type FilterType = "all" | "user" | "assistant" | "tool";
-type SourceFilter = "all" | "input" | "button" | "system";
+// 🔥 移除FilterType，不再需要筛选功能
 
 export function OutputStream({ className }: OutputStreamProps) {
   // 🔥 使用新的数据架构 - 从 unified-store 获取数据
@@ -54,11 +54,8 @@ export function OutputStream({ className }: OutputStreamProps) {
   const responding = useUnifiedStore((state) => state.responding);
   
   const [searchQuery, setSearchQuery] = useState("");
-  const [roleFilter, setRoleFilter] = useState<FilterType>("all");
-  const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
-  const [agentFilter, setAgentFilter] = useState<string>("all");
-  const [eventTypeFilter, setEventTypeFilter] = useState<string>("all");
-  const [autoScroll, setAutoScroll] = useState(true);
+  // 🔥 简化：移除筛选功能，自动滚动始终开启
+  const autoScroll = true;
   
   // 🔥 使用智能滚动容器
   const scrollContainerRef = useRef<ScrollContainerRef>(null);
@@ -68,134 +65,31 @@ export function OutputStream({ className }: OutputStreamProps) {
       return [];
     }
     
-    return [...messages].sort((a, b) => {
-      // 🔥 修复时间排序：使用真实时间戳而非字符串比较
-      const timeA = a.metadata?.timestamp || a.originalInput?.timestamp;
-      const timeB = b.metadata?.timestamp || b.originalInput?.timestamp;
-      
-      // 🔥 尝试解析为Date对象进行真实时间比较
-      let dateA: Date | null = null;
-      let dateB: Date | null = null;
-      
-      if (timeA) {
-        try {
-          dateA = new Date(timeA);
-          if (isNaN(dateA.getTime())) dateA = null;
-        } catch {
-          dateA = null;
-        }
-      }
-      
-      if (timeB) {
-        try {
-          dateB = new Date(timeB);
-          if (isNaN(dateB.getTime())) dateB = null;
-        } catch {
-          dateB = null;
-        }
-      }
-      
-      // 🔥 如果都有有效时间戳，按时间排序
-      if (dateA && dateB) {
-        return dateA.getTime() - dateB.getTime();
-      }
-      
-      // 🔥 如果只有一个有时间戳，有时间戳的排在前面
-      if (dateA && !dateB) return -1;
-      if (!dateA && dateB) return 1;
-      
-      // 🔥 如果都没有时间戳，按ID字符串排序（fallback）
-      const idA = a.id || '';
-      const idB = b.id || '';
-      return idA.localeCompare(idB);
-    });
+    // 🔥 简化：直接使用生成顺序，避免时区问题和复杂的时间戳解析
+    // Store中的消息已经按接收顺序存储，这是最可靠的排序方式
+    return [...messages];
   }, [messages]);
 
-  const availableOptions = useMemo(() => {
-    const roles = new Set<string>();
-    const agents = new Set<string>();
-    const sources = new Set<string>();
-    const eventTypes = new Set<string>();
-    
-    allMessages.forEach(msg => {
-      roles.add(msg.role);
-      if (msg.agent) agents.add(msg.agent);
-      if (msg.source) sources.add(msg.source);
-      
-      // 基于现有字段推断事件类型
-      if (msg.toolCalls && msg.toolCalls.length > 0) {
-        eventTypes.add('tool_calls');
-      }
-      if (msg.finishReason === 'interrupt') {
-        eventTypes.add('interrupt');
-      }
-      if (msg.finishReason === 'reask') {
-        eventTypes.add('reask');
-      }
-      if (msg.isStreaming) {
-        eventTypes.add('streaming');
-      }
-      if (msg.reasoningContent) {
-        eventTypes.add('reasoning');
-      }
-      if (msg.resources && msg.resources.length > 0) {
-        eventTypes.add('resource');
-      }
-      
-      // 默认消息类型
-      eventTypes.add('message');
-    });
-    
-    return {
-      roles: Array.from(roles),
-      agents: Array.from(agents),
-      sources: Array.from(sources),
-      eventTypes: Array.from(eventTypes),
-    };
-  }, [allMessages]);
+  // 🔥 移除复杂的availableOptions计算，简化代码
 
+  // 🔥 修复：简化过滤逻辑，默认显示所有消息，只保留基本搜索
   const filteredMessages = useMemo(() => {
-    return allMessages.filter(message => {
-      if (searchQuery && !message.content.toLowerCase().includes(searchQuery.toLowerCase())) {
-        return false;
-      }
-      
-      if (roleFilter !== "all" && message.role !== roleFilter) {
-        return false;
-      }
-      
-      if (sourceFilter !== "all" && message.source !== sourceFilter) {
-        return false;
-      }
-      
-      if (agentFilter !== "all" && message.agent !== agentFilter) {
-        return false;
-      }
-      
-      if (eventTypeFilter !== "all") {
-        switch (eventTypeFilter) {
-          case 'tool_calls':
-            return message.toolCalls && message.toolCalls.length > 0;
-          case 'interrupt':
-            return message.finishReason === 'interrupt';
-          case 'reask':
-            return message.finishReason === 'reask';
-          case 'streaming':
-            return message.isStreaming;
-          case 'reasoning':
-            return !!message.reasoningContent;
-          case 'resource':
-            return message.resources && message.resources.length > 0;
-          case 'message':
-            return true; // 所有消息都是message类型
-          default:
-            return true;
-        }
-      }
-      
-      return true;
-    });
-  }, [allMessages, searchQuery, roleFilter, sourceFilter, agentFilter, eventTypeFilter]);
+    // 🚀 按照用户要求：不要做那么多筛选，直接显示所有store中的消息
+    let filtered = allMessages;
+    
+    // 只保留基本的文本搜索功能
+    if (searchQuery) {
+      filtered = filtered.filter(message => 
+        message.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (message.reasoningContent && message.reasoningContent.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (message.langGraphMetadata?.agent && message.langGraphMetadata.agent.toLowerCase().includes(searchQuery.toLowerCase()))
+      );
+    }
+    
+    // 🔥 移除角色筛选功能
+    
+    return filtered;
+  }, [allMessages, searchQuery]);
 
   const handleExport = useCallback(() => {
     try {
@@ -212,8 +106,8 @@ export function OutputStream({ className }: OutputStreamProps) {
         outputStream: filteredMessages.map(msg => ({
           id: msg.id,
           role: msg.role,
-          agent: msg.agent,
-          source: msg.source,
+          agent: msg.langGraphMetadata?.agent,
+          origin: msg.origin,
           content: msg.content,
           isStreaming: msg.isStreaming,
           eventType: getEventType(msg),
@@ -242,23 +136,15 @@ export function OutputStream({ className }: OutputStreamProps) {
   }, [currentUrlParam, filteredMessages, threadData, responding, allMessages.length]);
 
   const getEventType = useCallback((message: Message): string => {
-    // 🔥 优先基于 metadata 信息识别真实的 SSE 事件类型
-    if (message.metadata?.nodeEvent) {
-      return message.metadata.nodeType === 'start' ? 'node_start' : 'node_complete';
-    }
-    if (message.metadata?.planEvent) return 'plan_generated';
-    if (message.metadata?.searchEvent) return 'search_results';
-    if (message.metadata?.agentEvent) return 'agent_output';
-    if (message.metadata?.progressEvent) return 'progress';
-    if (message.metadata?.artifactEvent) return 'artifact';
-    if (message.metadata?.completeEvent) return 'complete';
-    if (message.metadata?.errorEvent) return 'error';
-    if (message.metadata?.chunkType) return 'message_chunk';
-    if (message.metadata?.interruptEvent) return 'interrupt';
-    if (message.metadata?.userInput) return 'user_input';
-    if (message.metadata?.userFeedback) return 'user_feedback';
+    // 🔥 修复：使用LangGraph原生字段识别事件类型
+    const agent = message.langGraphMetadata?.agent;
     
-    // 🔥 Fallback 到原有的推断逻辑
+    // 基于agent类型识别特定事件
+    if (agent === 'projectmanager') return 'plan_generated';
+    if (agent === 'reporter') return 'artifact';
+    if (agent === 'podcast') return 'artifact';
+    
+    // 基于消息内容和状态识别事件类型
     if (message.toolCalls && message.toolCalls.length > 0) return 'tool_calls';
     if (message.finishReason === 'interrupt') return 'interrupt';
     if (message.finishReason === 'reask') return 'reask';
@@ -266,6 +152,7 @@ export function OutputStream({ className }: OutputStreamProps) {
     if (message.reasoningContent) return 'reasoning';
     if (message.resources && message.resources.length > 0) return 'resource';
     
+    // 🔥 移除废弃的metadata事件检查，使用简化的逻辑
     return 'message';
   }, []);
 
@@ -315,9 +202,10 @@ export function OutputStream({ className }: OutputStreamProps) {
 
   const getMessageIcon = (message: Message) => {
     if (message.role === "user") {
-      return message.source === "button" ? <Settings className="h-4 w-4" /> : <User className="h-4 w-4" />;
+      return message.origin === "user_button" ? <Settings className="h-4 w-4" /> : <User className="h-4 w-4" />;
     }
-    if (message.role === "tool") {
+    // 工具调用消息：role是assistant但有toolCalls
+    if (message.role === "assistant" && (message.toolCalls?.length ?? 0) > 0) {
       return <Settings className="h-4 w-4" />;
     }
     if (message.isStreaming) {
@@ -326,20 +214,89 @@ export function OutputStream({ className }: OutputStreamProps) {
     return <Bot className="h-4 w-4" />;
   };
 
+  // 智能内容渲染函数
+  const renderSmartContent = useCallback((content: string) => {
+    // 尝试检测和格式化JSON内容
+    const trimmedContent = content.trim();
+    
+    // 检测是否为JSON格式
+    if ((trimmedContent.startsWith('{') && trimmedContent.endsWith('}')) || 
+        (trimmedContent.startsWith('[') && trimmedContent.endsWith(']')) ||
+        trimmedContent.includes('```json')) {
+      
+      try {
+        // 使用项目现有的parseJSON工具处理JSON
+        const parsedData = parseJSON(trimmedContent, null);
+        
+        if (parsedData !== null) {
+          // 格式化JSON为易读的Markdown格式
+          const formattedJson = '```json\n' + JSON.stringify(parsedData, null, 2) + '\n```';
+          
+          return (
+            <div className="space-y-2">
+              <div className="text-xs text-muted-foreground bg-muted/30 px-2 py-1 rounded">
+                📄 JSON数据（已格式化）
+              </div>
+              <Markdown 
+                animated={true}
+                enableCopy={true}
+                className="prose-sm"
+              >
+                {formattedJson}
+              </Markdown>
+            </div>
+          );
+        }
+      } catch (error) {
+        // JSON解析失败，fallback到普通渲染
+      }
+    }
+    
+    // 检测是否包含结构化数据关键词
+    if (content.includes('"type":') || content.includes('"id":') || content.includes('"status":')) {
+      return (
+        <div className="space-y-2">
+          <div className="text-xs text-muted-foreground bg-blue-50 dark:bg-blue-950/20 px-2 py-1 rounded">
+            🔧 结构化数据
+          </div>
+          <Markdown 
+            animated={true}
+            enableCopy={true}
+            className="prose-sm"
+          >
+            {content}
+          </Markdown>
+        </div>
+      );
+    }
+    
+    // 普通Markdown渲染（启用所有增强功能）
+    return (
+      <Markdown 
+        animated={true}
+        enableCopy={true}
+        checkLinkCredibility={true}
+        className="prose-sm"
+      >
+        {content}
+      </Markdown>
+    );
+  }, []);
+
   const getEventBadge = useCallback((message: Message) => {
     const eventType = getEventType(message);
     const badges = [];
     
     if (message.role === "user") {
       badges.push(
-        <Badge key="role" variant={message.source === "button" ? "secondary" : "default"}>
-          {message.source === "button" ? "指令" : "查询"}
+        <Badge key="role" variant={message.origin === "user_button" ? "secondary" : "default"}>
+          {message.origin === "user_button" ? "指令" : "查询"}
         </Badge>
       );
-    } else if (message.agent) {
+    } else if (message.langGraphMetadata?.agent) {
       badges.push(
         <Badge key="agent" variant="outline">
-          {message.agent}
+          {message.langGraphMetadata.agent}
         </Badge>
       );
     } else {
@@ -409,17 +366,7 @@ export function OutputStream({ className }: OutputStreamProps) {
             )}
           </div>
           
-          <div className="flex items-center gap-2">
-            <label className="flex items-center gap-1 text-xs">
-              <input
-                type="checkbox"
-                checked={autoScroll}
-                onChange={(e) => setAutoScroll(e.target.checked)}
-                className="w-3 h-3"
-              />
-              自动滚动
-            </label>
-          </div>
+          {/* 🔥 移除自动滚动控制，始终开启 */}
         </div>
         
         <div className="flex items-center gap-2">
@@ -438,70 +385,10 @@ export function OutputStream({ className }: OutputStreamProps) {
           </Button>
         </div>
         
-        <div className="flex items-center gap-2 flex-wrap">
-          <Select value={roleFilter} onValueChange={(value: FilterType) => setRoleFilter(value)}>
-            <SelectTrigger className="w-32">
-              <SelectValue placeholder="角色" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">所有角色</SelectItem>
-              <SelectItem value="user">用户</SelectItem>
-              <SelectItem value="assistant">助手</SelectItem>
-              <SelectItem value="tool">工具</SelectItem>
-            </SelectContent>
-          </Select>
-          
-          <Select value={sourceFilter} onValueChange={(value: SourceFilter) => setSourceFilter(value)}>
-            <SelectTrigger className="w-32">
-              <SelectValue placeholder="来源" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">所有来源</SelectItem>
-              <SelectItem value="input">输入框</SelectItem>
-              <SelectItem value="button">按钮</SelectItem>
-              <SelectItem value="system">系统</SelectItem>
-            </SelectContent>
-          </Select>
-          
-          {availableOptions.agents.length > 0 && (
-            <Select value={agentFilter} onValueChange={setAgentFilter}>
-              <SelectTrigger className="w-32">
-                <SelectValue placeholder="Agent" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">所有Agent</SelectItem>
-                {availableOptions.agents.map(agent => (
-                  <SelectItem key={agent} value={agent}>{agent}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-          
-          {availableOptions.eventTypes.length > 0 && (
-            <Select value={eventTypeFilter} onValueChange={setEventTypeFilter}>
-              <SelectTrigger className="w-32">
-                <SelectValue placeholder="事件类型" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">所有事件</SelectItem>
-                {availableOptions.eventTypes.map(eventType => (
-                  <SelectItem key={eventType} value={eventType}>
-                    {eventType === 'message' ? '普通消息' : 
-                     eventType === 'tool_calls' ? '工具调用' :
-                     eventType === 'interrupt' ? '中断事件' :
-                     eventType === 'reask' ? '重问事件' :
-                     eventType === 'streaming' ? '流式消息' :
-                     eventType === 'reasoning' ? '推理过程' :
-                     eventType === 'resource' ? '资源加载' :
-                     eventType}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-          
+        {/* 🔥 简化：只显示消息统计 */}
+        <div className="flex items-center justify-end">
           <div className="text-sm text-muted-foreground">
-            共 {filteredMessages.length} 条输出 / {allMessages.length} 总计
+            显示 {filteredMessages.length} / {allMessages.length} 条消息
           </div>
         </div>
       </div>
@@ -538,8 +425,8 @@ export function OutputStream({ className }: OutputStreamProps) {
                       {getEventIcon(message)}
                       <CardTitle className="text-sm">
                         {message.role === "user" 
-                          ? (message.source === "button" ? "用户指令" : "用户查询")
-                          : message.agent || message.role
+                          ? (message.origin === "user_button" ? "用户指令" : "用户查询")
+                          : message.langGraphMetadata?.agent || message.role
                         }
                       </CardTitle>
                       {getEventBadge(message)}
@@ -554,7 +441,7 @@ export function OutputStream({ className }: OutputStreamProps) {
                 </CardHeader>
                 <CardContent>
                   <div className="prose prose-sm max-w-none">
-                    <Markdown>{message.content}</Markdown>
+                    {renderSmartContent(message.content)}
                   </div>
                   
                   {/* 显示消息的额外信息 */}
