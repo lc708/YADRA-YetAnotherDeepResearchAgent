@@ -3,11 +3,21 @@
 "use client";
 
 import React from 'react';
+import { 
+  PrimaryGradientText,
+  SuccessGradientText, 
+  WarningGradientText,
+  DangerGradientText,
+  PurpleGradientText,
+  RainbowGradientText,
+  SubtleGradientText,
+  GradientText
+} from '~/components/ui/gradient-text';
 
 export default function HomePage() {
   return (
-    <div className="flex-1 overflow-y-auto bg-gradient-to-b from-gray-50 via-white to-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="min-h-full bg-gradient-to-b from-gray-50 via-white to-gray-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
         <Hero />
         <SearchSection />
         <CaseShowcase />
@@ -22,11 +32,11 @@ const Hero = () => {
     <section className="pt-20 pb-16 text-center">
       <div className="max-w-4xl mx-auto">
         <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-foreground mb-6 leading-tight animate-fade-in">
-          YADRA深度研究Agent
+        <PrimaryGradientText intensity='strong'>YADRA</PrimaryGradientText>深度研究Agent
         </h1>
-        <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto leading-relaxed animate-fade-in-delay">
-          输入研究主题 - 确认执行计划 - 等待3-5分钟 - 实时在线编辑 - 下载复制保存
-        </p>
+                  <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto leading-relaxed animate-fade-in-delay">
+            <RainbowGradientText animated={true}>输入研究主题 - 确认执行计划 - 等待3-5分钟 - 实时在线编辑 - 下载复制保存</RainbowGradientText>
+          </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center items-center animate-fade-in-delay-2">
           <button className="px-8 py-3 bg-primary text-primary-foreground font-medium rounded-lg hover:bg-primary/90 transition-all duration-300 shadow-sm hover:shadow-md hover:scale-105 transform">
             登录后马上开始体验
@@ -61,7 +71,7 @@ const SearchSection = () => {
             <span className="text-lg font-semibold text-card-foreground">输入您感兴趣的话题</span>
           </div>
           <p className="text-muted-foreground">
-           特别感谢开源项目 DeerFlow / local-deep-researcher / Open Deep Research 的提示词模板，帮助良多
+           <SubtleGradientText intensity='light'>特别感谢开源项目 DeerFlow / local-deep-researcher / Open Deep Research 的提示词模板，帮助良多</SubtleGradientText>
           </p>
         </div>
         
@@ -159,42 +169,42 @@ const CaseShowcase = () => {
     {
       title: "数据流通利用基础设施研究报告",
       description: "具体定义、核心构成、应用实践、发展趋势及其深远影响。",
-      image: "https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=400&h=300&fit=crop",
+      image: "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=400&h=300&fit=crop",
       category: "研究报告",
       tags: ["数据要素", "隐私计算", "公共数据"]
     },
     {
       title: "小米YU7的上市新闻",
       description: "小米YU7的定价、性能、市场前景和影响",
-      image: "https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=400&h=300&fit=crop",
+      image: "https://cdn.8mediatech.com/gambar/97114574785-newscover_2025_5_28_1748414422264-zg3e4i.jpeg",
       category: "新闻稿件",
       tags: ["智能驾驶", "新能源汽车", "发布会"]
     },
     {
       title: "沙县小吃和兰州拉面",
       description: "揭秘！沙县vs兰州拉面，打工人YYDS到底是谁？",
-      image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=400&h=300&fit=crop",
+      image: "https://images.unsplash.com/photo-1704034740076-d3c0cdc991a7?w=400&h=300&fit=crop&q=80",
       category: "社媒文案",
       tags: ["小红书", "国民美食", "冷知识"]
     },
     {
       title: "AI Agent发展报告",
       description: "全面分析过去一年（2024年6月至2025年6月）AI Agent领域的技术发展、市场动态及代表性事件",
-      image: "https://images.unsplash.com/photo-1449824913935-59a10b8d2000?w=400&h=300&fit=crop",
+      image: "https://images.unsplash.com/photo-1738641928061-e68c5e8e2f2b?w=400&h=300&fit=crop",
       category: "科普博客",
       tags: ["人工智能", "智能体", "MCP"]
     },
     {
       title: "气候变化对全球农业影响的研究报告",
       description: "气候变化对全球农业的影响：影响范围、影响机制、未来研究方向",
-      image: "https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=400&h=300&fit=crop",
+      image: "https://images.unsplash.com/photo-1744477083960-2e2e3e6d8223?w=400&h=300&fit=crop",
       category: "研究报告",
       tags: ["气候变化", "粮食安全", "农业"]
     },
     {
       title: "墨尔本中餐厅发展报告2020-2025",
       description: "墨尔本作为澳大利亚多元文化中心，其中餐厅业态在最近5年间经历了显著的结构性变革",
-      image: "https://images.unsplash.com/photo-1518837695005-2083093ee35b?w=400&h=300&fit=crop",
+      image: "https://images.unsplash.com/photo-1721222778575-c64b9299ff2d?w=400&h=300&fit=crop",
       category: "科普博客",
       tags: ["市场分析", "消费者", "餐饮业"]
     }

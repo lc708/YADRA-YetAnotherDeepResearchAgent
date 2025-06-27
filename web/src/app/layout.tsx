@@ -50,7 +50,7 @@ export default async function RootLayout({
             <GlobalSidebar />
             
             {/* 主要内容区域 */}
-            <main className="flex-1 overflow-hidden">
+            <main className="flex-1 overflow-y-auto">
               {children}
             </main>
           </div>
