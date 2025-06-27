@@ -527,7 +527,13 @@ async def _execute_agent_step(
 
         agent_input["messages"].append(
             HumanMessage(
-                content="IMPORTANT: DO NOT include inline citations in the text. Instead, track all sources and include a References section at the end using link reference format. Include an empty line between each citation for better readability. Use this format for each reference:\n- [Source Title](URL)\n\n- [Another Source](URL)",
+                content="CRITICAL RESEARCH CONSTRAINTS:\n\n"
+                + "1. **Content Filtering**: When search results have relevance scores, prioritize sources with scores >0.8\n"
+                + "2. **Length Limit**: Keep your response under 2000 characters total\n"
+                + "3. **Quality Focus**: Process fewer high-quality sources rather than many low-quality ones\n"
+                + "4. **Essential Only**: Include only the most critical findings that directly address the research question\n"
+                + "5. **Citations**: Use exact URLs and titles from search results - do not modify or clean up URLs\n\n"
+                + "Focus on delivering concise, high-value insights rather than comprehensive coverage.",
                 name="system",
             )
         )
