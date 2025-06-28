@@ -43,11 +43,44 @@ npm-debug.log
 .DS_Store
 Thumbs.db
 
-# Project specific
-conf.yaml
+# Project specific - Development files not needed in production
 web/
 docs/
 examples/
 assets/
 tests/
+todos/
+scripts/
 *.log
+*.md
+README.md
+
+# Development configuration (keep conf.yaml for production)
+.env*
+!.env.production
+conf.yaml.example
+production.env.template
+
+# Development tools and cache
+.pytest_cache/
+.coverage
+.coverage.*
+.cursor/
+.langgraph_api/
+
+# Build artifacts
+*.tar.gz
+
+# Package manager files in root (web has its own)
+package-lock.json
+node_modules/
+
+# Development scripts (keep only production deploy script)
+bootstrap.sh
+bootstrap.bat
+docker-compose.yml
+nginx.conf
+
+# Temporary and generated files
+*.tmp
+*.temp

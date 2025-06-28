@@ -1,0 +1,48 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: yadra-backend-prod
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env.production
+    volumes:
+      - ./conf.yaml:/app/conf.yaml
+      - ./logs:/app/logs  # 持久化日志
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: '2.0'
+        reservations:
+          memory: 2G
+          cpus: '1.0'
+    networks:
+      - yadra-network
+
+  nginx:
+    image: nginx:alpine
+    container_name: yadra-nginx-prod
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro  # SSL证书目录（可选）
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - yadra-network
+
+networks:
+  yadra-network:
+    driver: bridge 
