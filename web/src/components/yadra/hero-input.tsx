@@ -9,7 +9,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { cn } from "~/lib/utils";
 
 import { Button } from "~/components/ui/button";
-import MessageInput, { type MessageInputRef } from "~/components/yadra/message-input";
+
 import { Tooltip } from "~/components/yadra/tooltip";
 import { enhancePrompt } from "~/core/api/prompt-enhancer";
 import { useSettingsStore, setEnableDeepThinking, setReportStyle } from "~/core/store";
@@ -80,7 +80,7 @@ export function HeroInput({
   const [showStyleDropdown, setShowStyleDropdown] = useState(false);
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
   
-  const inputRef = useRef<MessageInputRef>(null);
+
   const styleButtonRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const reportStyle = useSettingsStore((state) => state.general.reportStyle);
@@ -119,9 +119,8 @@ export function HeroInput({
 
   useEffect(() => {
     const reaskText = searchParams.get('reask');
-    if (reaskText && inputRef.current) {
-  
-      inputRef.current.setContent(reaskText);
+    if (reaskText) {
+      // 直接更新状态，因为使用的是受控的 textarea
       setCurrentPrompt(reaskText);
       
       const newUrl = window.location.pathname;
@@ -194,9 +193,6 @@ export function HeroInput({
         
         // 清空输入框
         setCurrentPrompt("");
-        if (inputRef.current) {
-          inputRef.current.setContent("");
-        }
         
       } catch (error) {
         console.error("[HeroInput] Research request failed:", error);
@@ -223,10 +219,8 @@ export function HeroInput({
 
       await new Promise((resolve) => setTimeout(resolve, 500));
 
-      if (inputRef.current) {
-        inputRef.current.setContent(enhancedPrompt);
-        setCurrentPrompt(enhancedPrompt);
-      }
+      // 直接更新状态，因为使用的是受控的 textarea
+      setCurrentPrompt(enhancedPrompt);
 
       setTimeout(() => {
         setIsEnhanceAnimating(false);
