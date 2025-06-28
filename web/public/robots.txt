@@ -1,0 +1,24 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /auth/
+Disallow: /_next/
+Disallow: /admin/
+Disallow: /private/
+
+# 允许搜索引擎访问关键页面
+Allow: /workspace
+Allow: /settings
+
+# 爬取延迟
+Crawl-delay: 1
+
+# Sitemap位置
+Sitemap: https://your-domain.com/sitemap.xml
+
+# 针对百度搜索引擎的特殊配置
+User-agent: Baiduspider
+Allow: /
+Disallow: /api/
+Disallow: /auth/
+Crawl-delay: 1 
