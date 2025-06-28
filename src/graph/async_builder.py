@@ -93,16 +93,17 @@ async def get_or_create_checkpointer() -> AsyncPostgresSaver:
                 # Based on LangGraph GitHub discussion #2833 and issue #2576
                 connection_kwargs = {
                     "autocommit": True,
-                    "prepare_threshold": 0,  # Critical: prevents prepared statement conflicts
+                    "prepare_threshold": (
+                        0
+                    ),  # Critical: prevents prepared statement conflicts
                     "row_factory": dict_row,  # Required for AsyncPostgresSaver
                 }
-                
+
                 # Create connection manually with proper configuration
                 async_conn = await psycopg.AsyncConnection.connect(
-                    db_uri, 
-                    **connection_kwargs
+                    db_uri, **connection_kwargs
                 )
-                
+
                 # Create checkpointer with the configured connection
                 _checkpointer = AsyncPostgresSaver(async_conn)
                 _checkpointer_context = async_conn  # Store connection for cleanup
@@ -110,7 +111,9 @@ async def get_or_create_checkpointer() -> AsyncPostgresSaver:
                 # Ensure tables are set up
                 await _checkpointer.setup()
 
-                logger.info("✅ Global AsyncPostgresSaver instance created with optimized connection config")
+                logger.info(
+                    "✅ Global AsyncPostgresSaver instance created with optimized connection config"
+                )
             except Exception as e:
                 logger.error(f"❌ Failed to create AsyncPostgresSaver: {e}")
                 raise
