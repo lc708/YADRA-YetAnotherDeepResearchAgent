@@ -57,31 +57,22 @@ def background_investigation_node(state: State, config: RunnableConfig):
     if SELECTED_SEARCH_ENGINE == SearchEngine.TAVILY.value:
         logger.info("Using Tavily search engine")
         try:
-            searched_content = LoggedTavilySearch(
+            background_investigation_results = LoggedTavilySearch(
                 max_results=configurable.max_search_results
             ).invoke(query)
             logger.info(
-                f"Tavily search returned: {type(searched_content)}, length: {len(searched_content) if isinstance(searched_content, list) else 'N/A'}"
+                f"Tavily search completed, result type: {type(background_investigation_results)}"
             )
 
-            if isinstance(searched_content, list):
-                background_investigation_results = [
-                    f"## {elem['title']}\n\n{elem['content']}"
-                    for elem in searched_content
-                ]
-                result = {
-                    "background_investigation_results": "\n\n".join(
-                        background_investigation_results
-                    )
-                }
-                logger.info(
-                    f"Background investigation completed successfully, result length: {len(result['background_investigation_results'])}"
+            result = {
+                "background_investigation_results": json.dumps(
+                    background_investigation_results, ensure_ascii=False
                 )
-                return result
-            else:
-                logger.error(
-                    f"Tavily search returned malformed response: {searched_content}"
-                )
+            }
+            logger.info(
+                f"Background investigation completed successfully, result length: {len(result['background_investigation_results'])}"
+            )
+            return result
         except Exception as e:
             logger.error(f"Error in Tavily search: {e}")
             logger.exception("Full traceback:")
@@ -536,7 +527,13 @@ async def _execute_agent_step(
 
         agent_input["messages"].append(
             HumanMessage(
-                content="IMPORTANT: DO NOT include inline citations in the text. Instead, track all sources and include a References section at the end using link reference format. Include an empty line between each citation for better readability. Use this format for each reference:\n- [Source Title](URL)\n\n- [Another Source](URL)",
+                content="CRITICAL RESEARCH CONSTRAINTS:\n\n"
+                + "1. **Content Filtering**: When search results have relevance scores, prioritize sources with scores >0.8\n"
+                + "2. **Length Limit**: Keep your response under 2000 characters total\n"
+                + "3. **Quality Focus**: Process fewer high-quality sources rather than many low-quality ones\n"
+                + "4. **Essential Only**: Include only the most critical findings that directly address the research question\n"
+                + "5. **Citations**: Use exact URLs and titles from search results - do not modify or clean up URLs\n\n"
+                + "Focus on delivering concise, high-value insights rather than comprehensive coverage.",
                 name="system",
             )
         )

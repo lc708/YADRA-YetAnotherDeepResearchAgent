@@ -324,16 +324,7 @@ export const useUnifiedStore = create<UnifiedStore>()(
       
       // 会话状态管理 - 新增方法
       setSessionState: (sessionState: UnifiedStore['sessionState']) => {
-        // 🔍 调试每次sessionState更新
-        const currentState = get().sessionState;
-        console.log('🔍 [setSessionState] Updating sessionState:', {
-          from: currentState,
-          to: sessionState,
-          session_id_before: currentState?.sessionMetadata?.session_id,
-          session_id_after: sessionState?.sessionMetadata?.session_id,
-          timestamp: new Date().toISOString(),
-          stack: new Error().stack?.split('\n').slice(1, 6) // 获取调用栈前5行
-        });
+
         
         set((state) => {
           state.sessionState = sessionState;
@@ -1247,14 +1238,25 @@ export const sendAskMessage = async (
       config: request.config
     });
     
+    // 🔥 获取认证信息
+    const { supabase } = await import('~/lib/supa');
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    // 🔥 准备请求头（包含认证）
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    
+    if (session?.access_token) {
+      headers['Authorization'] = `Bearer ${session.access_token}`;
+    }
+    
     // 🔥 发起SSE流请求
     const sseStream = fetchStream(
       resolveServiceURL('research/ask?stream=true'),
       {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify(requestData),
       }
     );
@@ -1467,6 +1469,12 @@ export const sendAskMessage = async (
                
                // 🔥 特殊处理：interrupt事件时设置currentInterrupt状态
                if (event.event === 'interrupt') {
+                 console.log('🔍 [Interrupt Event] Before state updates:', {
+                   responding: state.responding,
+                   threadId: currentThreadId,
+                   eventId: eventData.id
+                 });
+                 
                  const interruptData = {
                    interruptId: eventData.id || nanoid(),
                    message: eventData.content || "Please Review the Plan.",
@@ -1477,7 +1485,14 @@ export const sendAskMessage = async (
                    timestamp: new Date().toISOString(),
                    messageId: messageId  // 使用动态messageId
                  };
+                 
                  state.setCurrentInterrupt(currentThreadId, interruptData);
+                 state.setResponding(false);
+                 
+                 console.log('🔍 [Interrupt Event] After state updates:', {
+                   responding: useUnifiedStore.getState().responding,
+                   currentInterrupt: useUnifiedStore.getState().getCurrentInterrupt(currentThreadId)
+                 });
                }
                
                // 特殊处理：complete事件时停止流式状态和清除interrupt

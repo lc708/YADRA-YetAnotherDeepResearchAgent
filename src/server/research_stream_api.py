@@ -17,6 +17,7 @@ from src.server.repositories.session_repository import (
     SessionRepository,
     get_session_repository,
 )
+from src.server.supabase_auth_api import get_current_user
 
 # 添加LangChain消息类型导入
 from langchain_core.messages import BaseMessage, ToolMessage, AIMessageChunk
@@ -714,9 +715,13 @@ async def get_session_repository_dependency() -> SessionRepository:
 @router.post("/stream")
 async def research_stream(
     request: ResearchStreamRequest,
+    current_user: dict = Depends(get_current_user),  # 👈 添加强制认证
     session_repo: SessionRepository = Depends(get_session_repository_dependency),
 ):
     """统一研究流式接口"""
+    # 👈 注入用户ID到request
+    request.user_id = current_user["user_id"]
+
     service = ResearchStreamService(session_repo)
 
     if request.action == ActionType.CREATE:

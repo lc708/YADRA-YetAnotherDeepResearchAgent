@@ -57,6 +57,7 @@ test = [
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 addopts = "-v --cov=src --cov-report=term-missing"
+asyncio_default_fixture_loop_scope = "function"
 filterwarnings = [
     "ignore::DeprecationWarning",
     "ignore::UserWarning",

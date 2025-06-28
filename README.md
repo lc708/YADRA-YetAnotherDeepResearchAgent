@@ -72,24 +72,31 @@ cd YADRA-YetAnotherDeepResearchAgent
 
 ### 2. 设置环境
 
-#### 使用 bootstrap.sh 脚本（推荐）
+#### 📦 使用 bootstrap.sh 本地开发脚本（推荐）
+
+**重要说明：bootstrap.sh 是本地开发环境脚本，不用于生产部署！**
 
 ```bash
-# 开发模式（推荐）- 启用热重载和实时调试
+# 🚀 本地开发模式（推荐）- 启用热重载和实时调试
 ./bootstrap.sh --dev    # 或 -d, dev, development
 
-# 生产模式
+# 📋 本地生产模式预览
 ./bootstrap.sh
 
-# Windows 用户
-bootstrap.bat
+# 🪟 Windows 用户
+bootstrap.bat --dev
 ```
 
-**开发模式特性**：
+**本地开发模式特性**：
 - 🔥 **后端热重载**: `--reload` 模式，代码变更自动重启
 - ⚡ **前端快速刷新**: Next.js 开发模式，支持 HMR
 - 🐛 **调试模式**: 启用详细日志和错误追踪
 - 🔄 **实时 SSE**: 开发环境下的实时数据流
+- 📍 **服务地址**: 前端 http://localhost:3000，后端 http://localhost:8000
+
+**⚠️ 生产环境部署说明**：
+- 生产环境请查看 [docs/deployment-guide.md](docs/deployment-guide.md)
+- 前端部署到 Vercel，后端使用 `deploy.sh` 脚本部署到云服务器
 
 ### 3. 配置文件设置
 
@@ -309,10 +316,24 @@ CREATE TABLE message_history (
 
 ## 🐳 部署
 
-### Docker Compose 部署
+### 🏠 本地开发环境（推荐用于开发）
+
+**使用 bootstrap.sh 本地开发脚本**：
 
 ```bash
-# 构建并启动所有服务
+# 本地开发模式（同时启动前后端）
+./bootstrap.sh --dev
+
+# 本地生产模式预览
+./bootstrap.sh
+```
+
+### ⚡ 快速本地测试（Docker）
+
+如需本地Docker测试，可使用开发版docker-compose：
+
+```bash
+# 构建并启动所有服务（本地开发用）
 docker-compose up -d
 
 # 查看服务状态
@@ -326,11 +347,28 @@ docker-compose logs -f yadra-frontend
 docker-compose down
 ```
 
-### 生产环境配置
+### 🚀 生产环境部署
 
+**⚠️ 重要：生产环境采用前后端分离部署**
+
+#### 前端部署（Vercel）
+1. 将项目推送到GitHub
+2. 在Vercel导入仓库，设置Root Directory为 `web`
+3. 配置环境变量：`NEXT_PUBLIC_API_URL`等
+
+#### 后端部署（云服务器 + Docker）
+```bash
+# 生产环境后端部署脚本
+./deploy.sh
+```
+
+**详细部署指南**：请查看 [docs/deployment-guide.md](docs/deployment-guide.md)
+
+### 🔧 生产环境配置示例
+
+生产环境Docker配置（docker-compose.prod.yml）：
 ```yaml
-# docker-compose.prod.yml
-version: '3.8'
+# 仅后端服务（前端部署到Vercel）
 services:
   backend:
     build: .
@@ -339,13 +377,10 @@ services:
       - DEBUG=False
     ports:
       - "8000:8000"
-  
-  frontend:
-    build: ./web
-    environment:
-      - NODE_ENV=production
+  nginx:
+    image: nginx:alpine
     ports:
-      - "3000:3000"
+      - "80:80"
 ```
 
 ## 🧪 开发指南
@@ -436,8 +471,24 @@ YADRA-YetAnotherDeepResearchAgent/
 ├── examples/                    # 研究示例
 ├── main.py                      # 命令行入口
 ├── server.py                    # Web 服务入口
-└── bootstrap.sh                 # 快速启动脚本
+├── bootstrap.sh                 # 🏠 本地开发环境启动脚本
+├── bootstrap.bat                # 🪟 Windows本地开发脚本
+├── deploy.sh                    # 🚀 生产环境后端部署脚本  
+├── docker-compose.yml           # 🛠️ 本地开发Docker配置
+├── docker-compose.prod.yml      # 🏭 生产环境Docker配置
+├── production.env.template      # 📋 生产环境变量模板
+└── docs/deployment-guide.md     # 📖 完整部署指南
 ```
+
+### 🔧 关键文件说明
+
+| 文件 | 用途 | 使用场景 |
+|-----|------|---------|
+| `bootstrap.sh` | 本地开发环境启动脚本 | 开发、调试、本地测试 |
+| `deploy.sh` | 生产环境后端部署脚本 | 云服务器生产部署 |
+| `docker-compose.yml` | 本地开发Docker配置 | 本地Docker测试 |  
+| `docker-compose.prod.yml` | 生产环境Docker配置 | 生产环境部署 |
+| `production.env.template` | 生产环境变量模板 | 生产环境配置 |
 
 ## 🔄 更新日志
 
@@ -471,30 +522,4 @@ YADRA-YetAnotherDeepResearchAgent/
 ### 代码规范
 
 - **后端**: 使用 `ruff` 进行代码格式化和 lint 检查
-- **前端**: 使用 `prettier` 和 `eslint` 进行代码格式化
-- **提交信息**: 使用语义化提交信息 (Conventional Commits)
-- **类型安全**: 后端使用 Python 类型提示，前端使用 TypeScript
-
-## 🙏 致谢
-
-- [LangChain](https://github.com/langchain-ai/langchain) - 为 LLM 应用提供强大框架
-- [LangGraph](https://github.com/langchain-ai/langgraph) - 多代理工作流引擎  
-- [Next.js](https://github.com/vercel/next.js) - 现代化 React 框架
-- [FastAPI](https://github.com/tiangolo/fastapi) - 高性能 Web 框架
-- [Supabase](https://github.com/supabase/supabase) - 开源 Firebase 替代方案
-- [Tailwind CSS](https://github.com/tailwindlabs/tailwindcss) - 实用优先的 CSS 框架
-- 所有贡献者和开源社区
-
-## 📞 支持与反馈
-
-- 🐛 [报告问题](https://github.com/your-username/YADRA/issues)
-- 💬 [讨论区](https://github.com/your-username/YADRA/discussions)  
-
-
----
-
-<div align="center">
-
-**YADRA - 让 AI 研究更智能、更高效** 
-
-</div>    
+- **前端**: 使用 `prettier` 和 `eslint`

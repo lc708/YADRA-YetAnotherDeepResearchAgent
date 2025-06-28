@@ -51,10 +51,7 @@ def patch_config_from_runnable_config(mock_configurable):
 def mock_tavily_search():
     with patch("src.graph.nodes.LoggedTavilySearch") as mock:
         instance = mock.return_value
-        instance.invoke.return_value = [
-            {"title": "Test Title 1", "content": "Test Content 1"},
-            {"title": "Test Title 2", "content": "Test Content 2"},
-        ]
+        instance.invoke.return_value = MOCK_SEARCH_RESULTS
         yield mock
 
 
@@ -62,10 +59,7 @@ def mock_tavily_search():
 def mock_web_search_tool():
     with patch("src.graph.nodes.get_web_search_tool") as mock:
         instance = mock.return_value
-        instance.invoke.return_value = [
-            {"title": "Test Title 1", "content": "Test Content 1"},
-            {"title": "Test Title 2", "content": "Test Content 2"},
-        ]
+        instance.invoke.return_value = MOCK_SEARCH_RESULTS
         yield mock
 
 
@@ -93,15 +87,16 @@ def test_background_investigation_node_tavily(
 
         if search_engine == SearchEngine.TAVILY.value:
             mock_tavily_search.return_value.invoke.assert_called_once_with("test query")
-            assert (
-                results
-                == "## Test Title 1\n\nTest Content 1\n\n## Test Title 2\n\nTest Content 2"
-            )
+            # 验证返回的是JSON字符串，且可以解析为原始数据
+            parsed_results = json.loads(results)
+            assert parsed_results == MOCK_SEARCH_RESULTS
         else:
             mock_web_search_tool.return_value.invoke.assert_called_once_with(
                 "test query"
             )
-            assert len(json.loads(results)) == 2
+            # 验证返回的是JSON字符串，且可以解析为原始数据
+            parsed_results = json.loads(results)
+            assert parsed_results == MOCK_SEARCH_RESULTS
 
 
 def test_background_investigation_node_malformed_response(
@@ -122,4 +117,6 @@ def test_background_investigation_node_malformed_response(
 
         # Parse and verify the JSON content
         results = result["background_investigation_results"]
-        assert json.loads(results) is None
+        # 验证返回的是JSON字符串，包含无效响应
+        parsed_results = json.loads(results)
+        assert parsed_results == "invalid response"

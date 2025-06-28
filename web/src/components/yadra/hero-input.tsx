@@ -9,7 +9,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { cn } from "~/lib/utils";
 
 import { Button } from "~/components/ui/button";
-import MessageInput, { type MessageInputRef } from "~/components/yadra/message-input";
+
 import { Tooltip } from "~/components/yadra/tooltip";
 import { enhancePrompt } from "~/core/api/prompt-enhancer";
 import { useSettingsStore, setEnableDeepThinking, setReportStyle } from "~/core/store";
@@ -31,29 +31,29 @@ const PLACEHOLDER_TEXTS = [
 const REPORT_STYLES = [
   {
     value: "academic" as const,
-    label: "学术报告",
-    description: "严谨客观，逻辑缜密，适合研究分析",
+    label: "研究报告",
+    description: "严谨客观，数据翔实，适合研究分析",
     icon: GraduationCap,
     color: "text-emerald-400",
   },
   {
     value: "popular_science" as const,
-    label: "科普解读", 
-    description: "通俗易懂，深入浅出，适合大众传播",
+    label: "科普博客", 
+    description: "观点清晰，通俗易懂，适合大众传播",
     icon: BookOpen,
     color: "text-blue-400",
   },
   {
     value: "news" as const,
-    label: "新闻资讯",
-    description: "事实为准，简洁明了，适合快速阅读",
+    label: "新闻稿件",
+    description: "采用专业新闻风格，适合快速阅读",
     icon: Newspaper,
     color: "text-orange-400",
   },
   {
     value: "social_media" as const,
-    label: "社交媒体",
-    description: "生动有趣，观点鲜明，适合分享传播",
+    label: "社媒文案",
+    description: "小红书/X风格，适合分享传播",
     icon: MessageCircle,
     color: "text-purple-400",
   },
@@ -80,7 +80,7 @@ export function HeroInput({
   const [showStyleDropdown, setShowStyleDropdown] = useState(false);
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
   
-  const inputRef = useRef<MessageInputRef>(null);
+
   const styleButtonRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const reportStyle = useSettingsStore((state) => state.general.reportStyle);
@@ -119,9 +119,8 @@ export function HeroInput({
 
   useEffect(() => {
     const reaskText = searchParams.get('reask');
-    if (reaskText && inputRef.current) {
-      console.log("检测到reask参数:", reaskText);
-      inputRef.current.setContent(reaskText);
+    if (reaskText) {
+      // 直接更新状态，因为使用的是受控的 textarea
       setCurrentPrompt(reaskText);
       
       const newUrl = window.location.pathname;
@@ -188,25 +187,19 @@ export function HeroInput({
           config: buildResearchConfig()
         };
         
-        console.log("[HeroInput] Submitting research request:", {
-          question: currentPrompt.substring(0, 50) + '...',
-          config: researchRequest.config
-        });
+
         
         await onSubmitResearch(researchRequest);
         
         // 清空输入框
         setCurrentPrompt("");
-        if (inputRef.current) {
-          inputRef.current.setContent("");
-        }
         
       } catch (error) {
         console.error("[HeroInput] Research request failed:", error);
       }
     } else {
       // 🔥 如果没有回调，显示提示
-      console.warn("[HeroInput] No callback provided for message submission");
+
     }
   }, [currentPrompt, canOperate, responding, onSubmitResearch, buildResearchConfig]);
 
@@ -226,10 +219,8 @@ export function HeroInput({
 
       await new Promise((resolve) => setTimeout(resolve, 500));
 
-      if (inputRef.current) {
-        inputRef.current.setContent(enhancedPrompt);
-        setCurrentPrompt(enhancedPrompt);
-      }
+      // 直接更新状态，因为使用的是受控的 textarea
+      setCurrentPrompt(enhancedPrompt);
 
       setTimeout(() => {
         setIsEnhanceAnimating(false);
@@ -266,7 +257,7 @@ export function HeroInput({
                                   className="w-full resize-none bg-transparent text-sm text-foreground placeholder-muted-foreground outline-none border-none"
                 rows={2}
                 style={{ 
-                  minHeight: '56px', // 2行的最小高度
+                  minHeight: '48px', // 2行的最小高度
                   maxHeight: '168px', // 7行的最大高度 (24px * 7)
                   lineHeight: '24px',
                   overflowY: currentPrompt.split('\n').length > 7 || currentPrompt.length > 280 ? 'auto' : 'hidden'
@@ -334,8 +325,8 @@ export function HeroInput({
                       </p>
                       <p className="text-xs text-gray-600 leading-relaxed">
                         {enableDeepThinking 
-                          ? "AI将进行深度思考和推理，生成更加深思熟虑的研究计划"
-                          : "AI将以常规模式处理您的问题，快速生成研究计划"
+                          ? "使用DeepSeek R1，生成更加深思熟虑的研究计划"
+                          : "使用Gemini 2.5 Flash，快速生成研究计划"
                         }
                       </p>
                     </div>
@@ -377,7 +368,7 @@ export function HeroInput({
                   side="top"
                   sideOffset={8}
                   className="border border-gray-200 bg-white backdrop-blur-sm text-gray-900 shadow-xl"
-                  title="AI增强提示 - 让AI优化您的问题描述"
+                  title="AI增强提示 - 让AI帮您优化提示词"
                 >
                   <Button
                     variant="ghost"

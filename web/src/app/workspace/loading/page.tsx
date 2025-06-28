@@ -10,7 +10,7 @@ export default function WorkspaceLoadingPage() {
   useEffect(() => {
     // 缩短等待时间到3秒 - 通常研究任务创建不需要这么久
     const timeout = setTimeout(() => {
-      console.log("[Loading] Timeout reached, redirecting to home");
+
       router.push("/");
     }, 3000);
 

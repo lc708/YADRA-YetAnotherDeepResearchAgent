@@ -87,3 +87,14 @@ yarn-error.log*
 
 # idea files
 .idea
+
+# Production deployment files
+.env.production
+ssl/
+
+# Deployment artifacts
+*.tar.gz
+*.zip
+
+# Production logs
+logs/production/

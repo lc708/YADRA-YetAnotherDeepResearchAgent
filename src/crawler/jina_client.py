@@ -14,6 +14,7 @@ class JinaClient:
         headers = {
             "Content-Type": "application/json",
             "X-Return-Format": return_format,
+            # "X-With-Links-Summary": "true",
         }
         if os.getenv("JINA_API_KEY"):
             headers["Authorization"] = f"Bearer {os.getenv('JINA_API_KEY')}"

@@ -8,6 +8,8 @@ from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.graph import StateGraph
 import asyncio
 import logging
+import psycopg
+from psycopg.rows import dict_row
 
 from src.graph.types import State
 from src.graph.nodes import (
@@ -87,14 +89,31 @@ async def get_or_create_checkpointer() -> AsyncPostgresSaver:
             logger.info("🔄 Creating global AsyncPostgresSaver instance...")
 
             try:
-                # Create the context manager and enter it
-                _checkpointer_context = AsyncPostgresSaver.from_conn_string(db_uri)
-                _checkpointer = await _checkpointer_context.__aenter__()
+                # Connection configuration to fix prepared statement issues
+                # Based on LangGraph GitHub discussion #2833 and issue #2576
+                connection_kwargs = {
+                    "autocommit": True,
+                    "prepare_threshold": (
+                        0
+                    ),  # Critical: prevents prepared statement conflicts
+                    "row_factory": dict_row,  # Required for AsyncPostgresSaver
+                }
+
+                # Create connection manually with proper configuration
+                async_conn = await psycopg.AsyncConnection.connect(
+                    db_uri, **connection_kwargs
+                )
+
+                # Create checkpointer with the configured connection
+                _checkpointer = AsyncPostgresSaver(async_conn)
+                _checkpointer_context = async_conn  # Store connection for cleanup
 
                 # Ensure tables are set up
                 await _checkpointer.setup()
 
-                logger.info("✅ Global AsyncPostgresSaver instance created")
+                logger.info(
+                    "✅ Global AsyncPostgresSaver instance created with optimized connection config"
+                )
             except Exception as e:
                 logger.error(f"❌ Failed to create AsyncPostgresSaver: {e}")
                 raise
@@ -121,10 +140,11 @@ async def cleanup_async_resources():
     async with _checkpointer_lock:
         if _checkpointer_context is not None:
             try:
-                await _checkpointer_context.__aexit__(None, None, None)
-                logger.info("✅ Global checkpointer cleaned up")
+                # Close the manually created connection
+                await _checkpointer_context.close()
+                logger.info("✅ Global checkpointer connection cleaned up")
             except Exception as e:
-                logger.error(f"Error cleaning up checkpointer: {e}")
+                logger.error(f"Error cleaning up checkpointer connection: {e}")
             finally:
                 _checkpointer = None
                 _checkpointer_context = None

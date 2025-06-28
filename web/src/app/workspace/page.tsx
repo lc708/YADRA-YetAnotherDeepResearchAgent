@@ -6,6 +6,14 @@ import { cn } from "~/lib/utils";
 import { useShallow } from "zustand/react/shallow";
 import { toast } from "sonner";
 
+// 🔥 添加认证相关导入
+import { useAuth } from "~/hooks/useAuth";
+import { LoginScreen } from "~/components/auth/LoginScreen";
+import { 
+  PrimaryGradientText,
+  RainbowGradientText,
+  } from "~/components/ui/gradient-text";
+
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
@@ -74,6 +82,9 @@ export default function WorkspacePage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   
+  // 🔥 认证检查
+  const { isAuthenticated, loading: authLoading, user } = useAuth();
+  
   // 🔥 获取URL参数
   const urlParam = searchParams.get('id');
   
@@ -105,12 +116,12 @@ export default function WorkspacePage() {
   // 🚀 ASK API研究请求处理
   const handleResearchSubmit = useCallback(async (request: ResearchRequest) => {
     try {
-      console.log("[WorkspacePage] Handling research request:", request);
+
       
       // 🚀 重构：使用简化的sendAskMessage调用，所有事件处理已在Store层统一处理
       const result = await sendAskMessage(request, {
         onNavigate: async (workspaceUrl: string) => {
-          console.log("[WorkspacePage] Navigating to:", workspaceUrl);
+
           // 提取URL参数
           const urlMatch = workspaceUrl.match(/\/workspace\?id=([^&]+)/);
           if (urlMatch && urlMatch[1]) {
@@ -120,7 +131,7 @@ export default function WorkspacePage() {
         }
       });
       
-      console.log("[WorkspacePage] Research request completed:", result as any);
+      
       
     } catch (error) {
       console.error("[WorkspacePage] Research request failed:", error);
@@ -130,6 +141,9 @@ export default function WorkspacePage() {
   
   // 🚀 获取计划状态 - Hook必须在组件顶层调用
   const currentPlanData = useCurrentPlan(currentThreadId || undefined);
+  
+  // 🚀 获取responding状态 - 用于按钮显示控制
+  const responding = useUnifiedStore((state) => state.responding);
   
   // 🚀 计算布局模式 - 基于计划状态自动切换，使用稳定的依赖
   const layoutMode = useMemo(() => {
@@ -172,26 +186,20 @@ export default function WorkspacePage() {
     <div className="flex flex-1 items-center justify-center">
       <div className="text-center max-w-2xl mx-auto px-4">
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            Hi，我是YADRA，又一个深度研究助手
+          <h1 className="text-4xl font-bold mb-4">
+            <PrimaryGradientText>
+              你好，
+            </PrimaryGradientText>
+            {user?.email?.split('@')[0] || '尊敬的用户'}
             <br />
             <br />
           </h1>
           <h1 className="text-2xl font-bold text-gray-900 mb-4">
-            马上输入问题，开始让AI为你打工吧
+            <RainbowGradientText>
+              今天需要我做点什么？
+            </RainbowGradientText>
           </h1>
-          <p className="text-xl text-gray-300">
-            <br />
-            深度研究报告
-            <br />
-            科普文章
-            <br />
-            新闻稿
-            <br />
-            小红书文案
-            <br />
-            ……
-          </p>
+
         </div>
         
 
@@ -205,7 +213,7 @@ export default function WorkspacePage() {
       <div className="max-w-4xl mx-auto">
         <div className="backdrop-blur-sm bg-black/0 rounded-lg p-4">
           <HeroInput 
-            placeholder={hasMessages ? "继续研究对话..." : "开始您的研究之旅..."}
+            placeholder={hasMessages ? "继续研究对话..." : "给我一个任务，我来帮你完成..."}
             className="w-full"
             onSubmitResearch={handleResearchSubmit}
           />
@@ -282,7 +290,7 @@ export default function WorkspacePage() {
               )}
               
               {/* 🔥 优化点2：显示"YADRA正在工作中……"状态指示 */}
-              {messages.some(msg => msg.isStreaming) && (
+              {responding && (
                 <div className="flex items-center justify-center py-4 animate-in fade-in-0 slide-in-from-bottom-2 duration-300">
                   <div className="flex items-center gap-3">
                     <div className="flex space-x-1">
@@ -382,7 +390,14 @@ export default function WorkspacePage() {
     
     // 🚀 简化：直接判断是否显示操作按钮
     const shouldShowActions = (): boolean => {
-      return currentInterrupt !== null && currentPlan !== null;
+      // 🔥 修复：直接获取最新的responding状态，避免闭包问题
+      const currentResponding = useUnifiedStore.getState().responding;
+      const result = currentInterrupt !== null && currentPlan !== null && !currentResponding;
+      
+      // 🔍 调试日志：记录所有状态值和判断结果
+      
+      
+      return result;
     };
 
     // 🚀 简化：处理PlanCard回调函数
@@ -571,6 +586,30 @@ export default function WorkspacePage() {
       <OutputStream className="flex-1" />
     </div>
   );
+
+  // 🔥 认证检查：优先级最高
+  if (authLoading) {
+    return (
+      <div className="h-full w-full flex items-center justify-center bg-app-background">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">正在验证身份...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <LoginScreen 
+        onLoginSuccess={() => {
+          // 登录成功后，组件会自动重新渲染，因为useAuth会更新状态
+  
+        }}
+        returnUrl={`/workspace${urlParam ? `?id=${urlParam}` : ''}`}
+      />
+    );
+  }
 
   return (
           <div className="h-full w-full flex flex-col bg-app-background relative">

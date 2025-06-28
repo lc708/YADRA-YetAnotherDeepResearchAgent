@@ -1,13 +1,15 @@
 "use client";
 
-import { Home, Briefcase, Settings, User, Sparkles } from "lucide-react";
+import { Home, Briefcase, Settings, User, Sparkles, LogOut } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "~/lib/utils";
 import { Button } from "~/components/ui/button";
+import { useAuth } from "~/hooks/useAuth";
 
 export function GlobalSidebar() {
   const pathname = usePathname();
+  const { isAuthenticated, user, signOut } = useAuth();
 
   const navigationItems = [
     {
@@ -89,7 +91,43 @@ export function GlobalSidebar() {
 
       {/* 底部区域 */}
       <div className="border-t border-gray-200 p-4">
-        <div className="text-center">
+        {isAuthenticated && user ? (
+          <div className="space-y-3">
+            {/* 用户信息 */}
+            <div className="flex items-center gap-3 px-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100">
+                <User className="h-4 w-4 text-blue-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium text-gray-900 truncate">
+                  {user.email?.split('@')[0] || '用户'}
+                </div>
+                <div className="text-xs text-gray-500 truncate">
+                  {user.email}
+                </div>
+              </div>
+            </div>
+            
+            {/* 登出按钮 */}
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full gap-2"
+              onClick={async () => {
+                await signOut();
+              }}
+            >
+              <LogOut className="h-4 w-4" />
+              登出
+            </Button>
+          </div>
+        ) : (
+          <div className="text-center">
+            <div className="text-xs text-gray-400">未登录</div>
+          </div>
+        )}
+        
+        <div className="text-center mt-3 pt-3 border-t border-gray-100">
           <div className="text-xs text-gray-400">v1.0.0</div>
         </div>
       </div>

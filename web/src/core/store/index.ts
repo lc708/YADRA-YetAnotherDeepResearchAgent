@@ -93,5 +93,5 @@ export const useToolCalls = () => {
 
 export const listenToPodcast = (messageId: string) => {
   console.warn("listenToPodcast is deprecated and will be removed");
-  console.log("Listen to podcast for message:", messageId);
+
 };

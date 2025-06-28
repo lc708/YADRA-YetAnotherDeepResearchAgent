@@ -46,6 +46,87 @@ YADRA平台采用**现代简约、专业高效**的设计理念，以**干净的
 
 ---
 
+## 渐变色设计
+
+### ✅ **已实现的功能：**
+
+#### 1. **完整的渐变文字组件系统**
+- 📍 位置：`web/src/components/ui/gradient-text.tsx`
+- 🎯 基于YADRA设计风格规范的7种主题色
+- 🔧 支持强度、方向、动画等多种配置
+
+#### 2. **主题色系统**
+```typescript
+// 基于YADRA设计规范的主题色
+- primary: 品牌蓝渐变 (#3b82f6系列)
+- success: 成功绿渐变 (#10b981系列) 
+- warning: 警告橙渐变 (#f59e0b系列)
+- danger: 错误红渐变 (#ef4444系列)
+- purple: 紫色强调渐变 (#8b5cf6系列)
+- rainbow: 彩虹渐变 (多色组合)
+- subtle: 微妙灰度渐变 (低调效果)
+```
+
+#### 3. **灵活的配置选项**
+```typescript
+// 强度控制
+intensity: "light" | "medium" | "strong"
+
+// 渐变方向 
+direction: "to-r" | "to-br" | "to-b" | "to-bl" | "to-l" | "to-tl" | "to-t" | "to-tr"
+
+// 动画效果
+animated: boolean
+```
+
+#### 4. **预设组合组件**
+```typescript
+<PrimaryGradientText>品牌蓝渐变</PrimaryGradientText>
+<SuccessGradientText>成功绿渐变</SuccessGradientText>
+<WarningGradientText>警告橙渐变</WarningGradientText>
+<DangerGradientText>错误红渐变</DangerGradientText>
+<PurpleGradientText>紫色强调渐变</PurpleGradientText>
+<RainbowGradientText>彩虹渐变</RainbowGradientText>
+<SubtleGradientText>微妙灰度渐变</SubtleGradientText>
+```
+
+#### 5. **实际应用**
+- ✅ 已在workspace页面中应用：将"Hi {用户名}"改为品牌蓝渐变效果
+- 📍 位置：`web/src/app/workspace/page.tsx` (第188行)
+
+#### 6. **完整的使用示例**
+- 📍 位置：`web/src/components/ui/gradient-text-examples.tsx`
+- 🎯 包含所有主题、强度、方向的展示
+- 💡 提供实际应用场景的参考
+
+### 🎯 **使用方法：**
+
+#### 基础用法：
+```tsx
+import { PrimaryGradientText } from "~/components/ui/gradient-text";
+
+<PrimaryGradientText className="text-4xl font-bold">
+  Hi {user?.email?.split('@')[0] || '你好'}
+</PrimaryGradientText>
+```
+
+#### 高级用法：
+```tsx
+import { GradientText } from "~/components/ui/gradient-text";
+
+<GradientText 
+  theme="primary" 
+  intensity="strong" 
+  direction="to-br" 
+  animated
+  className="text-2xl font-bold"
+>
+  YADRA深度研究助手
+</GradientText>
+```
+
+---
+
 ## 📐 布局规范
 
 ### 间距系统

@@ -609,6 +609,12 @@ async def create_task(
     return await create_or_update_task(current_user["user_id"], thread_id, task_name)
 
 
+@app.get("/api/health")
+async def health_check():
+    """健康检查端点"""
+    return {"status": "healthy", "service": "yadra-backend"}
+
+
 # 在应用启动事件中初始化日志
 @app.on_event("startup")
 async def startup():

@@ -72,7 +72,7 @@ def _create_llm_use_conf(
     http_client = httpx.Client(
         verify=False,  # 跳过SSL验证
         timeout=120.0,  # 增加超时时间到120秒
-        limits=httpx.Limits(max_connections=10, max_keepalive_connections=5),
+        limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
     )
 
     # 添加HTTP客户端和其他连接设置到配置中

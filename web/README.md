@@ -1,6 +1,6 @@
 # YADRA Frontend
 
-YADRA (Yet Another Deep Research Agent) 的前端应用，基于 Next.js 14 构建的现代化深度研究界面。
+YADRA (Yet Another Deep Research Agent) 的前端应用，基于 Next.js 15 构建的现代化深度研究界面。
 
 ## 🚀 快速开始
 

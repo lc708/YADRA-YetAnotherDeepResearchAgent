@@ -34,7 +34,7 @@ export const GoogleLogin: React.FC<GoogleLoginProps> = ({
         return;
       }
 
-      console.log('Google login initiated:', data);
+      
       
     } catch (error) {
       console.error('Unexpected error:', error);

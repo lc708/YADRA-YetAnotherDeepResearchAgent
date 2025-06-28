@@ -10,9 +10,8 @@ class TestCrawlTool:
         # Arrange
         mock_crawler = Mock()
         mock_article = Mock()
-        mock_article.to_markdown.return_value = (
-            "# Test Article\nThis is test content." * 100
-        )
+        test_content = "# Test Article\nThis is test content." * 100
+        mock_article.to_markdown.return_value = test_content
         mock_crawler.crawl.return_value = mock_article
         mock_crawler_class.return_value = mock_crawler
 
@@ -22,10 +21,8 @@ class TestCrawlTool:
         result = crawl_tool(url)
 
         # Assert
-        assert isinstance(result, dict)
-        assert result["url"] == url
-        assert "crawled_content" in result
-        assert len(result["crawled_content"]) <= 1000
+        assert isinstance(result, str)
+        assert result == test_content
         mock_crawler_class.assert_called_once()
         mock_crawler.crawl.assert_called_once_with(url)
         mock_article.to_markdown.assert_called_once()
@@ -46,7 +43,7 @@ class TestCrawlTool:
         result = crawl_tool(url)
 
         # Assert
-        assert result["crawled_content"] == short_content
+        assert result == short_content
 
     @patch("src.tools.crawl.Crawler")
     @patch("src.tools.crawl.logger")

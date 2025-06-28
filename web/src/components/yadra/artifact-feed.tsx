@@ -105,22 +105,13 @@ export function ArtifactFeed({ traceId, className }: ArtifactFeedProps) {
         // 可用于列表的高度 = 总高度 - 头部高度 - 边距
         const availableHeight = totalHeight - headerHeight - 16; // 16px为边距
         
-        // 调试信息（开发模式）
-        if (process.env.NODE_ENV === 'development') {
-          console.log('[ArtifactFeed] Height calculation:', {
-            totalHeight,
-            headerHeight,
-            availableHeight,
-            currentListHeight: listHeight,
-          });
-        }
+
         
         // 确保高度合理：最小400px，最大1200px
         const calculatedHeight = Math.max(400, Math.min(1200, availableHeight));
         
         if (calculatedHeight !== listHeight && calculatedHeight > 350) { // 只有显著变化才更新
           setListHeight(calculatedHeight);
-          console.log(`[ArtifactFeed] Height updated: ${listHeight} → ${calculatedHeight}`);
         }
       }
     };
@@ -178,7 +169,7 @@ export function ArtifactFeed({ traceId, className }: ArtifactFeedProps) {
   const handleSaveArtifact = useCallback(async (artifact: Artifact, content: string) => {
     try {
       // 更新本地状态 - 这里可以添加保存到后端的逻辑
-      console.log("Saving artifact:", artifact.id, content);
+
       // 🔥 注意：artifact转换逻辑已迁移到unified-store，待重新设计
       // 这个功能将在后续的Phase中完善
     } catch (error) {
