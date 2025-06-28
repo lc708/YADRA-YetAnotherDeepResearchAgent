@@ -57,7 +57,13 @@ class TestTavilySearchResultsWithImages:
     @pytest.fixture
     def sample_cleaned_results(self):
         """Sample cleaned results."""
-        return [{"title": "Test Title", "url": "https://example.com", "content": "Test content"}]
+        return [
+            {
+                "title": "Test Title",
+                "url": "https://example.com",
+                "content": "Test content",
+            }
+        ]
 
     def test_init_default_values(self):
         """Test initialization with default values."""
