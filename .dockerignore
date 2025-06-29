@@ -55,9 +55,13 @@ scripts/
 *.md
 README.md
 
-# Development configuration (keep conf.yaml for production)
+# All configuration files with sensitive data (use environment variables instead)
 .env*
-!.env.production
+*.env
+.env.production
+.env.development
+.env.local
+conf.yaml
 conf.yaml.example
 production.env.template
 
