@@ -53,7 +53,7 @@ todos/
 scripts/
 *.log
 *.md
-README.md
+!README.md
 
 # All configuration files with sensitive data (use environment variables instead)
 .env*

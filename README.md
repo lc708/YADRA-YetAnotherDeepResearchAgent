@@ -66,7 +66,7 @@ YADRA（Yet Another Deep Research Agent）是一个现代化的AI研究代理，
 ### 1. 克隆项目
 
 ```bash
-git clone https://github.com/your-username/YADRA-YetAnotherDeepResearchAgent.git
+git clone https://github.com/lc708/YADRA-YetAnotherDeepResearchAgent.git
 cd YADRA-YetAnotherDeepResearchAgent
 ```
 
