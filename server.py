@@ -9,6 +9,7 @@ import logging
 import signal
 import sys
 import uvicorn
+import os
 
 # Configure logging
 logging.basicConfig(
@@ -46,8 +47,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--port",
         type=int,
-        default=8000,
-        help="Port to bind the server to (default: 8000)",
+        default=int(os.environ.get("PORT", 8000)),  # 支持环境变量PORT
+        help="Port to bind the server to (default: 8000 or PORT env var)",
     )
     parser.add_argument(
         "--log-level",
