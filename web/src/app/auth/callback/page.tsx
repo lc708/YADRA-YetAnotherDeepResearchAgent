@@ -1,12 +1,31 @@
 // OAuth Callback Handler
 'use client';
 
+import { Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 import { supabase } from '~/lib/supa';
 
-export default function AuthCallback() {
+// Loading fallback component
+function AuthCallbackLoading() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="max-w-md w-full bg-white rounded-lg shadow-md p-6">
+        <div className="text-center">
+          <div className="flex flex-col items-center">
+            <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></div>
+            <h2 className="text-lg font-medium text-gray-900 mb-2">正在处理登录</h2>
+            <p className="text-gray-600">请稍候...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Main callback component that uses useSearchParams
+function AuthCallbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
@@ -25,13 +44,12 @@ export default function AuthCallback() {
         }
 
         if (data.session?.user) {
-  
           setStatus('success');
           setMessage('登录成功，正在跳转...');
           
           // 检查是否有返回URL
           const returnTo = searchParams.get('returnTo');
-          const redirectUrl = returnTo || '/workspace';
+          const redirectUrl = returnTo ?? '/workspace';
           
           setTimeout(() => {
             router.push(redirectUrl);
@@ -47,8 +65,8 @@ export default function AuthCallback() {
       }
     };
 
-    handleAuthCallback();
-  }, [router]);
+    void handleAuthCallback();
+  }, [router, searchParams]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -94,5 +112,14 @@ export default function AuthCallback() {
         </div>
       </div>
     </div>
+  );
+}
+
+// Main component wrapped with Suspense
+export default function AuthCallback() {
+  return (
+    <Suspense fallback={<AuthCallbackLoading />}>
+      <AuthCallbackContent />
+    </Suspense>
   );
 }

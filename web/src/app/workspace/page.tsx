@@ -14,7 +14,7 @@ import {
   X,
 } from "lucide-react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useCallback, useMemo, useEffect, Suspense } from "react";
 import { toast } from "sonner";
 import { useShallow } from "zustand/react/shallow";
 
@@ -78,7 +78,19 @@ enum LayoutMode {
 // 🔥 稳定的空数组引用，避免useShallow无限循环
 const EMPTY_MESSAGES: any[] = [];
 
-export default function WorkspacePage() {
+// Loading component for Suspense fallback
+function WorkspaceLoading() {
+  return (
+    <div className="h-screen bg-gray-50 flex items-center justify-center">
+      <div className="text-center">
+        <LoadingAnimation />
+        <p className="mt-4 text-gray-600">正在加载工作区...</p>
+      </div>
+    </div>
+  );
+}
+
+function WorkspacePageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   
@@ -718,5 +730,14 @@ export default function WorkspacePage() {
         </div>
       )}
     </div>
+  );
+}
+
+// Main component wrapped with Suspense
+export default function WorkspacePage() {
+  return (
+    <Suspense fallback={<WorkspaceLoading />}>
+      <WorkspacePageContent />
+    </Suspense>
   );
 } 

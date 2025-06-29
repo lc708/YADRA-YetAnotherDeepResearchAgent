@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, Suspense } from "react";
 import { createPortal } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Send, ChevronDown, GraduationCap, BookOpen, Newspaper, MessageCircle, Brain, User, StopCircle } from "lucide-react";
@@ -66,7 +66,23 @@ interface HeroInputProps {
   onSubmitResearch?: (request: import("~/core/store/unified-store").ResearchRequest) => Promise<void>;
 }
 
-export function HeroInput({ 
+// Loading component for HeroInput
+function HeroInputLoading() {
+  return (
+    <div className="mx-auto w-full max-w-4xl">
+      <div className="relative">
+        <div className="relative w-full overflow-hidden rounded-xl border border-border bg-white shadow-sm">
+          <div className="p-4">
+            <div className="w-full h-12 bg-gray-200 animate-pulse rounded"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Main HeroInput content that uses useSearchParams
+function HeroInputContent({ 
   className, 
   placeholder: customPlaceholder, 
   onSubmitResearch
@@ -115,8 +131,6 @@ export function HeroInput({
     });
   }, []);
 
-
-
   useEffect(() => {
     const reaskText = searchParams.get('reask');
     if (reaskText) {
@@ -157,7 +171,7 @@ export function HeroInput({
       document.removeEventListener('mousedown', handleClickOutside);
       window.removeEventListener('resize', handleResize);
     };
-  }, [showStyleDropdown]);
+  }, [showStyleDropdown, calculateDropdownPosition]);
 
   // 🚀 构建研究配置的辅助函数
   const buildResearchConfig = useCallback(() => {
@@ -187,8 +201,6 @@ export function HeroInput({
           config: buildResearchConfig()
         };
         
-
-        
         await onSubmitResearch(researchRequest);
         
         // 清空输入框
@@ -199,7 +211,7 @@ export function HeroInput({
       }
     } else {
       // 🔥 如果没有回调，显示提示
-
+      console.warn("[HeroInput] No onSubmitResearch callback provided");
     }
   }, [currentPrompt, canOperate, responding, onSubmitResearch, buildResearchConfig]);
 
@@ -485,5 +497,21 @@ export function HeroInput({
         document.body
       )}
     </div>
+  );
+}
+
+export function HeroInput({ 
+  className, 
+  placeholder: customPlaceholder, 
+  onSubmitResearch
+}: HeroInputProps) {
+  return (
+    <Suspense fallback={<HeroInputLoading />}>
+      <HeroInputContent 
+        className={className} 
+        placeholder={customPlaceholder} 
+        onSubmitResearch={onSubmitResearch}
+      />
+    </Suspense>
   );
 } 
