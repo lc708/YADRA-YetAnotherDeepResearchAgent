@@ -1,21 +1,8 @@
 "use client";
 
-import { useState, useCallback, useMemo, useEffect } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
-import { cn } from "~/lib/utils";
-import { useShallow } from "zustand/react/shallow";
-import { toast } from "sonner";
 
 // 🔥 添加认证相关导入
-import { useAuth } from "~/hooks/useAuth";
-import { LoginScreen } from "~/components/auth/LoginScreen";
-import { 
-  PrimaryGradientText,
-  RainbowGradientText,
-  } from "~/components/ui/gradient-text";
 
-import { Button } from "~/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
 import { Badge } from "~/components/ui/badge";
 import { Textarea } from "~/components/ui/textarea";
@@ -26,7 +13,29 @@ import {
   Headphones,
   X,
 } from "lucide-react";
+import { useSearchParams, useRouter } from "next/navigation";
+import { useState, useCallback, useMemo, useEffect } from "react";
+import { toast } from "sonner";
+import { useShallow } from "zustand/react/shallow";
 
+
+import { OutputStream } from "~/app/workspace/components/output-stream";
+import { LoginScreen } from "~/components/auth/LoginScreen";
+import { MessageContainer } from "~/components/conversation/message-container";
+import { LoadingAnimation } from "~/components/conversation/loading-animation";
+import { MarkdownRenderer } from "~/components/conversation/markdown-renderer";
+import { ScrollContainer } from "~/components/conversation/scroll-container";
+import { HeroInput } from "~/components/yadra/hero-input";
+import ReportViewer from "~/components/editor/report-viewer";
+import type { ResearchPlan } from "~/components/research/plan-card";
+import { PlanCard } from "~/components/research/plan-card";
+import { Button } from "~/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { 
+  PrimaryGradientText,
+  RainbowGradientText,
+  } from "~/components/ui/gradient-text";
+import type { ResearchRequest, BusinessPlan, BusinessPlanStep } from "~/core/store";
 import { 
   useUnifiedStore, 
   useThreadMessages,
@@ -35,17 +44,8 @@ import {
   useCurrentInterrupt,
   useFinalReport
 } from "~/core/store";
-import type { ResearchRequest, BusinessPlan, BusinessPlanStep } from "~/core/store";
-
-import { OutputStream } from "~/app/workspace/components/output-stream";
-import { PlanCard } from "~/components/research/plan-card";
-import type { ResearchPlan } from "~/components/research/plan-card";
-import { MessageContainer } from "~/components/conversation/message-container";
-import { ScrollContainer } from "~/components/conversation/scroll-container";
-import { LoadingAnimation } from "~/components/conversation/loading-animation";
-import { MarkdownRenderer } from "~/components/conversation/markdown-renderer";
-import { HeroInput } from "~/components/yadra/hero-input";
-import ReportViewer from "~/components/editor/report-viewer";
+import { useAuth } from "~/hooks/useAuth";
+import { cn } from "~/lib/utils";
 
 // 消息类型定义
 interface Message {
@@ -123,8 +123,8 @@ export default function WorkspacePage() {
         onNavigate: async (workspaceUrl: string) => {
 
           // 提取URL参数
-          const urlMatch = workspaceUrl.match(/\/workspace\?id=([^&]+)/);
-          if (urlMatch && urlMatch[1]) {
+          const urlMatch = /\/workspace\?id=([^&]+)/.exec(workspaceUrl);
+          if (urlMatch?.[1]) {
             const newUrlParam = urlMatch[1];
             router.replace(`/workspace?id=${newUrlParam}`);
           }
@@ -352,7 +352,7 @@ export default function WorkspacePage() {
         const jsonString = jsonContent.substring(0, jsonEnd);
         const backendPlan = JSON.parse(jsonString);
         
-        if (!backendPlan || !backendPlan.title || !backendPlan.steps) return null;
+        if (!backendPlan?.title || !backendPlan.steps) return null;
         
         // 转换为BusinessPlan格式
         const steps: BusinessPlanStep[] = (backendPlan.steps || []).map((step: any, index: number) => ({

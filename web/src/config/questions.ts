@@ -82,7 +82,7 @@ export const CATEGORIZED_QUESTIONS = [
 ];
 
 // 工具函数：获取指定数量的随机问题
-export function getRandomQuestions(count: number = 6): string[] {
+export function getRandomQuestions(count = 6): string[] {
   const shuffled = [...DEFAULT_QUESTIONS].sort(() => 0.5 - Math.random());
   return shuffled.slice(0, count);
 }

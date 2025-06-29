@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useEffect } from "react";
+
 import { LoadingAnimation } from "~/components/yadra/loading-animation";
 
 export default function WorkspaceLoadingPage() {

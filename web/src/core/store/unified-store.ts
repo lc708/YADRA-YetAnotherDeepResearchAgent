@@ -9,17 +9,18 @@
  * 4. 性能优化 - 使用 zustand 的选择器避免不必要的重渲染
  */
 
-import { create } from "zustand";
-import { immer } from "zustand/middleware/immer";
 import { enableMapSet } from "immer";
-import { subscribeWithSelector } from "zustand/middleware";
-import { shallow } from "zustand/shallow";
-import { useShallow } from "zustand/react/shallow";
-import type { Message, Resource } from "~/core/messages";
-import type { ChatEvent } from "~/core/api";
-import type { Artifact } from "~/lib/supa";
 import { nanoid } from "nanoid";
 import React from "react";
+import { create } from "zustand";
+import { subscribeWithSelector } from "zustand/middleware";
+import { immer } from "zustand/middleware/immer";
+import { useShallow } from "zustand/react/shallow";
+import { shallow } from "zustand/shallow";
+
+import type { ChatEvent } from "~/core/api";
+import type { Message, Resource } from "~/core/messages";
+import type { Artifact } from "~/lib/supa";
 // 🔥 state-adapter已废弃，artifact转换逻辑待重新设计
 
 // Enable Immer MapSet plugin
@@ -609,7 +610,7 @@ export const useUnifiedStore = create<UnifiedStore>()(
           // 🔥 解析JSON
           const backendPlan = JSON.parse(jsonString);
           
-          if (!backendPlan || !backendPlan.title || !backendPlan.steps) {
+          if (!backendPlan?.title || !backendPlan.steps) {
             console.warn('❌ Invalid plan structure in extracted JSON:', backendPlan);
             return null;
           }
@@ -1248,7 +1249,7 @@ export const sendAskMessage = async (
     };
     
     if (session?.access_token) {
-      headers['Authorization'] = `Bearer ${session.access_token}`;
+      headers.Authorization = `Bearer ${session.access_token}`;
     }
     
     // 🔥 发起SSE流请求

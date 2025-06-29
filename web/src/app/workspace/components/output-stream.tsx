@@ -18,20 +18,17 @@
  * - 输出流：完全基于SSE实时数据，用于监控当前任务
  */
 
+import { Search, Download, Activity, User, Bot, Settings, Zap, FileText, AlertCircle } from "lucide-react";
 import { useState, useMemo, useCallback, useRef } from "react";
 import { toast } from "sonner";
-import { Search, Download, Activity, User, Bot, Settings, Zap, FileText, AlertCircle } from "lucide-react";
 
-import { Button } from "~/components/ui/button";
-import { Input } from "~/components/ui/input";
+import { ScrollContainer, type ScrollContainerRef } from "~/components/conversation/scroll-container";
 import { Badge } from "~/components/ui/badge";
+import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { Input } from "~/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
 import { Markdown } from "~/components/yadra/markdown";
-import { parseJSON } from "~/core/utils/json";
-import { ScrollContainer, type ScrollContainerRef } from "~/components/conversation/scroll-container";
-import { cn } from "~/lib/utils";
-
 import type { Message } from "~/core/messages";
 import { 
   useUnifiedStore, 
@@ -39,6 +36,8 @@ import {
   useThreadMessages, 
   useCurrentUrlParam 
 } from "~/core/store";
+import { parseJSON } from "~/core/utils/json";
+import { cn } from "~/lib/utils";
 
 interface OutputStreamProps {
   className?: string;
@@ -81,8 +80,8 @@ export function OutputStream({ className }: OutputStreamProps) {
     if (searchQuery) {
       filtered = filtered.filter(message => 
         message.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (message.reasoningContent && message.reasoningContent.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (message.langGraphMetadata?.agent && message.langGraphMetadata.agent.toLowerCase().includes(searchQuery.toLowerCase()))
+        (message.reasoningContent?.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (message.langGraphMetadata?.agent?.toLowerCase().includes(searchQuery.toLowerCase()))
       );
     }
     

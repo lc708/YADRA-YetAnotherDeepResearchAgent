@@ -1,8 +1,9 @@
 // OAuth Callback Handler
 'use client';
 
-import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useState } from 'react';
+
 import { supabase } from '~/lib/supa';
 
 export default function AuthCallback() {

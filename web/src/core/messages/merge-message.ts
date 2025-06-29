@@ -116,7 +116,7 @@ function mergeToolCallChunksMessage(message: Message, event: LangGraphNativeEven
     if (message.toolCalls) {
       event.data.tool_call_chunks.forEach((chunk: ToolCallChunk) => {
         const toolCall = message.toolCalls?.find(tc => tc.id === chunk.id);
-        if (toolCall && toolCall.argsChunks) {
+        if (toolCall?.argsChunks) {
           toolCall.argsChunks.push(chunk.args);
         }
       });

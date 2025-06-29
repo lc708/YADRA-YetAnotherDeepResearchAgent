@@ -5,8 +5,8 @@ import "~/styles/globals.css";
 import { type Metadata } from "next";
 import Script from "next/script";
 
-import { ThemeProviderWrapper } from "~/components/yadra/theme-provider-wrapper";
 import { GlobalSidebar } from "~/components/layout/global-sidebar";
+import { ThemeProviderWrapper } from "~/components/yadra/theme-provider-wrapper";
 import { loadConfig } from "~/core/api/config";
 import { env } from "~/env";
 

@@ -2,18 +2,19 @@
 
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
-import { Headphones, Download, Play, Pause, Volume2, VolumeX } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
-import { Button } from "~/components/ui/button";
-import { Badge } from "~/components/ui/badge";
-import { ScrollArea } from "~/components/ui/scroll-area";
-import { Tooltip } from "~/components/yadra/tooltip";
-import { RainbowText } from "~/components/yadra/rainbow-text";
 import { LoadingOutlined } from "@ant-design/icons";
+import { Headphones, Download, Play, Pause, Volume2, VolumeX } from "lucide-react";
+import { useState, useMemo, useCallback } from "react";
+
+import { Badge } from "~/components/ui/badge";
+import { Button } from "~/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { ScrollArea } from "~/components/ui/scroll-area";
+import { RainbowText } from "~/components/yadra/rainbow-text";
+import { Tooltip } from "~/components/yadra/tooltip";
+import type { Message } from "~/core/messages";
 import { useUnifiedStore, useThreadMessages } from "~/core/store/unified-store";
 import { cn } from "~/lib/utils";
-import type { Message } from "~/core/messages";
 
 interface PodcastPanelProps {
   className?: string;
