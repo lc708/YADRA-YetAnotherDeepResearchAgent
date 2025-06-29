@@ -35,12 +35,12 @@ RUN chown -R yadra:yadra /app
 # Switch to non-root user
 USER yadra
 
-# Expose port
-EXPOSE 8000
+# Expose port (Zeabur default)
+EXPOSE 8080
 
-# Health check
+# Health check - use environment variable PORT with fallback
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-    CMD curl -f http://localhost:8000/api/health || exit 1
+    CMD curl -f http://localhost:${PORT:-8000}/api/health || exit 1
 
-# Run the application
-CMD ["uv", "run", "python", "server.py", "--host", "0.0.0.0", "--port", "8000"]
+# Run the application - let server.py read PORT from environment
+CMD ["uv", "run", "python", "server.py", "--host", "0.0.0.0"]
