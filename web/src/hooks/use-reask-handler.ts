@@ -2,9 +2,10 @@
 
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
+import { useCallback, useEffect, useRef } from "react";
 import { toast } from "sonner";
+
 import { useUnifiedStore } from "~/core/store/unified-store";
 
 export interface OriginalInput {
@@ -44,7 +45,7 @@ export function useReaskHandler(options?: {
       // 延迟一下，确保页面已经导航
       setTimeout(() => {
         // 触发新的消息发送
-        const inputElement = document.querySelector('textarea[name="message"]') as HTMLTextAreaElement;
+        const inputElement = document.querySelector('textarea[name="message"]')!;
         if (inputElement) {
           inputElement.value = original_input;
           inputElement.dispatchEvent(new Event('input', { bubbles: true }));
@@ -58,7 +59,7 @@ export function useReaskHandler(options?: {
       }, 500);
     } else {
       // 如果在聊天页面，直接发送新消息
-      const inputElement = document.querySelector('textarea[name="message"]') as HTMLTextAreaElement;
+      const inputElement = document.querySelector('textarea[name="message"]')!;
       if (inputElement) {
         inputElement.value = original_input;
         inputElement.dispatchEvent(new Event('input', { bubbles: true }));
@@ -87,7 +88,7 @@ export function useReaskHandler(options?: {
       // 延迟一下，确保页面已经导航
       setTimeout(() => {
         // 触发新的消息发送
-        const inputElement = document.querySelector('textarea[name="message"]') as HTMLTextAreaElement;
+        const inputElement = document.querySelector('textarea[name="message"]')!;
         if (inputElement && originalInputRef.current) {
           inputElement.value = originalInputRef.current;
           inputElement.dispatchEvent(new Event('input', { bubbles: true }));
