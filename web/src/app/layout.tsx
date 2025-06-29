@@ -156,6 +156,28 @@ export default async function RootLayout({
           // When `NEXT_PUBLIC_STATIC_WEBSITE_ONLY` is `true`, the script will be injected
           // into the page only when `AMPLITUDE_API_KEY` is provided in `.env`
         }
+        {/* Google Analytics */}
+        {env.NEXT_PUBLIC_GA_MEASUREMENT_ID && (
+          <>
+            <Script
+              src={`https://www.googletagmanager.com/gtag/js?id=${env.NEXT_PUBLIC_GA_MEASUREMENT_ID}`}
+              strategy="afterInteractive"
+            />
+            <Script id="google-analytics" strategy="afterInteractive">
+              {`
+                window.dataLayer = window.dataLayer || [];
+                function gtag(){dataLayer.push(arguments);}
+                gtag('js', new Date());
+                gtag('config', '${env.NEXT_PUBLIC_GA_MEASUREMENT_ID}', {
+                  page_title: document.title,
+                  page_location: window.location.href,
+                });
+              `}
+            </Script>
+          </>
+        )}
+        
+        {/* Amplitude Analytics */}
         {env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY && env.AMPLITUDE_API_KEY && (
           <>
             <Script src="https://cdn.amplitude.com/script/d2197dd1df3f2959f26295bb0e7e849f.js"></Script>

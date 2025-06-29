@@ -24,6 +24,7 @@ export const env = createEnv({
     NEXT_PUBLIC_STATIC_WEBSITE_ONLY: z.boolean().optional(),
     NEXT_PUBLIC_SUPABASE_URL: z.string().optional(),
     NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().optional(),
+    NEXT_PUBLIC_GA_MEASUREMENT_ID: z.string().optional(),
   },
 
   /**
@@ -37,6 +38,7 @@ export const env = createEnv({
       process.env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY === "true",
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
     NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    NEXT_PUBLIC_GA_MEASUREMENT_ID: process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID,
     AMPLITUDE_API_KEY: process.env.AMPLITUDE_API_KEY,
     GITHUB_OAUTH_TOKEN: process.env.GITHUB_OAUTH_TOKEN,
   },
