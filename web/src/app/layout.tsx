@@ -2,7 +2,7 @@
 
 import "~/styles/globals.css";
 
-import { type Metadata } from "next";
+import { type Metadata, type Viewport } from "next";
 import Script from "next/script";
 
 import { GlobalSidebar } from "~/components/layout/global-sidebar";
@@ -13,6 +13,7 @@ import { env } from "~/env";
 import { Toaster } from "../components/yadra/toaster";
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://www.yadra.im'),
   title: "YADRA - 智能深度研究AI助手 | 3分钟生成专业研究报告、小红书爆款文案",
   description: "YADRA是专业的AI深度研究助手，支持生成研究报告、新闻稿件、小红书爆款文案、科普博客。输入主题，3-5分钟自动生成专业内容，支持实时编辑和多格式导出。",
   keywords: "AI研究助手,研究报告生成,小红书爆款文案,深度调研工具,智能分析,学术研究,市场调研,新闻稿件,社媒文案,科普博客",
@@ -20,8 +21,6 @@ export const metadata: Metadata = {
   creator: "YADRA Team",
   publisher: "YADRA",
   robots: "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1",
-  viewport: "width=device-width, initial-scale=1.0",
-  themeColor: "#ffffff",
   category: "productivity",
   classification: "AI工具,研究助手,内容生成",
   icons: [
@@ -72,6 +71,13 @@ export const metadata: Metadata = {
     "apple-mobile-web-app-status-bar-style": "default",
     "format-detection": "telephone=no",
   },
+};
+
+// Viewport configuration for Next.js 15
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1.0,
+  themeColor: '#ffffff',
 };
 
 // 临时禁用Google字体以解决Turbopack问题
