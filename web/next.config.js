@@ -44,8 +44,8 @@ const config = {
     return config;
   },
 
-  // ... rest of the configuration.
-  output: "standalone",
+  // 以下生成独立Node.js服务器，适用于docker环境，与vercel不兼容
+  //output: "standalone",
 };
 
 export default config;
