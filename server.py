@@ -47,9 +47,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "--port",
         type=int,
-        default=int(os.environ.get("PORT", 8000)),  #支持环境变量PORT
+        default=int(os.environ.get("PORT", 8000)),  # 支持环境变量PORT
         help="Port to bind the server to (default: 8000 or PORT env var)",
-)
+    )
     parser.add_argument(
         "--log-level",
         type=str,
