@@ -1,7 +1,7 @@
 "use client";
 
 
-// 🔥 添加认证相关导入
+// Import authentication related modules
 
 import { Input } from "~/components/ui/input";
 import { Badge } from "~/components/ui/badge";
@@ -47,7 +47,7 @@ import {
 import { useAuth } from "~/hooks/useAuth";
 import { cn } from "~/lib/utils";
 
-// 消息类型定义
+// Message type definitions
 interface Message {
   id: string;
   content: string;

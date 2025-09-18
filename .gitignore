@@ -30,6 +30,15 @@ coverage/
 # temporary files
 todos/
 
+# Development artifacts and reference files
+docs/
+examples/
+tests/
+*.dev.md
+*.temp.md
+*_reference.md
+*_draft.md
+
 #misc
 .DS_Store
 

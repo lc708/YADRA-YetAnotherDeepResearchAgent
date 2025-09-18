@@ -12,7 +12,7 @@ import type { Message, ToolCallChunk } from "./types";
 export function mergeMessage(message: Message, event: ChatEvent): Message {
   const clonedMessage = cloneMessage(message);
   
-  // 🔥 统一事件处理：支持"type"和"event"两种格式
+  // Unified event handling: support both "type" and "event" formats
   const eventType = event.event;
   
   if (eventType === "message_chunk") {
@@ -35,12 +35,12 @@ export function mergeMessage(message: Message, event: ChatEvent): Message {
     mergeCompleteMessage(clonedMessage, event);
   }
   
-  // 🔥 统一处理finish_reason和流式状态
+  // Unified handling of finish_reason and streaming status
   if (event.data.finish_reason) {
     clonedMessage.finishReason = event.data.finish_reason;
     clonedMessage.isStreaming = false;
     
-    // 🔥 完成时处理tool call参数拼接
+    // Handle tool call parameter concatenation on completion
     if (clonedMessage.toolCalls) {
       clonedMessage.toolCalls.forEach((toolCall) => {
         if (toolCall.argsChunks?.length) {
@@ -58,32 +58,32 @@ export function mergeMessage(message: Message, event: ChatEvent): Message {
   return clonedMessage;
 }
 
-// 🔥 处理message_chunk事件：文本内容拼接
+// Handle message_chunk event: text content concatenation
 function mergeLangGraphTextMessage(message: Message, event: LangGraphNativeEvent) {
-  // 处理主要内容
+  // Handle main content
   if (event.data.content) {
     message.content = (message.content || "") + event.data.content;
     message.contentChunks = [...(message.contentChunks || []), event.data.content];
   }
   
-  // 🔥 处理reasoning_content
+  // Handle reasoning_content
   if (event.data.reasoning_content) {
     message.reasoningContent = (message.reasoningContent || "") + event.data.reasoning_content;
     message.reasoningContentChunks = [...(message.reasoningContentChunks || []), event.data.reasoning_content];
   }
   
-  // 🔥 保存LangGraph原生元数据
+  // Save LangGraph native metadata
   saveLangGraphMetadata(message, event);
 }
 
-// 🔥 处理tool_calls事件：完整的工具调用
+// Handle tool_calls event: complete tool calls
 function mergeToolCallsMessage(message: Message, event: LangGraphNativeEvent) {
   if (event.data.tool_calls?.[0]?.name) {
     message.toolCalls = event.data.tool_calls.map((raw: any) => ({
       id: raw.id,
       name: raw.name,
       args: raw.args,
-      argsChunks: [], // 初始化为空，等待后续chunks
+      argsChunks: [], // Initialize as empty, wait for subsequent chunks
     }));
     message.isToolCallsMessage = true;
   }
@@ -194,7 +194,7 @@ function mergeReaskMessage(message: Message, event: LangGraphNativeEvent) {
 // 🔥 处理error事件：错误信息
 function mergeErrorMessage(message: Message, event: LangGraphNativeEvent) {
   if (event.data.error_message) {
-    const errorContent = `[错误] ${event.data.error_message}`;
+    const errorContent = `[Error] ${event.data.error_message}`;
     message.content = (message.content || "") + errorContent;
     message.contentChunks = [...(message.contentChunks || []), errorContent];
     message.isErrorMessage = true;

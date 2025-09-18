@@ -366,7 +366,7 @@ export const FeedbackSystem: React.FC<FeedbackSystemProps> = ({
         [type]: (prev[type] || 0) + 1
       }));
     } catch (error) {
-      console.error("提交反馈失败:", error);
+      console.error("Failed to submit feedback:", error);
       setCurrentFeedback(null);
     } finally {
       setIsSubmitting(false);
@@ -399,7 +399,7 @@ export const FeedbackSystem: React.FC<FeedbackSystemProps> = ({
         [feedback.type]: (prev[feedback.type] || 0) + 1
       }));
     } catch (error) {
-      console.error("提交反馈失败:", error);
+      console.error("Failed to submit feedback:", error);
     } finally {
       setIsSubmitting(false);
     }

@@ -255,7 +255,7 @@ export const PodcastPlayer: React.FC<PodcastPlayerProps> = ({
         await audioRef.current.play();
       }
     } catch (error) {
-      console.error('播放失败:', error);
+      console.error('Playback failed:', error);
       setIsLoading(false);
     }
   }, [isPlaying]);

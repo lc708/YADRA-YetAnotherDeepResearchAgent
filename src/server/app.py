@@ -65,7 +65,7 @@ from src.server.supabase_auth_api import (
     update_user_profile,
 )
 
-# 添加日志导入
+# Import logging utilities
 from src.utils.logger import setup_logging, app_logger
 
 logger = logging.getLogger(__name__)
@@ -119,21 +119,21 @@ app.include_router(research_ask_router)
 async def chat_stream(
     request: ChatRequest, authorization: Optional[str] = Header(None)
 ):
-    # 尝试获取当前用户，但不强制要求
+    # Try to get current user, but don't require authentication
     current_user = None
     if authorization:
         try:
             current_user = await get_current_user(authorization)
         except:
-            # 如果认证失败，仍然允许匿名访问
+            # Allow anonymous access if authentication fails
             pass
 
-    # 后端生成 thread_id
+    # Generate thread_id on backend
     thread_id = request.thread_id
     if thread_id == "__default__" or not thread_id:
         thread_id = str(uuid4())
 
-    # 如果有用户登录，创建或更新任务记录
+    # Create or update task record if user is logged in
     if current_user:
         await create_or_update_task(current_user["user_id"], thread_id)
 
@@ -142,7 +142,7 @@ async def chat_stream(
 
     async def stream_response():
         """Stream response."""
-        # 首先发送 thread_id 事件
+        # First send thread_id event
         yield _make_event("thread_created", {"thread_id": thread_id})
 
         # Stream the workflow
@@ -228,13 +228,13 @@ async def _astream_workflow_generator(
                 interrupt_data = event_data["__interrupt__"][0]
                 interrupt_value = interrupt_data.value
 
-                # 检查是否是reask类型的interrupt
+                # Check if this is a reask type interrupt
                 if (
                     isinstance(interrupt_value, tuple)
                     and len(interrupt_value) == 2
                     and interrupt_value[0] == "reask"
                 ):
-                    # 处理reask interrupt
+                    # Handle reask interrupt
                     original_input = interrupt_value[1]
                     yield _make_event(
                         "reask",
@@ -242,14 +242,14 @@ async def _astream_workflow_generator(
                             "thread_id": thread_id,
                             "id": interrupt_data.ns[0],
                             "role": "assistant",
-                            "content": "正在恢复原始输入状态...",
+                            "content": "Restoring original input state...",
                             "finish_reason": "reask",
                             "original_input": original_input,
                         },
                     )
                 else:
-                    # 处理标准interrupt
-                    # 检查 interrupt_value 是否包含 options
+                    # Handle standard interrupt
+                    # Check if interrupt_value contains options
                     if (
                         isinstance(interrupt_value, dict)
                         and "options" in interrupt_value
@@ -259,7 +259,7 @@ async def _astream_workflow_generator(
                         )
                         options = interrupt_value.get("options", [])
                     else:
-                        # 兼容旧格式
+                        # Compatible with old format
                         message_content = str(interrupt_value)
                         options = [
                             {"text": "Edit plan", "value": "edit_plan"},
@@ -324,7 +324,7 @@ async def _astream_workflow_generator(
                 # AI Message - Raw message tokens
                 yield _make_event("message_chunk", event_stream_message)
 
-    # 添加流式响应结束标志
+    # Add streaming response end marker
     yield _make_event("done", {"thread_id": thread_id, "status": "completed"})
 
 
@@ -557,25 +557,25 @@ async def config():
 # User Authentication API Endpoints
 @app.post("/api/auth/register", response_model=AuthResponse)
 async def register_user(user_data: UserSignUpRequest):
-    """注册新用户 - 使用 Supabase Auth"""
+    """Register new user - using Supabase Auth"""
     return await sign_up_user(user_data)
 
 
 @app.post("/api/auth/login", response_model=AuthResponse)
 async def login(login_data: UserSignInRequest):
-    """用户登录 - 使用 Supabase Auth"""
+    """User login - using Supabase Auth"""
     return await sign_in_user(login_data)
 
 
 @app.post("/api/auth/logout")
 async def logout(current_user: dict = Depends(get_current_user)):
-    """用户登出"""
+    """User logout"""
     return await sign_out_user(current_user["user"]["access_token"])
 
 
 @app.get("/api/auth/me", response_model=UserResponse)
 async def get_me(current_user: dict = Depends(get_current_user)):
-    """获取当前登录用户信息 - 使用 Supabase Auth"""
+    """Get current logged in user info - using Supabase Auth"""
     return await get_user_info(current_user)
 
 
@@ -583,7 +583,7 @@ async def get_me(current_user: dict = Depends(get_current_user)):
 async def update_me(
     update_data: UserUpdateRequest, current_user: dict = Depends(get_current_user)
 ):
-    """更新当前用户信息"""
+    """Update current user information"""
     return await update_user_profile(current_user["user_id"], update_data)
 
 
@@ -595,7 +595,7 @@ async def get_tasks(
     ),
     current_user: dict = Depends(get_current_user),
 ):
-    """获取用户任务列表"""
+    """Get user task list"""
     return await get_user_tasks(current_user["user_id"], status)
 
 
@@ -605,27 +605,27 @@ async def create_task(
     task_name: Optional[str] = None,
     current_user: dict = Depends(get_current_user),
 ):
-    """创建或更新任务"""
+    """Create or update task"""
     return await create_or_update_task(current_user["user_id"], thread_id, task_name)
 
 
 @app.get("/api/health")
 async def health_check():
-    """健康检查端点"""
+    """Health check endpoint"""
     return {"status": "healthy", "service": "yadra-backend"}
 
 
-# 在应用启动事件中初始化日志
+# Initialize logging in application startup event
 @app.on_event("startup")
 async def startup():
     """Server startup event handler."""
-    # 初始化日志系统
+    # Initialize logging system
     setup_logging(log_dir="logs", log_level="INFO")
     app_logger.info(
         "🚀 YADRA Server starting up", version="1.0.0", python_version=sys.version
     )
 
-    # 现有的启动逻辑
+    # Existing startup logic
     await setup_user_tables()
     await get_graph_instance()
     app_logger.info("✅ Server startup complete")

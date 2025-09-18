@@ -18,15 +18,15 @@ def enable_debug_logging():
 
 logger = logging.getLogger(__name__)
 
-# Create the graph (无memory版本，供模块导入和命令行工具使用)
+# Create the graph (no memory version, for module import and command line tools)
 graph = build_graph()
 
-# 异步图管理
+# Async graph management
 _async_graph = None
 
 
 async def get_async_graph():
-    """获取或创建异步图实例"""
+    """Get or create async graph instance"""
     global _async_graph
     if _async_graph is None:
         _async_graph = await create_graph()
@@ -60,7 +60,7 @@ async def run_agent_workflow_async(
 
     logger.info(f"Starting async workflow with user input: {user_input}")
 
-    # 获取异步图（带checkpointer）
+    # Get async graph (with checkpointer)
     async_graph = await get_async_graph()
 
     initial_state = {

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 URL Parameter Generator for YADRA
-生成SEO友好的URL参数，支持中文转拼音
+Generate SEO-friendly URL parameters with Chinese to Pinyin conversion support
 """
 
 import re

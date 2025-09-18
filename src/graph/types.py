@@ -24,6 +24,6 @@ class State(MessagesState):
     background_investigation_results: str = None
 
     # Feedback System Fields
-    original_user_input: Optional[Dict[str, Any]] = None  # 用户原始输入状态
-    early_termination: Optional[bool] = None  # 提前终止标记
-    termination_reason: Optional[str] = None  # 终止原因
+    original_user_input: Optional[Dict[str, Any]] = None  # User original input state
+    early_termination: Optional[bool] = None  # Early termination flag
+    termination_reason: Optional[str] = None  # Termination reason

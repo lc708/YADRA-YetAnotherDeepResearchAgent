@@ -62,7 +62,7 @@ const SearchSection = () => {
     e.preventDefault();
     // 移除跳转功能，保持纯静态
     if (searchQuery.trim()) {
-      console.log('搜索查询:', searchQuery);
+      console.log('Search query:', searchQuery);
     }
   };
 

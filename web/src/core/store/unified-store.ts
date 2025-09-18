@@ -1,12 +1,12 @@
 // Copyright (c) 2025 YADRA
 /**
- * 统一的状态管理 Store
+ * Unified State Management Store
  * 
- * 设计原则：
- * 1. 单一数据源 - 所有状态集中管理
- * 2. 直接访问 - 组件直接获取数据，无需多层转换
- * 3. 类型安全 - 完整的 TypeScript 类型支持
- * 4. 性能优化 - 使用 zustand 的选择器避免不必要的重渲染
+ * Design Principles:
+ * 1. Single Source of Truth - All state centrally managed
+ * 2. Direct Access - Components directly access data without multi-layer transformation
+ * 3. Type Safety - Complete TypeScript type support
+ * 4. Performance Optimization - Use zustand selectors to avoid unnecessary re-renders
  */
 
 import { enableMapSet } from "immer";

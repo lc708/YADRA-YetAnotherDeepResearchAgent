@@ -99,7 +99,7 @@ def background_investigation_node(state: State, config: RunnableConfig):
             logger.error(f"Error in alternative search: {e}")
             logger.exception("Full traceback:")
 
-    # 如果所有搜索都失败，返回空结果
+    # If all search methods fail, return empty result
     logger.warning("All search methods failed, returning empty result")
     return {"background_investigation_results": json.dumps(None)}
 
@@ -192,7 +192,7 @@ def human_feedback_node(
     auto_accepted_plan = state.get("auto_accepted_plan", False)
 
     if not auto_accepted_plan:
-        # 定义选项
+        # Define options
         options = [
             {"text": "开始研究", "value": "accepted"},
             {"text": "立即生成报告", "value": "skip_research"},
@@ -309,7 +309,7 @@ def generalmanager_node(
     )
     logger.debug(f"Current state messages: {state['messages']}")
 
-    # 添加详细的调试日志
+    # Add detailed debug logs
     logger.info(f"Generalmanager LLM response type: {type(response)}")
     logger.info(f"Generalmanager LLM response content: {response.content}")
     logger.info(f"Generalmanager LLM response tool_calls: {response.tool_calls}")
@@ -388,7 +388,7 @@ def reporter_node(state: State, config: RunnableConfig):
         )
     )
 
-    # 如果跳过了研究，添加特殊提示
+    # If skipped research, add special prompt
     if skipped_research:
         invoke_messages.append(
             HumanMessage(
@@ -418,7 +418,7 @@ def reporter_node(state: State, config: RunnableConfig):
 
 
 def reask_node(state: State) -> Command[Literal["__end__"]]:
-    """重新提问节点 - 恢复用户原始输入状态"""
+    """Reask node: preparing to restore original user input"""
     logger.info("Reask node: preparing to restore original user input")
 
     original_input = state.get("original_user_input")
@@ -437,20 +437,20 @@ def reask_node(state: State) -> Command[Literal["__end__"]]:
 
     logger.info(f"Restoring original input: {original_input.get('text', 'N/A')}")
 
-    # 创建一个特殊的reask消息来传递原始输入信息
+    # Create a special reask message to pass original input information
     reask_message = AIMessage(content="重新提问请求已处理", name="system")
 
     return Command(
         update={
-            "messages": [reask_message],  # 添加reask消息
-            "current_plan": None,  # 清空当前计划
-            "observations": [],  # 清空研究结果
-            "plan_iterations": 0,  # 重置计划迭代
-            "final_report": "",  # 清空最终报告
-            "early_termination": None,  # 清空提前终止标记
-            "termination_reason": None,  # 清空终止原因
-            "background_investigation_results": None,  # 清空背景调查结果
-            # 从原始输入恢复用户设置
+            "messages": [reask_message],  # Add reask message
+            "current_plan": None,  # Clear current plan
+            "observations": [],  # Clear research results
+            "plan_iterations": 0,  # Reset plan iterations
+            "final_report": "",  # Clear final report
+            "early_termination": None,  # Clear early termination flag
+            "termination_reason": None,  # Clear termination reason
+            "background_investigation_results": None,  # Clear background investigation results
+            # Restore user settings from original input
             "auto_accepted_plan": (
                 original_input.get("settings", {}).get("auto_accepted_plan", False)
             ),

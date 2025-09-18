@@ -2,7 +2,7 @@
 
 import type { Option } from "../messages";
 
-// Tool Calls - 保留原生LangGraph工具调用结构
+// Tool Calls - preserve native LangGraph tool call structure
 
 export interface ToolCall {
   id: string;
@@ -17,9 +17,9 @@ export interface ToolCallChunk {
   args: string;
 }
 
-// ✅ 完全抽象的LangGraph原生事件 - 不预定义业务事件类型
+// Fully abstract LangGraph native events - no predefined business event types
 export interface LangGraphNativeEvent {
-  event: string;  // 原生事件类型：message_chunk, tool_calls, tool_call_result, interrupt, error等
+  event: string;  // Native event types: message_chunk, tool_calls, tool_call_result, interrupt, error, etc.
   data: {
     // 🔥 LangGraph原生必需字段
     id: string;

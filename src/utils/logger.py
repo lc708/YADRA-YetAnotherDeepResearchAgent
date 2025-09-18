@@ -1,6 +1,6 @@
 """
-YADRA 日志配置模块
-使用 loguru 提供结构化日志
+YADRA logging configuration module
+Use loguru to provide structured logging
 """
 
 import sys
@@ -12,19 +12,19 @@ from datetime import datetime
 
 
 class StructuredLogger:
-    """结构化日志器"""
+    """Structured logger"""
 
     def __init__(self, component: str):
         self.component = component
 
     def _log(self, level: str, message: str, **kwargs):
-        """统一的日志方法"""
+        """Uniform logging method"""
         extra = {
             "component": self.component,
             "timestamp": datetime.utcnow().isoformat(),
             **kwargs,
         }
-        # 直接使用 loguru，不使用 structlog
+        # Use loguru directly, not structlog
         getattr(loguru_logger, level)(f"{message}", **extra)
 
     def info(self, message: str, **kwargs):
@@ -41,16 +41,16 @@ class StructuredLogger:
 
 
 def setup_logging(log_dir: str = "logs", log_level: str = "INFO"):
-    """设置全局日志配置"""
+    """Set global logging configuration"""
 
-    # 创建日志目录
+    # Create log directory
     log_path = Path(log_dir)
     log_path.mkdir(exist_ok=True)
 
-    # 移除默认处理器
+    # Remove default handler
     loguru_logger.remove()
 
-    # 控制台输出（彩色，简化格式）
+    # Console output (colored, simplified format)
     loguru_logger.add(
         sys.stderr,
         format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{extra[component]}</cyan> | {message}",
@@ -59,7 +59,7 @@ def setup_logging(log_dir: str = "logs", log_level: str = "INFO"):
         filter=lambda record: "component" in record["extra"],
     )
 
-    # 应用日志文件（JSON格式，便于分析）
+    # Apply log file (JSON format,便于分析)
     loguru_logger.add(
         log_path / "app.log",
         format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {extra[component]} | {message} | {extra}",
@@ -70,7 +70,7 @@ def setup_logging(log_dir: str = "logs", log_level: str = "INFO"):
         filter=lambda record: "component" in record["extra"],
     )
 
-    # 错误日志文件（单独记录）
+    # Error log file (separate record)
     loguru_logger.add(
         log_path / "error.log",
         format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {extra[component]} | {message} | {extra}",
@@ -81,7 +81,7 @@ def setup_logging(log_dir: str = "logs", log_level: str = "INFO"):
         filter=lambda record: "component" in record["extra"],
     )
 
-    # 性能日志（用于分析瓶颈）
+    # Performance log (for analyzing bottlenecks)
     loguru_logger.add(
         log_path / "performance.log",
         format="{time:YYYY-MM-DD HH:mm:ss} | {extra}",
@@ -94,13 +94,13 @@ def setup_logging(log_dir: str = "logs", log_level: str = "INFO"):
 
 
 def get_logger(component: str) -> StructuredLogger:
-    """获取组件专用的结构化日志器"""
+    """Get component-specific structured logger"""
     return StructuredLogger(component)
 
 
-# 性能监控日志器
+# Performance monitoring logger
 class PerformanceLogger:
-    """性能监控专用日志器"""
+    """Performance monitoring logger"""
 
     @staticmethod
     def log_llm_call(
@@ -164,7 +164,7 @@ class PerformanceLogger:
         )
 
 
-# 导出常用的日志器
+# Export commonly used loggers
 app_logger = get_logger("app")
 graph_logger = get_logger("graph")
 llm_logger = get_logger("llm")
