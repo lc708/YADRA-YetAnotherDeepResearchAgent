@@ -4,15 +4,16 @@
 # - Replace `base_url` and `model` name if you want to use a custom model
 
 BASIC_MODEL:
-  base_url: https://ark.cn-beijing.volces.com/api/v3
-  model: "doubao-1-5-pro-32k-250115"
+  base_url: https://openrouter.ai/api/v1
+  model: "google/gemini-2.5-flash"
   api_key: xxxx
+
 
 # Reasoning model is optional.
 # Uncomment the following settings if you want to use reasoning model
 # for planning.
 
-# REASONING_MODEL:
-#   base_url: https://ark-cn-beijing.bytedance.net/api/v3
-#   model: "doubao-1-5-thinking-pro-m-250428"
-#   api_key: xxxx
+REASONING_MODEL:
+  base_url: https://api.deepseek.com
+  model: "deepseek-reasoner"
+  api_key: xxx

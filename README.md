@@ -242,11 +242,51 @@ Please see our [Security Policy](SECURITY.md) for reporting vulnerabilities.
 - 💡 **Feature Requests**: [GitHub Issues](../../issues)
 - 💬 **Discussions**: [GitHub Discussions](../../discussions)
 
+## 🏗️ Built On
+
+YADRA stands on the shoulders of giants. We're grateful to these amazing open-source projects:
+
+### 🧠 Core AI & Workflow
+- **[LangGraph](https://langchain-ai.github.io/langgraph/)** - Multi-agent workflow orchestration
+- **[LangChain](https://langchain.com/)** - LLM application framework
+- **[LiteLLM](https://litellm.ai/)** - Unified LLM API interface
+
+### 🌐 Frontend & UI
+- **[Next.js 15](https://nextjs.org/)** - React framework with App Router
+- **[TipTap](https://tiptap.dev/)** - Headless rich text editor
+- **[Novel](https://novel.sh/)** - Notion-style WYSIWYG editor
+- **[Radix UI](https://radix-ui.com/)** - Unstyled, accessible UI primitives
+- **[Tailwind CSS](https://tailwindcss.com/)** - Utility-first CSS framework
+- **[Framer Motion](https://framer.com/motion/)** - Animation library
+- **[Zustand](https://zustand.docs.pmnd.rs/)** - State management
+
+### 🔧 Backend & Infrastructure
+- **[FastAPI](https://fastapi.tiangolo.com/)** - Modern Python web framework
+- **[Supabase](https://supabase.com/)** - Open-source Firebase alternative
+- **[PostgreSQL](https://postgresql.org/)** - Advanced relational database
+- **[uv](https://docs.astral.sh/uv/)** - Fast Python package manager
+
+### 🔍 Search & Data
+- **[Tavily](https://tavily.com/)** - AI-powered web search API
+- **[DuckDuckGo Search](https://github.com/deedy5/duckduckgo_search)** - Privacy-focused search
+- **[arXiv](https://arxiv.org/)** - Academic paper search
+- **[Jina AI](https://jina.ai/)** - Web content extraction
+
+## 💡 Inspiration
+
+YADRA draws inspiration from these pioneering research projects:
+
+- **[DeerFlow](https://github.com/deepflowai/deerflow)** - Prompt templates and workflow patterns
+- **[local-deep-researcher](https://github.com/localagi/local-deep-researcher)** - Local AI research methodologies  
+- **[OpenDeepResearch](https://github.com/opendeepresearch/opendeepresearch)** - Open-source research frameworks
+
+*Special thanks to these projects for their prompt templates and research methodologies that helped shape YADRA's approach.*
+
 ## 🙏 Acknowledgments
 
-- Built with [LangGraph](https://langchain-ai.github.io/langgraph/)
-- UI powered by [Next.js](https://nextjs.org/) and [Tailwind CSS](https://tailwindcss.com/)
-- Thanks to all [contributors](../../contributors)
+- Thanks to all [contributors](../../contributors) who make YADRA better
+- Inspired by the open-source AI research community
+- Built with love for researchers, by researchers
 
 ---
 

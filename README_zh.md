@@ -227,11 +227,51 @@ YADRA/
 - 💡 **功能请求**：[GitHub Issues](../../issues)
 - 💬 **讨论**：[GitHub Discussions](../../discussions)
 
+## 🏗️ 技术基础
+
+YADRA 站在巨人的肩膀上。我们感谢这些出色的开源项目：
+
+### 🧠 核心 AI 与工作流
+- **[LangGraph](https://langchain-ai.github.io/langgraph/)** - 多智能体工作流编排
+- **[LangChain](https://langchain.com/)** - LLM 应用框架
+- **[LiteLLM](https://litellm.ai/)** - 统一的 LLM API 接口
+
+### 🌐 前端与界面
+- **[Next.js 15](https://nextjs.org/)** - 基于 App Router 的 React 框架
+- **[TipTap](https://tiptap.dev/)** - 无头富文本编辑器
+- **[Novel](https://novel.sh/)** - Notion 风格的所见即所得编辑器
+- **[Radix UI](https://radix-ui.com/)** - 无样式、可访问的 UI 原语
+- **[Tailwind CSS](https://tailwindcss.com/)** - 实用优先的 CSS 框架
+- **[Framer Motion](https://framer.com/motion/)** - 动画库
+- **[Zustand](https://zustand.docs.pmnd.rs/)** - 状态管理
+
+### 🔧 后端与基础设施
+- **[FastAPI](https://fastapi.tiangolo.com/)** - 现代 Python Web 框架
+- **[Supabase](https://supabase.com/)** - 开源的 Firebase 替代方案
+- **[PostgreSQL](https://postgresql.org/)** - 先进的关系型数据库
+- **[uv](https://docs.astral.sh/uv/)** - 快速的 Python 包管理器
+
+### 🔍 搜索与数据
+- **[Tavily](https://tavily.com/)** - AI 驱动的网络搜索 API
+- **[DuckDuckGo Search](https://github.com/deedy5/duckduckgo_search)** - 注重隐私的搜索
+- **[arXiv](https://arxiv.org/)** - 学术论文搜索
+- **[Jina AI](https://jina.ai/)** - 网页内容提取
+
+## 💡 灵感来源
+
+YADRA 从这些开创性的研究项目中汲取灵感：
+
+- **[DeerFlow](https://github.com/deepflowai/deerflow)** - 提示词模板和工作流模式
+- **[local-deep-researcher](https://github.com/localagi/local-deep-researcher)** - 本地 AI 研究方法论
+- **[OpenDeepResearch](https://github.com/opendeepresearch/opendeepresearch)** - 开源研究框架
+
+*特别感谢这些项目的提示词模板和研究方法论，它们帮助塑造了 YADRA 的方法。*
+
 ## 🙏 致谢
 
-- 基于 [LangGraph](https://langchain-ai.github.io/langgraph/) 构建
-- UI 由 [Next.js](https://nextjs.org/) 和 [Tailwind CSS](https://tailwindcss.com/) 驱动
-- 感谢所有 [贡献者](../../contributors)
+- 感谢所有让 YADRA 变得更好的 [贡献者](../../contributors)
+- 受开源 AI 研究社区的启发
+- 由研究者为研究者用爱构建
 
 ---
 
