@@ -13,7 +13,8 @@ import type { Resource } from "~/core/messages";
 
 export const resourceSuggestion: MentionOptions["suggestion"] = {
   items: ({ query }) => {
-    return fetch(resolveServiceURL(`rag/resources?query=${query}`), {
+    const params = new URLSearchParams({ query });
+    return fetch(resolveServiceURL(`rag/resources?${params}`), {
       method: "GET",
     })
       .then((res) => res.json())

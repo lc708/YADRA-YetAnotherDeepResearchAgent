@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, Dict
 import os
 import httpx
+import logging
 
 from langchain_openai import ChatOpenAI
 from langchain_deepseek import ChatDeepSeek
@@ -12,6 +13,8 @@ from typing import get_args
 
 from src.config import load_yaml_config
 from src.config.agents import LLMType
+
+logger = logging.getLogger(__name__)
 
 # Cache for LLM instances
 _llm_cache: dict[LLMType, ChatOpenAI] = {}
@@ -68,10 +71,19 @@ def _create_llm_use_conf(
     if not merged_conf:
         raise ValueError(f"No configuration found for LLM type: {llm_type}")
 
-    # 创建自定义的httpx客户端来解决SSL连接问题
+    # SSL verification control via environment variable
+    # Default: enabled (secure). Set DISABLE_SSL_VERIFY=true to disable (development only)
+    ssl_verify = os.getenv("DISABLE_SSL_VERIFY", "false").lower() != "true"
+    if not ssl_verify:
+        logger.warning(
+            "SSL verification is disabled via DISABLE_SSL_VERIFY environment variable. "
+            "This is a security risk and should only be used in development environments!"
+        )
+
+    # Create custom httpx client
     http_client = httpx.Client(
-        verify=False,  # 跳过SSL验证
-        timeout=120.0,  # 增加超时时间到120秒
+        verify=ssl_verify,
+        timeout=120.0,
         limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
     )
 

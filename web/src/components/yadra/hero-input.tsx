@@ -338,7 +338,7 @@ function HeroInputContent({
                       <p className="text-xs text-gray-600 leading-relaxed">
                         {enableDeepThinking 
                           ? "使用DeepSeek R1，生成更加深思熟虑的研究计划"
-                          : "使用Gemini 2.5 Flash，快速生成研究计划"
+                          : "使用Gemini 3 Flash，快速生成研究计划"
                         }
                       </p>
                     </div>
