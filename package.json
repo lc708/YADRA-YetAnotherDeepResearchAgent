@@ -1,5 +1,4 @@
 {
-  "dependencies": {
-    "node-fetch": "^2.7.0"
-  }
+  "private": true,
+  "description": "YADRA - Yet Another Deep Research Agent"
 }

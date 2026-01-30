@@ -547,7 +547,7 @@ class ResearchAskService:
                 frontend_context_uuid=frontend_uuid,
                 action_type=ActionType.CREATE,
                 user_message=question,
-                model_used=model_config.get("model_name", "claude-3-5-sonnet"),
+                model_used=model_config.get("model_name", "claude-haiku-4-5"),
                 provider=model_config.get("provider", "anthropic"),
             )
 
@@ -658,7 +658,7 @@ class ResearchAskService:
                 frontend_context_uuid=frontend_uuid,
                 action_type=ActionType.CONTINUE,  # 使用CONTINUE表示followup
                 user_message=question,
-                model_used=model_config.get("model_name", "claude-3-5-sonnet"),
+                model_used=model_config.get("model_name", "claude-haiku-4-5"),
                 provider=model_config.get("provider", "anthropic"),
             )
 

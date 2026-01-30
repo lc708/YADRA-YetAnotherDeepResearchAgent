@@ -3,7 +3,8 @@ import type { Resource } from "../messages";
 import { resolveServiceURL } from "./resolve-service-url";
 
 export function queryRAGResources(query: string) {
-  return fetch(resolveServiceURL(`rag/resources?query=${query}`), {
+  const params = new URLSearchParams({ query });
+  return fetch(resolveServiceURL(`rag/resources?${params}`), {
     method: "GET",
   })
     .then((res) => res.json())

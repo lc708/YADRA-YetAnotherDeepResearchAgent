@@ -230,7 +230,7 @@ class ResearchStreamService:
                     "model_info": {
                         "model_name": (
                             request.config.get("model_config", {}).get(
-                                "model_name", "claude-3-5-sonnet-20241022"
+                                "model_name", "claude-haiku-4-5"
                             )
                         ),
                         "provider": (
@@ -238,7 +238,7 @@ class ResearchStreamService:
                                 "provider", "anthropic"
                             )
                         ),
-                        "version": "20241022",
+                        "version": "4.5",
                     },
                     "estimated_duration": 120,
                     "start_time": start_time.isoformat() + "Z",
