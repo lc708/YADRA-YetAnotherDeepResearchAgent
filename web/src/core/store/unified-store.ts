@@ -198,6 +198,7 @@ type UnifiedStore = {
   setCurrentInterrupt: (threadId: string, interruptData: ThreadState['ui']['currentInterrupt']) => void;
   getCurrentInterrupt: (threadId: string) => ThreadState['ui']['currentInterrupt'];
   clearCurrentInterrupt: (threadId: string) => void;
+  finalizeStreamingMessages: (threadId: string) => void;
   
   // 工作区操作
   setWorkspaceState: (update: Partial<UnifiedStore['workspace']>) => void;
@@ -523,6 +524,26 @@ export const useUnifiedStore = create<UnifiedStore>()(
             newThreads.set(threadId, newThread);
             return { ...state, threads: newThreads };
           }
+        });
+      },
+
+      finalizeStreamingMessages: (threadId: string) => {
+        set((state) => {
+          const thread = state.threads.get(threadId);
+          if (!thread) return;
+
+          let changed = false;
+          const newMessages = thread.messages.map((message) => {
+            if (!message.isStreaming) return message;
+            changed = true;
+            return { ...message, isStreaming: false };
+          });
+
+          if (!changed) return;
+
+          const newThreads = new Map(state.threads);
+          newThreads.set(threadId, { ...thread, messages: newMessages });
+          return { ...state, threads: newThreads };
         });
       },
       
@@ -1427,6 +1448,17 @@ export const sendAskMessage = async (
          case 'reask':
           case 'complete':
          case 'error':
+           // Session-level terminal events omit message id; handle before per-message logic
+            if (
+              currentThreadId &&
+              (event.event === "complete" || event.event === "error")
+            ) {
+              state.clearCurrentInterrupt(currentThreadId);
+              state.finalizeStreamingMessages(currentThreadId);
+              state.setResponding(false);
+              break;
+            }
+
            // 🚀 关键：使用后端提供的eventData.id而不是单一assistantMessage.id
             if (currentThreadId && eventData.id) {
              const messageId = eventData.id;
@@ -1496,19 +1528,11 @@ export const sendAskMessage = async (
                  });
                }
                
-               // 特殊处理：complete事件时停止流式状态和清除interrupt
-               if (event.event === 'complete') {
+               // complete/error with message id: finalize that message too
+               if (event.event === 'complete' || event.event === 'error') {
                  state.updateMessage(currentThreadId, messageId, {
                    isStreaming: false,
                  });
-                 state.clearCurrentInterrupt(currentThreadId);
-                 state.setResponding(false);
-               }
-               
-               // 特殊处理：error事件时清除interrupt
-               if (event.event === 'error') {
-                 state.clearCurrentInterrupt(currentThreadId);
-                 state.setResponding(false);
                }
              }
             }
