@@ -68,7 +68,7 @@ if __name__ == "__main__":
     try:
         logger.info(f"Starting YADRA API server on {args.host}:{args.port}")
         uvicorn.run(
-            "src.server:app",
+            "src.server.app:app",
             host=args.host,
             port=args.port,
             reload=reload,
