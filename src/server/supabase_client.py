@@ -8,8 +8,8 @@ import os
 import logging
 from typing import Optional, Dict, Any
 from supabase import create_client, Client
-from gotrue.types import Session, User
-from gotrue.errors import AuthApiError
+from supabase_auth.types import Session, User
+from supabase_auth.errors import AuthApiError
 from fastapi import HTTPException
 from dotenv import load_dotenv
 

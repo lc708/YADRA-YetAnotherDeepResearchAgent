@@ -9,7 +9,7 @@ from typing import Optional, Dict, Any, List
 from datetime import datetime
 from fastapi import HTTPException, Request, Depends, Header
 from pydantic import BaseModel, Field
-from gotrue.errors import AuthApiError
+from supabase_auth.errors import AuthApiError
 import psycopg
 from psycopg.rows import dict_row
 
