@@ -1,25 +1,24 @@
 # Copyright (c) 2025 YADRA
 
-"""Shared pytest fixtures and import shims for the test suite."""
+"""Shared pytest fixtures for YADRA unit tests."""
 
 import os
-import sys
-import types
+
+import pytest
 
 os.environ.setdefault("NEXT_PUBLIC_SUPABASE_URL", "https://example.supabase.co")
 os.environ.setdefault("NEXT_PUBLIC_SUPABASE_ANON_KEY", "test-anon-key")
 os.environ.setdefault("DATABASE_URL", "postgresql://test:test@localhost:5432/test")
 
-# supabase-auth no longer publishes the legacy `gotrue` package name
-if "gotrue" not in sys.modules or not hasattr(sys.modules["gotrue"], "types"):
-    _gotrue = types.ModuleType("gotrue")
-    _gotrue_errors = types.ModuleType("gotrue.errors")
-    _gotrue_errors.AuthApiError = type("AuthApiError", (Exception,), {})
-    _gotrue_types = types.ModuleType("gotrue.types")
-    _gotrue_types.Session = dict
-    _gotrue_types.User = dict
-    _gotrue.errors = _gotrue_errors
-    _gotrue.types = _gotrue_types
-    sys.modules["gotrue"] = _gotrue
-    sys.modules["gotrue.errors"] = _gotrue_errors
-    sys.modules["gotrue.types"] = _gotrue_types
+import src.config.loader as config_loader
+import src.llms.llm as llm_module
+
+
+@pytest.fixture(autouse=True)
+def clear_module_caches():
+    """Prevent cross-test pollution from module-level caches."""
+    config_loader._config_cache.clear()
+    llm_module._llm_cache.clear()
+    yield
+    config_loader._config_cache.clear()
+    llm_module._llm_cache.clear()
