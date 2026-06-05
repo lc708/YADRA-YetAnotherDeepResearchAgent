@@ -17,6 +17,7 @@ from src.server.repositories.session_repository import (
     SessionRepository,
     get_session_repository,
 )
+from src.server.session_auth import assert_session_owner
 from src.server.supabase_auth_api import get_current_user
 
 # Import LangChain message types
@@ -588,6 +589,9 @@ class ResearchStreamService:
             if not session:
                 raise HTTPException(status_code=404, detail="Session does not exist")
 
+            if request.user_id:
+                assert_session_owner(session, request.user_id)
+
             execution_record = await self.session_repo.create_execution_record(
                 session_id=session.id,
                 frontend_context_uuid=request.frontend_context_uuid,
@@ -748,6 +752,7 @@ async def research_stream(
 @router.get("/workspace/{url_param}")
 async def get_workspace_data(
     url_param: str,
+    current_user: dict = Depends(get_current_user),
     session_repo: SessionRepository = Depends(get_session_repository_dependency),
 ):
     """Get workspace status interface"""
@@ -756,6 +761,8 @@ async def get_workspace_data(
         session = await session_repo.get_session_by_url_param(url_param)
         if not session:
             raise HTTPException(status_code=404, detail="Session does not exist")
+
+        assert_session_owner(session, current_user["user_id"])
 
         # Get message history
         messages_data = await session_repo.get_messages_by_session_id(session.id)
