@@ -25,6 +25,7 @@ from src.server.repositories.session_repository import (
     ActionType,
     ExecutionStatus,
 )
+from src.server.session_auth import assert_session_owner
 from src.server.supabase_auth_api import get_current_user
 from src.utils.logger import get_logger
 
@@ -323,6 +324,9 @@ class ResearchAskService:
         if session_overview["thread_id"] != request.thread_id:
             raise HTTPException(status_code=400, detail="thread_id不匹配")
 
+        if request.user_id:
+            assert_session_owner(session_overview, request.user_id)
+
         # 获取session数据
         session_data = await self.session_repo.get_session_by_thread_id(
             request.thread_id
@@ -442,6 +446,9 @@ class ResearchAskService:
 
         if session_overview["thread_id"] != request.thread_id:
             raise HTTPException(status_code=400, detail="thread_id不匹配")
+
+        if request.user_id:
+            assert_session_owner(session_overview, request.user_id)
 
         # 解析配置（followup可能有新的配置）
         research_config, model_config, output_config = self._parse_config(
