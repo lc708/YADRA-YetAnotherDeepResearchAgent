@@ -40,6 +40,14 @@ def safe_json_dumps(obj):
     return json.dumps(obj, cls=CustomJSONEncoder, ensure_ascii=False)
 
 
+def build_interrupt_resume_message(interrupt_feedback: str, message: str = "") -> str:
+    """Format HITL resume payload for LangGraph Command(resume=...)."""
+    resume_msg = f"[{interrupt_feedback}]"
+    if message:
+        resume_msg += f" {message}"
+    return resume_msg
+
+
 # Create router
 router = APIRouter(prefix="/api/research", tags=["research"])
 
@@ -659,9 +667,9 @@ class ResearchStreamService:
 
             # Critical fix: if there is interrupt_feedback, use Command(resume=...) instead of normal state
             if interrupt_feedback:
-                resume_msg = f"[{interrupt_feedback}]"
-                if request.message:
-                    resume_msg += f" {request.message}"
+                resume_msg = build_interrupt_resume_message(
+                    interrupt_feedback, request.message
+                )
                 from langgraph.types import Command
 
                 initial_state = Command(resume=resume_msg)
