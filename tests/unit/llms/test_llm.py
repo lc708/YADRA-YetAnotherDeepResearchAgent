@@ -141,3 +141,28 @@ def test_get_configured_llm_models_returns_empty_on_load_failure(monkeypatch):
 
     monkeypatch.setattr(llm, "load_yaml_config", boom)
     assert llm.get_configured_llm_models() == {}
+
+
+class DummyChatDeepSeek:
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+
+
+def test_create_llm_use_conf_reasoning_uses_deepseek_and_api_base(
+    monkeypatch, dummy_conf
+):
+    """Regression: reasoning LLM must map base_url -> api_base for ChatDeepSeek."""
+    monkeypatch.setattr(llm, "ChatDeepSeek", DummyChatDeepSeek)
+
+    reasoning_conf = {
+        **dummy_conf,
+        "REASONING_MODEL": {
+            "api_key": "reason_key",
+            "base_url": "http://reasoning",
+            "model": "deepseek-reasoner",
+        },
+    }
+    result = llm._create_llm_use_conf("reasoning", reasoning_conf)
+    assert isinstance(result, DummyChatDeepSeek)
+    assert result.kwargs["api_base"] == "http://reasoning"
+    assert "base_url" not in result.kwargs

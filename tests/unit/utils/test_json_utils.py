@@ -26,3 +26,9 @@ def test_repair_json_output_repairs_trailing_comma():
     content = '{"items": [1, 2,],}'
     result = repair_json_output(content)
     assert json.loads(result) == {"items": [1, 2]}
+
+
+def test_repair_json_output_strips_typescript_code_fence():
+    content = '```ts\n{"typed": true}\n```'
+    result = repair_json_output(content)
+    assert json.loads(result) == {"typed": True}
