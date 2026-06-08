@@ -33,7 +33,8 @@ todos/
 # Development artifacts and reference files
 docs/
 examples/
-tests/
+tests/*
+!tests/test_session_auth.py
 *.dev.md
 *.temp.md
 *_reference.md
