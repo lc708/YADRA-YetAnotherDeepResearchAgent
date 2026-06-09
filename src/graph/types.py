@@ -25,5 +25,3 @@ class State(MessagesState):
 
     # Feedback System Fields
     original_user_input: Optional[Dict[str, Any]] = None  # User original input state
-    early_termination: Optional[bool] = None  # Early termination flag
-    termination_reason: Optional[str] = None  # Termination reason
