@@ -74,3 +74,26 @@ async def test_followup_ask_rejects_thread_id_mismatch():
 
     assert exc.value.status_code == 400
     assert exc.value.detail == "thread_id不匹配"
+
+
+@pytest.mark.asyncio
+async def test_followup_ask_accepts_valid_session(monkeypatch):
+    """Valid followup must pass ownership checks and return workspace metadata."""
+    repo = MagicMock()
+    repo.get_session_overview = AsyncMock(
+        return_value={"id": 1, "thread_id": "thread-1"}
+    )
+    service = ResearchAskService(session_repo=repo)
+
+    async def noop_task(**_kwargs):
+        return None
+
+    monkeypatch.setattr(service, "_start_followup_research_task", noop_task)
+
+    response = await service._handle_followup_ask(_followup_request())
+
+    assert response.ask_type == "followup"
+    assert response.session_id == 1
+    assert response.thread_id == "thread-1"
+    assert response.url_param == "valid-slug-abc12345"
+    assert response.workspace_url == "/workspace?id=valid-slug-abc12345"
