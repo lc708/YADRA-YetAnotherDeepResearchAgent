@@ -149,12 +149,6 @@ type UnifiedStore = {
   // 工作区状态
   workspace: {
     currentTraceId: string | null;
-    conversationVisible: boolean;
-    debugVisible: boolean;
-    feedback: { option: { text: string; value: string } } | null;
-    artifactsVisible: boolean;
-    historyVisible: boolean;
-    podcastVisible: boolean;
   };
   
   // 线程管理 - 新架构方法
@@ -231,12 +225,6 @@ export const useUnifiedStore = create<UnifiedStore>()(
       responding: false,
       workspace: {
         currentTraceId: null,
-        conversationVisible: true,
-        debugVisible: false,
-        feedback: null,
-        artifactsVisible: true,
-        historyVisible: false,
-        podcastVisible: false,
       },
       
       // 线程管理
@@ -956,46 +944,6 @@ export const openResearch = (researchId: string | null) => {
 
 export const closeResearch = () => {
   openResearch(null);
-};
-
-// 工作区 UI 状态便捷 hooks
-export const useConversationPanelVisible = () => {
-  return useUnifiedStore((state) => state.workspace.conversationVisible);
-};
-
-export const useArtifactsPanelVisible = () => {
-  return useUnifiedStore((state) => state.workspace.artifactsVisible);
-};
-
-export const useHistoryPanelVisible = () => {
-  return useUnifiedStore((state) => state.workspace.historyVisible);
-};
-
-export const usePodcastPanelVisible = () => {
-  return useUnifiedStore((state) => state.workspace.podcastVisible);
-};
-
-export const useWorkspaceFeedback = () => {
-  return useUnifiedStore((state) => state.workspace.feedback);
-};
-
-// 工作区操作便捷 hooks
-export const useWorkspaceActions = () => {
-  return useUnifiedStore((state) => ({
-    setConversationVisible: (visible: boolean) =>
-      state.setWorkspaceState({ conversationVisible: visible }),
-    setArtifactsVisible: (visible: boolean) =>
-      state.setWorkspaceState({ artifactsVisible: visible }),
-    setHistoryVisible: (visible: boolean) =>
-      state.setWorkspaceState({ historyVisible: visible }),
-    setPodcastVisible: (visible: boolean) =>
-      state.setWorkspaceState({ podcastVisible: visible }),
-    setDebugVisible: (visible: boolean) =>
-      state.setWorkspaceState({ debugVisible: visible }),
-    setFeedback: (feedback: { option: { text: string; value: string } } | null) =>
-      state.setWorkspaceState({ feedback }),
-    clearFeedback: () => state.setWorkspaceState({ feedback: null }),
-  }));
 };
 
 // 🚀 新增：业务状态Hook接口

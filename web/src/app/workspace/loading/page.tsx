@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
-import { LoadingAnimation } from "~/components/yadra/loading-animation";
+import LoadingAnimation from "~/components/conversation/loading-animation";
 
 export default function WorkspaceLoadingPage() {
   const router = useRouter();
