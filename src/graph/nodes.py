@@ -447,8 +447,6 @@ def reask_node(state: State) -> Command[Literal["__end__"]]:
             "observations": [],  # Clear research results
             "plan_iterations": 0,  # Reset plan iterations
             "final_report": "",  # Clear final report
-            "early_termination": None,  # Clear early termination flag
-            "termination_reason": None,  # Clear termination reason
             "background_investigation_results": None,  # Clear background investigation results
             # Restore user settings from original input
             "auto_accepted_plan": (

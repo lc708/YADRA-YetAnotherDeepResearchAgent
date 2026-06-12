@@ -42,7 +42,6 @@ interface ScrollContainerProps {
   onReachTop?: () => void;
   // 性能优化选项
   throttleMs?: number;
-  enableVirtualization?: boolean;
 }
 
 export const ScrollContainer = forwardRef<ScrollContainerRef, ScrollContainerProps>(({
@@ -55,7 +54,6 @@ export const ScrollContainer = forwardRef<ScrollContainerRef, ScrollContainerPro
   onReachBottom,
   onReachTop,
   throttleMs = 16, // 60fps
-  enableVirtualization = false,
 }, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
