@@ -25,6 +25,7 @@ from src.server.repositories.session_repository import (
     ActionType,
     ExecutionStatus,
 )
+from src.server.session_access import SessionAccessDenied, verify_session_access
 from src.server.supabase_auth_api import get_current_user
 from src.utils.logger import get_logger
 
@@ -330,6 +331,18 @@ class ResearchAskService:
         if not session_data:
             raise HTTPException(status_code=404, detail="Session数据不存在")
 
+        if not request.user_id:
+            raise HTTPException(status_code=401, detail="Authentication required")
+
+        try:
+            verify_session_access(
+                session_data,
+                user_id=request.user_id,
+                visitor_id=request.visitor_id,
+            )
+        except SessionAccessDenied:
+            raise HTTPException(status_code=403, detail="无权访问此会话")
+
         logger.info(
             f"Prepared followup session: {request.session_id}, thread_id: {request.thread_id}"
         )
@@ -442,6 +455,24 @@ class ResearchAskService:
 
         if session_overview["thread_id"] != request.thread_id:
             raise HTTPException(status_code=400, detail="thread_id不匹配")
+
+        session_data = await self.session_repo.get_session_by_thread_id(
+            request.thread_id
+        )
+        if not session_data:
+            raise HTTPException(status_code=404, detail="Session数据不存在")
+
+        if not request.user_id:
+            raise HTTPException(status_code=401, detail="Authentication required")
+
+        try:
+            verify_session_access(
+                session_data,
+                user_id=request.user_id,
+                visitor_id=request.visitor_id,
+            )
+        except SessionAccessDenied:
+            raise HTTPException(status_code=403, detail="无权访问此会话")
 
         # 解析配置（followup可能有新的配置）
         research_config, model_config, output_config = self._parse_config(
