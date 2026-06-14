@@ -26,6 +26,7 @@ from src.server.repositories.session_repository import (
     ExecutionStatus,
 )
 from src.server.supabase_auth_api import get_current_user
+from src.server.session_auth import assert_session_owner
 from src.utils.logger import get_logger
 
 logger = get_logger("research_ask_api")
@@ -330,6 +331,9 @@ class ResearchAskService:
         if not session_data:
             raise HTTPException(status_code=404, detail="Session数据不存在")
 
+        if request.user_id:
+            assert_session_owner(session_data, request.user_id)
+
         logger.info(
             f"Prepared followup session: {request.session_id}, thread_id: {request.thread_id}"
         )
@@ -442,6 +446,15 @@ class ResearchAskService:
 
         if session_overview["thread_id"] != request.thread_id:
             raise HTTPException(status_code=400, detail="thread_id不匹配")
+
+        session_data = await self.session_repo.get_session_by_thread_id(
+            request.thread_id
+        )
+        if not session_data:
+            raise HTTPException(status_code=404, detail="Session数据不存在")
+
+        if request.user_id:
+            assert_session_owner(session_data, request.user_id)
 
         # 解析配置（followup可能有新的配置）
         research_config, model_config, output_config = self._parse_config(
