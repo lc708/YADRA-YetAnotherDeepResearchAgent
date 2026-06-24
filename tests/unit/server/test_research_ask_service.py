@@ -1,8 +1,11 @@
 # Copyright (c) 2025 YADRA
 
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
-from src.server.research_create_api import ResearchAskService
+import pytest
+from fastapi import HTTPException
+
+from src.server.research_create_api import ResearchAskRequest, ResearchAskService
 
 
 def _service():
@@ -113,3 +116,107 @@ def test_estimate_research_duration_never_exceeds_cap():
     duration = _service()._estimate_research_duration(question)
     assert duration == 260  # 60 + 30 + 30 + 7 keywords × 20
     assert duration <= 300
+
+
+def _followup_request(**overrides):
+    data = {
+        "question": "Follow-up question",
+        "ask_type": "followup",
+        "frontend_uuid": "uuid-1",
+        "visitor_id": "visitor-1",
+        "session_id": 42,
+        "thread_id": "thread-abc",
+        "url_param": "test-slug",
+    }
+    data.update(overrides)
+    return ResearchAskRequest(**data)
+
+
+@pytest.mark.asyncio
+async def test_handle_followup_ask_rejects_missing_required_fields():
+    service = _service()
+    request = _followup_request(session_id=None)
+
+    with pytest.raises(HTTPException) as exc:
+        await service._handle_followup_ask(request)
+
+    assert exc.value.status_code == 400
+    assert "session_id, thread_id, url_param" in exc.value.detail
+
+
+@pytest.mark.asyncio
+async def test_handle_followup_ask_rejects_unknown_session():
+    session_repo = MagicMock()
+    session_repo.get_session_overview = AsyncMock(return_value=None)
+    service = ResearchAskService(session_repo=session_repo)
+
+    with pytest.raises(HTTPException) as exc:
+        await service._handle_followup_ask(_followup_request())
+
+    assert exc.value.status_code == 404
+    assert exc.value.detail == "会话不存在"
+
+
+@pytest.mark.asyncio
+async def test_handle_followup_ask_rejects_session_id_mismatch():
+    session_repo = MagicMock()
+    session_repo.get_session_overview = AsyncMock(
+        return_value={"id": 99, "thread_id": "thread-abc"}
+    )
+    service = ResearchAskService(session_repo=session_repo)
+
+    with pytest.raises(HTTPException) as exc:
+        await service._handle_followup_ask(_followup_request(session_id=42))
+
+    assert exc.value.status_code == 400
+    assert exc.value.detail == "session_id不匹配"
+
+
+@pytest.mark.asyncio
+async def test_handle_followup_ask_rejects_thread_id_mismatch():
+    session_repo = MagicMock()
+    session_repo.get_session_overview = AsyncMock(
+        return_value={"id": 42, "thread_id": "other-thread"}
+    )
+    service = ResearchAskService(session_repo=session_repo)
+
+    with pytest.raises(HTTPException) as exc:
+        await service._handle_followup_ask(_followup_request())
+
+    assert exc.value.status_code == 400
+    assert exc.value.detail == "thread_id不匹配"
+
+
+@pytest.mark.asyncio
+async def test_prepare_followup_session_rejects_missing_session_data():
+    session_repo = MagicMock()
+    session_repo.get_session_overview = AsyncMock(
+        return_value={"id": 42, "thread_id": "thread-abc"}
+    )
+    session_repo.get_session_by_thread_id = AsyncMock(return_value=None)
+    service = ResearchAskService(session_repo=session_repo)
+
+    with pytest.raises(HTTPException) as exc:
+        await service._prepare_followup_session(_followup_request())
+
+    assert exc.value.status_code == 404
+    assert exc.value.detail == "Session数据不存在"
+
+
+@pytest.mark.asyncio
+async def test_prepare_followup_session_returns_session_when_valid():
+    session_repo = MagicMock()
+    session_repo.get_session_overview = AsyncMock(
+        return_value={"id": 42, "thread_id": "thread-abc"}
+    )
+    session_data = MagicMock(id=42, thread_id="thread-abc")
+    session_repo.get_session_by_thread_id = AsyncMock(return_value=session_data)
+    service = ResearchAskService(session_repo=session_repo)
+
+    data, thread_id, url_param = await service._prepare_followup_session(
+        _followup_request()
+    )
+
+    assert data is session_data
+    assert thread_id == "thread-abc"
+    assert url_param == "test-slug"
