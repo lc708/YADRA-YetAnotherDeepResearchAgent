@@ -188,6 +188,18 @@ async def test_handle_followup_ask_rejects_thread_id_mismatch():
 
 
 @pytest.mark.asyncio
+async def test_prepare_followup_session_rejects_missing_required_fields():
+    service = _service()
+    request = _followup_request(session_id=None)
+
+    with pytest.raises(HTTPException) as exc:
+        await service._prepare_followup_session(request)
+
+    assert exc.value.status_code == 400
+    assert "session_id, thread_id, url_param" in exc.value.detail
+
+
+@pytest.mark.asyncio
 async def test_prepare_followup_session_rejects_missing_session_data():
     session_repo = MagicMock()
     session_repo.get_session_overview = AsyncMock(

@@ -208,3 +208,38 @@ async def test_followup_research_task_records_haiku_default(monkeypatch):
     kwargs = session_repo.create_execution_record.await_args.kwargs
     assert kwargs["model_used"] == "claude-haiku-4-5"
     assert kwargs["provider"] == "anthropic"
+
+
+@pytest.mark.asyncio
+async def test_followup_research_task_respects_explicit_model_config(monkeypatch):
+    """Regression: followup tasks must persist explicit model_config over PR #28 defaults."""
+    session_repo = MagicMock()
+    execution = MagicMock(execution_id="exec-3")
+    session_repo.create_execution_record = AsyncMock(return_value=execution)
+    session_repo.update_execution_record = AsyncMock()
+    session_repo.get_session_by_thread_id = AsyncMock(
+        return_value=MagicMock(url_param="test-slug")
+    )
+
+    mock_stream_service = MagicMock()
+    mock_stream_service.continue_research_stream = _immediate_complete_stream
+    monkeypatch.setattr(
+        "src.server.research_stream_api.ResearchStreamService",
+        MagicMock(return_value=mock_stream_service),
+    )
+
+    service = ResearchAskService(session_repo=session_repo)
+    await service._start_followup_research_task(
+        thread_id="thread-3",
+        session_id=3,
+        question="Follow up with custom model",
+        frontend_uuid="uuid-3",
+        visitor_id="visitor-3",
+        research_config={},
+        model_config={"model_name": "custom-followup-model", "provider": "openai"},
+        output_config={},
+    )
+
+    kwargs = session_repo.create_execution_record.await_args.kwargs
+    assert kwargs["model_used"] == "custom-followup-model"
+    assert kwargs["provider"] == "openai"
