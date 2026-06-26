@@ -220,3 +220,48 @@ async def test_prepare_followup_session_returns_session_when_valid():
     assert data is session_data
     assert thread_id == "thread-abc"
     assert url_param == "test-slug"
+
+
+@pytest.mark.asyncio
+async def test_handle_stream_ask_followup_forwards_interrupt_feedback(monkeypatch):
+    """Stream followup must pass interrupt_feedback into continue_research_stream context."""
+    session_data = MagicMock(id=42, thread_id="thread-abc")
+    service = ResearchAskService(session_repo=MagicMock())
+    service._prepare_followup_session = AsyncMock(
+        return_value=(session_data, "thread-abc", "test-slug")
+    )
+
+    captured = {}
+
+    async def fake_continue(stream_request):
+        captured["request"] = stream_request
+        yield {"event": "complete", "data": "{}"}
+
+    mock_stream_service = MagicMock()
+    mock_stream_service.continue_research_stream = fake_continue
+    monkeypatch.setattr(
+        "src.server.research_stream_api.ResearchStreamService",
+        MagicMock(return_value=mock_stream_service),
+    )
+    monkeypatch.setattr(
+        "src.server.research_create_api.get_session_repository",
+        MagicMock(return_value=MagicMock()),
+    )
+
+    request = ResearchAskRequest(
+        question="",
+        ask_type="followup",
+        frontend_uuid="uuid-1",
+        visitor_id="visitor-1",
+        session_id=42,
+        thread_id="thread-abc",
+        url_param="test-slug",
+        interrupt_feedback="edit_plan",
+        config={},
+    )
+
+    chunks = [chunk async for chunk in service._handle_stream_ask(request)]
+
+    assert any("event: navigation" in chunk for chunk in chunks)
+    assert captured["request"].context == {"interrupt_feedback": "edit_plan"}
+    assert captured["request"].action.value == "continue"
