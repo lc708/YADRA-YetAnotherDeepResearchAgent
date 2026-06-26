@@ -1,0 +1,222 @@
+# Copyright (c) 2025 YADRA
+
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
+from fastapi import HTTPException
+
+from src.server.research_create_api import ResearchAskRequest, ResearchAskService
+
+
+def _service():
+    return ResearchAskService(session_repo=MagicMock())
+
+
+def test_parse_config_uses_nested_research_overrides():
+    research, model, output = _service()._parse_config(
+        {
+            "research": {
+                "auto_accepted_plan": True,
+                "max_research_depth": 7,
+                "max_step_num": 9,
+                "max_search_results": 11,
+                "report_style": "news",
+            },
+            "model": {"model_name": "claude-haiku-4-5", "provider": "anthropic"},
+            "output": {"language": "en", "output_format": "html"},
+        }
+    )
+    assert research["auto_accepted_plan"] is True
+    assert research["max_plan_iterations"] == 7
+    assert research["max_step_num"] == 9
+    assert research["max_search_results"] == 11
+    assert research["report_style"] == "news"
+    assert model["model_name"] == "claude-haiku-4-5"
+    assert output["language"] == "en"
+
+
+def test_parse_config_falls_back_to_flat_keys_and_defaults():
+    research, model, output = _service()._parse_config(
+        {
+            "auto_accepted_plan": True,
+            "max_plan_iterations": 4,
+            "max_step_num": 6,
+            "max_search_results": 8,
+            "report_style": "casual",
+        }
+    )
+    assert research["auto_accepted_plan"] is True
+    assert research["enable_background_investigation"] is True
+    assert research["max_plan_iterations"] == 4
+    assert research["max_step_num"] == 6
+    assert research["max_search_results"] == 8
+    assert research["report_style"] == "casual"
+    assert model == {}
+    assert output == {"language": "zh-CN", "output_format": "markdown"}
+
+
+def test_parse_config_nested_research_depth_overrides_flat_iterations():
+    research, _, _ = _service()._parse_config(
+        {
+            "research": {"max_research_depth": 2},
+            "max_plan_iterations": 99,
+        }
+    )
+    assert research["max_plan_iterations"] == 2
+
+
+def test_parse_config_explicit_false_background_investigation_uses_or_chain():
+    """Documents current or-chain behavior: explicit False is treated as missing and defaults to True."""
+    research, _, _ = _service()._parse_config(
+        {"research": {"enable_background_investigation": False}}
+    )
+    assert research["enable_background_investigation"] is True
+
+
+def test_build_stream_config_flattens_nested_research_settings():
+    stream_config = _service()._build_stream_config(
+        {
+            "research": {
+                "auto_accepted_plan": True,
+                "max_research_depth": 4,
+                "max_step_num": 7,
+                "max_search_results": 9,
+                "report_style": "news",
+                "enable_deep_thinking": True,
+            },
+            "output": {"output_format": "html"},
+            "interrupt_feedback": "accepted",
+        }
+    )
+    assert stream_config["auto_accepted_plan"] is True
+    assert stream_config["enableBackgroundInvestigation"] is True
+    assert stream_config["reportStyle"] == "news"
+    assert stream_config["enableDeepThinking"] is True
+    assert stream_config["maxPlanIterations"] == 4
+    assert stream_config["maxStepNum"] == 7
+    assert stream_config["maxSearchResults"] == 9
+    assert stream_config["outputFormat"] == "html"
+    assert stream_config["interrupt_feedback"] == "accepted"
+    assert stream_config["research_config"]["max_plan_iterations"] == 4
+
+
+def test_estimate_research_duration_base_case():
+    assert _service()._estimate_research_duration("short question") == 60
+
+
+def test_estimate_research_duration_scales_with_length_and_keywords():
+    long_question = "x" * 150 + "深入分析比较"
+    duration = _service()._estimate_research_duration(long_question)
+    # 60 base + 30 (len>100) + 20 each for 深入/分析/比较
+    assert duration == 150
+
+
+def test_estimate_research_duration_never_exceeds_cap():
+    question = "分析比较研究评估调查深入全面" + "x" * 250
+    duration = _service()._estimate_research_duration(question)
+    assert duration == 260  # 60 + 30 + 30 + 7 keywords × 20
+    assert duration <= 300
+
+
+def _followup_request(**overrides):
+    data = {
+        "question": "Follow-up question",
+        "ask_type": "followup",
+        "frontend_uuid": "uuid-1",
+        "visitor_id": "visitor-1",
+        "session_id": 42,
+        "thread_id": "thread-abc",
+        "url_param": "test-slug",
+    }
+    data.update(overrides)
+    return ResearchAskRequest(**data)
+
+
+@pytest.mark.asyncio
+async def test_handle_followup_ask_rejects_missing_required_fields():
+    service = _service()
+    request = _followup_request(session_id=None)
+
+    with pytest.raises(HTTPException) as exc:
+        await service._handle_followup_ask(request)
+
+    assert exc.value.status_code == 400
+    assert "session_id, thread_id, url_param" in exc.value.detail
+
+
+@pytest.mark.asyncio
+async def test_handle_followup_ask_rejects_unknown_session():
+    session_repo = MagicMock()
+    session_repo.get_session_overview = AsyncMock(return_value=None)
+    service = ResearchAskService(session_repo=session_repo)
+
+    with pytest.raises(HTTPException) as exc:
+        await service._handle_followup_ask(_followup_request())
+
+    assert exc.value.status_code == 404
+    assert exc.value.detail == "会话不存在"
+
+
+@pytest.mark.asyncio
+async def test_handle_followup_ask_rejects_session_id_mismatch():
+    session_repo = MagicMock()
+    session_repo.get_session_overview = AsyncMock(
+        return_value={"id": 99, "thread_id": "thread-abc"}
+    )
+    service = ResearchAskService(session_repo=session_repo)
+
+    with pytest.raises(HTTPException) as exc:
+        await service._handle_followup_ask(_followup_request(session_id=42))
+
+    assert exc.value.status_code == 400
+    assert exc.value.detail == "session_id不匹配"
+
+
+@pytest.mark.asyncio
+async def test_handle_followup_ask_rejects_thread_id_mismatch():
+    session_repo = MagicMock()
+    session_repo.get_session_overview = AsyncMock(
+        return_value={"id": 42, "thread_id": "other-thread"}
+    )
+    service = ResearchAskService(session_repo=session_repo)
+
+    with pytest.raises(HTTPException) as exc:
+        await service._handle_followup_ask(_followup_request())
+
+    assert exc.value.status_code == 400
+    assert exc.value.detail == "thread_id不匹配"
+
+
+@pytest.mark.asyncio
+async def test_prepare_followup_session_rejects_missing_session_data():
+    session_repo = MagicMock()
+    session_repo.get_session_overview = AsyncMock(
+        return_value={"id": 42, "thread_id": "thread-abc"}
+    )
+    session_repo.get_session_by_thread_id = AsyncMock(return_value=None)
+    service = ResearchAskService(session_repo=session_repo)
+
+    with pytest.raises(HTTPException) as exc:
+        await service._prepare_followup_session(_followup_request())
+
+    assert exc.value.status_code == 404
+    assert exc.value.detail == "Session数据不存在"
+
+
+@pytest.mark.asyncio
+async def test_prepare_followup_session_returns_session_when_valid():
+    session_repo = MagicMock()
+    session_repo.get_session_overview = AsyncMock(
+        return_value={"id": 42, "thread_id": "thread-abc"}
+    )
+    session_data = MagicMock(id=42, thread_id="thread-abc")
+    session_repo.get_session_by_thread_id = AsyncMock(return_value=session_data)
+    service = ResearchAskService(session_repo=session_repo)
+
+    data, thread_id, url_param = await service._prepare_followup_session(
+        _followup_request()
+    )
+
+    assert data is session_data
+    assert thread_id == "thread-abc"
+    assert url_param == "test-slug"
