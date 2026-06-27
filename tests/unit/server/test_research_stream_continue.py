@@ -255,3 +255,35 @@ async def test_continue_research_stream_requires_thread_id_or_url_param():
     assert events[0]["event"] == "error"
     payload = json.loads(events[0]["data"])
     assert payload["error_code"] == "CONTINUE_STREAM_ERROR"
+
+
+@pytest.mark.asyncio
+async def test_continue_research_stream_rejects_unknown_url_param():
+    session_repo = MagicMock()
+    session_repo.get_session_by_url_param = AsyncMock(return_value=None)
+    service = ResearchStreamService(session_repo)
+
+    request = _continue_request(thread_id=None, url_param="missing-slug", context=None)
+    events = [event async for event in service.continue_research_stream(request)]
+
+    assert len(events) == 1
+    assert events[0]["event"] == "error"
+    payload = json.loads(events[0]["data"])
+    assert payload["error_code"] == "CONTINUE_STREAM_ERROR"
+    assert "Session does not exist" in payload["error_message"]
+
+
+@pytest.mark.asyncio
+async def test_continue_research_stream_rejects_unknown_thread_id():
+    session_repo = MagicMock()
+    session_repo.get_session_by_thread_id = AsyncMock(return_value=None)
+    service = ResearchStreamService(session_repo)
+
+    request = _continue_request(thread_id="ghost-thread", context=None)
+    events = [event async for event in service.continue_research_stream(request)]
+
+    assert len(events) == 1
+    assert events[0]["event"] == "error"
+    payload = json.loads(events[0]["data"])
+    assert payload["error_code"] == "CONTINUE_STREAM_ERROR"
+    assert "Session does not exist" in payload["error_message"]
