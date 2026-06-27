@@ -150,7 +150,6 @@ type UnifiedStore = {
   workspace: {
     currentTraceId: string | null;
     conversationVisible: boolean;
-    debugVisible: boolean;
     feedback: { option: { text: string; value: string } } | null;
     artifactsVisible: boolean;
     historyVisible: boolean;
@@ -232,7 +231,6 @@ export const useUnifiedStore = create<UnifiedStore>()(
       workspace: {
         currentTraceId: null,
         conversationVisible: true,
-        debugVisible: false,
         feedback: null,
         artifactsVisible: true,
         historyVisible: false,
@@ -990,8 +988,6 @@ export const useWorkspaceActions = () => {
       state.setWorkspaceState({ historyVisible: visible }),
     setPodcastVisible: (visible: boolean) =>
       state.setWorkspaceState({ podcastVisible: visible }),
-    setDebugVisible: (visible: boolean) =>
-      state.setWorkspaceState({ debugVisible: visible }),
     setFeedback: (feedback: { option: { text: string; value: string } } | null) =>
       state.setWorkspaceState({ feedback }),
     clearFeedback: () => state.setWorkspaceState({ feedback: null }),
