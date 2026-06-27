@@ -150,16 +150,6 @@ export function setEnableDeepThinking(value: boolean) {
   saveSettings();
 }
 
-export function setEnableBackgroundInvestigation(value: boolean) {
-  useSettingsStore.setState((state) => ({
-    general: {
-      ...state.general,
-      enableBackgroundInvestigation: value,
-    },
-  }));
-  saveSettings();
-}
-
 export function setAutoAcceptedPlan(value: boolean) {
   useSettingsStore.setState((state) => ({
     general: {
