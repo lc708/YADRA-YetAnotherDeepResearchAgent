@@ -228,60 +228,39 @@ async def _astream_workflow_generator(
                 interrupt_data = event_data["__interrupt__"][0]
                 interrupt_value = interrupt_data.value
 
-                # Check if this is a reask type interrupt
+                # Check if interrupt_value contains options
                 if (
-                    isinstance(interrupt_value, tuple)
-                    and len(interrupt_value) == 2
-                    and interrupt_value[0] == "reask"
+                    isinstance(interrupt_value, dict)
+                    and "options" in interrupt_value
                 ):
-                    # Handle reask interrupt
-                    original_input = interrupt_value[1]
-                    yield _make_event(
-                        "reask",
-                        {
-                            "thread_id": thread_id,
-                            "id": interrupt_data.ns[0],
-                            "role": "assistant",
-                            "content": "Restoring original input state...",
-                            "finish_reason": "reask",
-                            "original_input": original_input,
-                        },
+                    message_content = interrupt_value.get(
+                        "message", "Please Review the Plan."
                     )
+                    options = interrupt_value.get("options", [])
                 else:
-                    # Handle standard interrupt
-                    # Check if interrupt_value contains options
-                    if (
-                        isinstance(interrupt_value, dict)
-                        and "options" in interrupt_value
-                    ):
-                        message_content = interrupt_value.get(
-                            "message", "Please Review the Plan."
-                        )
-                        options = interrupt_value.get("options", [])
-                    else:
-                        # Compatible with old format
-                        message_content = str(interrupt_value)
-                        options = [
-                            {"text": "Edit plan", "value": "edit_plan"},
-                            {"text": "Start research", "value": "accepted"},
-                            {
-                                "text": "Generate report now",
-                                "value": "skip_research",
-                            },
-                            {"text": "Cancel plan", "value": "cancel"},
-                        ]
-
-                    yield _make_event(
-                        "interrupt",
+                    # Compatible with old format
+                    message_content = str(interrupt_value)
+                    options = [
+                        {"text": "Edit plan", "value": "edit_plan"},
+                        {"text": "Start research", "value": "accepted"},
                         {
-                            "thread_id": thread_id,
-                            "id": interrupt_data.ns[0],
-                            "role": "assistant",
-                            "content": message_content,
-                            "finish_reason": "interrupt",
-                            "options": options,
+                            "text": "Generate report now",
+                            "value": "skip_research",
                         },
-                    )
+                        {"text": "Cancel plan", "value": "cancel"},
+                    ]
+
+                yield _make_event(
+                    "interrupt",
+                    {
+                        "thread_id": thread_id,
+                        "id": interrupt_data.ns[0],
+                        "role": "assistant",
+                        "content": message_content,
+                        "finish_reason": "interrupt",
+                        "options": options,
+                    },
+                )
             continue
         message_chunk, message_metadata = cast(
             tuple[BaseMessage, dict[str, any]], event_data

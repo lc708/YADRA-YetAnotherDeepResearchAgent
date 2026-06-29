@@ -336,56 +336,35 @@ class ResearchStreamService:
 
                         logger.info(f"Received interrupt event: {interrupt_value}")
 
-                        # Check if it is a reask type of interrupt
                         if (
-                            isinstance(interrupt_value, tuple)
-                            and len(interrupt_value) == 2
-                            and interrupt_value[0] == "reask"
+                            isinstance(interrupt_value, dict)
+                            and "options" in interrupt_value
                         ):
-                            # Process reask interrupt
-                            original_input = interrupt_value[1]
-                            yield self._make_research_event(
-                                "reask",
-                                {
-                                    "thread_id": thread_id,
-                                    "id": interrupt_data.ns[0],
-                                    "role": "assistant",
-                                    "content": "正在恢复原始输入状态...",
-                                    "finish_reason": "reask",
-                                    "original_input": original_input,
-                                },
+                            message_content = interrupt_value.get(
+                                "message", "Please Review the Plan."
                             )
+                            options = interrupt_value.get("options", [])
                         else:
-                            # Process standard interrupt
-                            if (
-                                isinstance(interrupt_value, dict)
-                                and "options" in interrupt_value
-                            ):
-                                message_content = interrupt_value.get(
-                                    "message", "Please Review the Plan."
-                                )
-                                options = interrupt_value.get("options", [])
-                            else:
-                                # Compatible with old format
-                                message_content = str(interrupt_value)
-                                options = [
-                                    {"text": "开始研究", "value": "accepted"},
-                                    {"text": "编辑计划", "value": "edit_plan"},
-                                    {"text": "立即生成报告", "value": "skip_research"},
-                                    {"text": "重新提问", "value": "reask"},
-                                ]
+                            # Compatible with old format
+                            message_content = str(interrupt_value)
+                            options = [
+                                {"text": "开始研究", "value": "accepted"},
+                                {"text": "编辑计划", "value": "edit_plan"},
+                                {"text": "立即生成报告", "value": "skip_research"},
+                                {"text": "重新提问", "value": "reask"},
+                            ]
 
-                            yield self._make_research_event(
-                                "interrupt",
-                                {
-                                    "thread_id": thread_id,
-                                    "id": interrupt_data.ns[0],
-                                    "role": "assistant",
-                                    "content": message_content,
-                                    "finish_reason": "interrupt",
-                                    "options": options,
-                                },
-                            )
+                        yield self._make_research_event(
+                            "interrupt",
+                            {
+                                "thread_id": thread_id,
+                                "id": interrupt_data.ns[0],
+                                "role": "assistant",
+                                "content": message_content,
+                                "finish_reason": "interrupt",
+                                "options": options,
+                            },
+                        )
 
                         # After interrupt, do not send complete event, wait for user feedback
                         logger.info(f"Interrupt sent, waiting for user feedback")
