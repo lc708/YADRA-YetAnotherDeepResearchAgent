@@ -72,8 +72,6 @@ interface ThreadState {
     activityMessageIds: Map<string, string[]>; // researchId -> activityMessageIds[]
   };
   ui: {
-    lastInterruptMessageId: string | null;
-    waitingForFeedbackMessageId: string | null;
     currentInterrupt: {
       interruptId: string;
       message: string;
@@ -150,7 +148,6 @@ type UnifiedStore = {
   workspace: {
     currentTraceId: string | null;
     conversationVisible: boolean;
-    debugVisible: boolean;
     feedback: { option: { text: string; value: string } } | null;
     artifactsVisible: boolean;
     historyVisible: boolean;
@@ -191,8 +188,6 @@ type UnifiedStore = {
   
   // UI 操作
   setResponding: (responding: boolean) => void;
-  setInterruptMessage: (threadId: string, messageId: string | null) => void;
-  setWaitingForFeedback: (threadId: string, messageId: string | null) => void;
   
   // 🔥 添加interrupt事件管理方法
   setCurrentInterrupt: (threadId: string, interruptData: ThreadState['ui']['currentInterrupt']) => void;
@@ -232,7 +227,6 @@ export const useUnifiedStore = create<UnifiedStore>()(
       workspace: {
         currentTraceId: null,
         conversationVisible: true,
-        debugVisible: false,
         feedback: null,
         artifactsVisible: true,
         historyVisible: false,
@@ -253,8 +247,6 @@ export const useUnifiedStore = create<UnifiedStore>()(
             activityMessageIds: new Map(),
           },
           ui: {
-            lastInterruptMessageId: null,
-            waitingForFeedbackMessageId: null,
             currentInterrupt: null,
           },
         };
@@ -287,8 +279,6 @@ export const useUnifiedStore = create<UnifiedStore>()(
                 activityMessageIds: new Map(),
               },
               ui: {
-                lastInterruptMessageId: null,
-                waitingForFeedbackMessageId: null,
                 currentInterrupt: null,
               },
             };
@@ -462,34 +452,6 @@ export const useUnifiedStore = create<UnifiedStore>()(
       setResponding: (responding: boolean) => {
         set((state) => {
           state.responding = responding;
-        });
-      },
-      
-      setInterruptMessage: (threadId: string, messageId: string | null) => {
-        set((state) => {
-          const thread = state.threads.get(threadId);
-          if (thread) {
-            // 🔥 使用不可变更新：保持一致性
-            const newUi = { ...thread.ui, lastInterruptMessageId: messageId };
-            const newThread = { ...thread, ui: newUi };
-            const newThreads = new Map(state.threads);
-            newThreads.set(threadId, newThread);
-            return { ...state, threads: newThreads };
-          }
-        });
-      },
-      
-      setWaitingForFeedback: (threadId: string, messageId: string | null) => {
-        set((state) => {
-          const thread = state.threads.get(threadId);
-          if (thread) {
-            // 🔥 使用不可变更新：保持一致性
-            const newUi = { ...thread.ui, waitingForFeedbackMessageId: messageId };
-            const newThread = { ...thread, ui: newUi };
-            const newThreads = new Map(state.threads);
-            newThreads.set(threadId, newThread);
-            return { ...state, threads: newThreads };
-          }
         });
       },
       
@@ -990,8 +952,6 @@ export const useWorkspaceActions = () => {
       state.setWorkspaceState({ historyVisible: visible }),
     setPodcastVisible: (visible: boolean) =>
       state.setWorkspaceState({ podcastVisible: visible }),
-    setDebugVisible: (visible: boolean) =>
-      state.setWorkspaceState({ debugVisible: visible }),
     setFeedback: (feedback: { option: { text: string; value: string } } | null) =>
       state.setWorkspaceState({ feedback }),
     clearFeedback: () => state.setWorkspaceState({ feedback: null }),
