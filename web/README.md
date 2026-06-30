@@ -44,7 +44,6 @@ NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
 
 # 可选配置
-GITHUB_OAUTH_TOKEN=your-github-token
 AMPLITUDE_API_KEY=your-amplitude-key
 ```
 
