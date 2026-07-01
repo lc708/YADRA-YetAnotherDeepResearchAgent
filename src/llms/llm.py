@@ -158,6 +158,5 @@ def get_configured_llm_models() -> dict[str, list[str]]:
         return {}
 
 
-# In the future, we will use reasoning_llm and vl_llm for different purposes
+# In the future, we will use reasoning_llm for different purposes
 # reasoning_llm = get_llm_by_type("reasoning")
-# vl_llm = get_llm_by_type("vision")
