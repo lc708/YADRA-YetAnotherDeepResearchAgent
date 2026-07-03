@@ -66,14 +66,11 @@ interface ThreadState {
   metadata: {
     researchIds: string[];
     ongoingResearchId: string | null;
-    openResearchId: string | null;
     planMessageIds: Map<string, string>; // researchId -> planMessageId
     reportMessageIds: Map<string, string>; // researchId -> reportMessageId
     activityMessageIds: Map<string, string[]>; // researchId -> activityMessageIds[]
   };
   ui: {
-    lastInterruptMessageId: string | null;
-    waitingForFeedbackMessageId: string | null;
     currentInterrupt: {
       interruptId: string;
       message: string;
@@ -146,17 +143,6 @@ type UnifiedStore = {
   // 全局 UI 状态
   responding: boolean;
   
-  // 工作区状态
-  workspace: {
-    currentTraceId: string | null;
-    conversationVisible: boolean;
-    debugVisible: boolean;
-    feedback: { option: { text: string; value: string } } | null;
-    artifactsVisible: boolean;
-    historyVisible: boolean;
-    podcastVisible: boolean;
-  };
-  
   // 线程管理 - 新架构方法
   createThread: (threadId: string) => ThreadState;
   getThread: (threadId: string) => ThreadState | null;
@@ -185,22 +171,16 @@ type UnifiedStore = {
   
   // 研究操作
   setOngoingResearch: (threadId: string, researchId: string | null) => void;
-  openResearch: (threadId: string, researchId: string | null) => void;
   addResearch: (threadId: string, researchId: string, planMessageId: string) => void;
   setResearchReport: (threadId: string, researchId: string, reportMessageId: string) => void;
   
   // UI 操作
   setResponding: (responding: boolean) => void;
-  setInterruptMessage: (threadId: string, messageId: string | null) => void;
-  setWaitingForFeedback: (threadId: string, messageId: string | null) => void;
   
   // 🔥 添加interrupt事件管理方法
   setCurrentInterrupt: (threadId: string, interruptData: ThreadState['ui']['currentInterrupt']) => void;
   getCurrentInterrupt: (threadId: string) => ThreadState['ui']['currentInterrupt'];
   clearCurrentInterrupt: (threadId: string) => void;
-  
-  // 工作区操作
-  setWorkspaceState: (update: Partial<UnifiedStore['workspace']>) => void;
   
   // 派生数据
   getArtifacts: (threadId: string) => Artifact[];
@@ -229,15 +209,6 @@ export const useUnifiedStore = create<UnifiedStore>()(
       urlParamToThreadId: new Map() as Map<string, string>,
       sessionState: null as UnifiedStore['sessionState'],
       responding: false,
-      workspace: {
-        currentTraceId: null,
-        conversationVisible: true,
-        debugVisible: false,
-        feedback: null,
-        artifactsVisible: true,
-        historyVisible: false,
-        podcastVisible: false,
-      },
       
       // 线程管理
       createThread: (threadId: string) => {
@@ -247,14 +218,11 @@ export const useUnifiedStore = create<UnifiedStore>()(
           metadata: {
             researchIds: [],
             ongoingResearchId: null,
-            openResearchId: null,
             planMessageIds: new Map(),
             reportMessageIds: new Map(),
             activityMessageIds: new Map(),
           },
           ui: {
-            lastInterruptMessageId: null,
-            waitingForFeedbackMessageId: null,
             currentInterrupt: null,
           },
         };
@@ -281,14 +249,11 @@ export const useUnifiedStore = create<UnifiedStore>()(
               metadata: {
                 researchIds: [],
                 ongoingResearchId: null,
-                openResearchId: null,
                 planMessageIds: new Map(),
                 reportMessageIds: new Map(),
                 activityMessageIds: new Map(),
               },
               ui: {
-                lastInterruptMessageId: null,
-                waitingForFeedbackMessageId: null,
                 currentInterrupt: null,
               },
             };
@@ -391,20 +356,6 @@ export const useUnifiedStore = create<UnifiedStore>()(
         });
       },
       
-      openResearch: (threadId: string, researchId: string | null) => {
-        set((state) => {
-          const thread = state.threads.get(threadId);
-          if (thread) {
-            // 🔥 使用不可变更新：保持一致性
-            const newMetadata = { ...thread.metadata, openResearchId: researchId };
-            const newThread = { ...thread, metadata: newMetadata };
-            const newThreads = new Map(state.threads);
-            newThreads.set(threadId, newThread);
-            return { ...state, threads: newThreads };
-          }
-        });
-      },
-      
       addResearch: (threadId: string, researchId: string, planMessageId: string) => {
         set((state) => {
           const thread = state.threads.get(threadId);
@@ -465,34 +416,6 @@ export const useUnifiedStore = create<UnifiedStore>()(
         });
       },
       
-      setInterruptMessage: (threadId: string, messageId: string | null) => {
-        set((state) => {
-          const thread = state.threads.get(threadId);
-          if (thread) {
-            // 🔥 使用不可变更新：保持一致性
-            const newUi = { ...thread.ui, lastInterruptMessageId: messageId };
-            const newThread = { ...thread, ui: newUi };
-            const newThreads = new Map(state.threads);
-            newThreads.set(threadId, newThread);
-            return { ...state, threads: newThreads };
-          }
-        });
-      },
-      
-      setWaitingForFeedback: (threadId: string, messageId: string | null) => {
-        set((state) => {
-          const thread = state.threads.get(threadId);
-          if (thread) {
-            // 🔥 使用不可变更新：保持一致性
-            const newUi = { ...thread.ui, waitingForFeedbackMessageId: messageId };
-            const newThread = { ...thread, ui: newUi };
-            const newThreads = new Map(state.threads);
-            newThreads.set(threadId, newThread);
-            return { ...state, threads: newThreads };
-          }
-        });
-      },
-      
       // 🔥 添加interrupt事件管理方法
       setCurrentInterrupt: (threadId: string, interruptData: ThreadState['ui']['currentInterrupt']) => {
         set((state) => {
@@ -523,17 +446,6 @@ export const useUnifiedStore = create<UnifiedStore>()(
             newThreads.set(threadId, newThread);
             return { ...state, threads: newThreads };
           }
-        });
-      },
-      
-      // 工作区操作
-      setWorkspaceState: (update: Partial<UnifiedStore['workspace']>) => {
-        set((state) => {
-          // 🔥 使用不可变更新：创建新的workspace对象
-          return {
-            ...state,
-            workspace: { ...state.workspace, ...update }
-          };
         });
       },
       
@@ -850,47 +762,6 @@ export const useThreadArtifacts = (threadIdOrUrlParam?: string) => {
   });
 };
 
-export const useWorkspaceState = () => {
-  return useUnifiedStore((state) => state.workspace);
-};
-
-// 兼容旧 API 的 wrapper
-export const useMessageIds = (threadIdOrUrlParam?: string) => {
-  // 🔥 修复无限循环：将逻辑移到store层的selector中，避免Map对象依赖
-  return useUnifiedStore(
-    useShallow((state) => {
-      // 在selector内部解析thread_id，避免Map对象作为依赖项
-      let actualThreadId = threadIdOrUrlParam;
-      
-      if (threadIdOrUrlParam) {
-        // 首先尝试作为thread_id直接使用
-        if (!state.threads.has(threadIdOrUrlParam)) {
-          // 然后尝试作为URL参数映射
-          const mappedThreadId = state.urlParamToThreadId.get(threadIdOrUrlParam);
-          if (mappedThreadId && state.threads.has(mappedThreadId)) {
-            actualThreadId = mappedThreadId;
-          }
-        }
-      } else {
-        actualThreadId = state.currentThreadId || undefined;
-      }
-      
-      if (!actualThreadId) return [];
-      const thread = state.threads.get(actualThreadId);
-      return thread?.messages.map((m) => m.id) || [];
-    })
-  );
-};
-
-export const useMessage = (messageId: string, threadId?: string) => {
-  return useUnifiedStore((state) => {
-    const actualThreadId = threadId || state.currentThreadId;
-    if (!actualThreadId) return undefined;
-    const thread = state.threads.get(actualThreadId);
-    return thread?.messages.find(m => m.id === messageId);
-  });
-};
-
 // 导出便捷方法
 export const setCurrentThreadId = (threadId: string) => {
   useUnifiedStore.getState().setCurrentThread(threadId);
@@ -945,59 +816,6 @@ export const setResponding = (responding: boolean) => {
   useUnifiedStore.getState().setResponding(responding);
 };
 
-export const openResearch = (researchId: string | null) => {
-  const state = useUnifiedStore.getState();
-  const currentThreadId = state.currentThreadId;
-  
-  if (currentThreadId) {
-    state.openResearch(currentThreadId, researchId);
-  }
-};
-
-export const closeResearch = () => {
-  openResearch(null);
-};
-
-// 工作区 UI 状态便捷 hooks
-export const useConversationPanelVisible = () => {
-  return useUnifiedStore((state) => state.workspace.conversationVisible);
-};
-
-export const useArtifactsPanelVisible = () => {
-  return useUnifiedStore((state) => state.workspace.artifactsVisible);
-};
-
-export const useHistoryPanelVisible = () => {
-  return useUnifiedStore((state) => state.workspace.historyVisible);
-};
-
-export const usePodcastPanelVisible = () => {
-  return useUnifiedStore((state) => state.workspace.podcastVisible);
-};
-
-export const useWorkspaceFeedback = () => {
-  return useUnifiedStore((state) => state.workspace.feedback);
-};
-
-// 工作区操作便捷 hooks
-export const useWorkspaceActions = () => {
-  return useUnifiedStore((state) => ({
-    setConversationVisible: (visible: boolean) =>
-      state.setWorkspaceState({ conversationVisible: visible }),
-    setArtifactsVisible: (visible: boolean) =>
-      state.setWorkspaceState({ artifactsVisible: visible }),
-    setHistoryVisible: (visible: boolean) =>
-      state.setWorkspaceState({ historyVisible: visible }),
-    setPodcastVisible: (visible: boolean) =>
-      state.setWorkspaceState({ podcastVisible: visible }),
-    setDebugVisible: (visible: boolean) =>
-      state.setWorkspaceState({ debugVisible: visible }),
-    setFeedback: (feedback: { option: { text: string; value: string } } | null) =>
-      state.setWorkspaceState({ feedback }),
-    clearFeedback: () => state.setWorkspaceState({ feedback: null }),
-  }));
-};
-
 // 🚀 新增：业务状态Hook接口
 export const useCurrentPlan = (threadIdOrUrlParam?: string) => {
   // 🔥 修复无限循环：使用useShallow确保引用稳定性
@@ -1046,54 +864,6 @@ export const useCurrentPlan = (threadIdOrUrlParam?: string) => {
   );
 };
 
-export const useToolCallResults = (threadIdOrUrlParam?: string, toolName?: string) => {
-  // 🔥 修复无限循环：将逻辑移到store层的selector中，避免Map对象依赖
-  return useUnifiedStore((state) => {
-    // 在selector内部解析thread_id，避免Map对象作为依赖项
-    let actualThreadId = threadIdOrUrlParam;
-    
-    if (threadIdOrUrlParam) {
-      // 首先尝试作为thread_id直接使用
-      if (!state.threads.has(threadIdOrUrlParam)) {
-        // 然后尝试作为URL参数映射
-        const mappedThreadId = state.urlParamToThreadId.get(threadIdOrUrlParam);
-        if (mappedThreadId && state.threads.has(mappedThreadId)) {
-          actualThreadId = mappedThreadId;
-        }
-      }
-    } else {
-      actualThreadId = state.currentThreadId || undefined;
-    }
-    
-    if (!actualThreadId) return [];
-    return state.getToolCallResults(actualThreadId, toolName);
-  });
-};
-
-export const useResearchProgress = (threadIdOrUrlParam?: string) => {
-  // 🔥 修复无限循环：将逻辑移到store层的selector中，避免Map对象依赖
-  return useUnifiedStore((state) => {
-    // 在selector内部解析thread_id，避免Map对象作为依赖项
-    let actualThreadId = threadIdOrUrlParam;
-    
-    if (threadIdOrUrlParam) {
-      // 首先尝试作为thread_id直接使用
-      if (!state.threads.has(threadIdOrUrlParam)) {
-        // 然后尝试作为URL参数映射
-        const mappedThreadId = state.urlParamToThreadId.get(threadIdOrUrlParam);
-        if (mappedThreadId && state.threads.has(mappedThreadId)) {
-          actualThreadId = mappedThreadId;
-        }
-      }
-    } else {
-      actualThreadId = state.currentThreadId || undefined;
-    }
-    
-    if (!actualThreadId) return { stage: 'idle', progress: 0, currentActivity: null };
-    return state.getResearchProgress(actualThreadId);
-  });
-};
-
 export const useFinalReport = (threadIdOrUrlParam?: string) => {
   // 🔥 修复无限循环：将逻辑移到store层的selector中，避免Map对象依赖
   return useUnifiedStore((state) => {
@@ -1115,30 +885,6 @@ export const useFinalReport = (threadIdOrUrlParam?: string) => {
     
     if (!actualThreadId) return null;
     return state.getFinalReport(actualThreadId);
-  });
-};
-
-export const useResearchActivities = (threadIdOrUrlParam?: string) => {
-  // 🔥 修复无限循环：将逻辑移到store层的selector中，避免Map对象依赖
-  return useUnifiedStore((state) => {
-    // 在selector内部解析thread_id，避免Map对象作为依赖项
-    let actualThreadId = threadIdOrUrlParam;
-    
-    if (threadIdOrUrlParam) {
-      // 首先尝试作为thread_id直接使用
-      if (!state.threads.has(threadIdOrUrlParam)) {
-        // 然后尝试作为URL参数映射
-        const mappedThreadId = state.urlParamToThreadId.get(threadIdOrUrlParam);
-        if (mappedThreadId && state.threads.has(mappedThreadId)) {
-          actualThreadId = mappedThreadId;
-        }
-      }
-    } else {
-      actualThreadId = state.currentThreadId || undefined;
-    }
-    
-    if (!actualThreadId) return [];
-    return state.getResearchActivities(actualThreadId);
   });
 };
 
