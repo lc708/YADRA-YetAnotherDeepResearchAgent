@@ -274,6 +274,31 @@ async def test_continue_research_stream_rejects_unknown_url_param():
 
 
 @pytest.mark.asyncio
+async def test_continue_research_stream_yields_events_from_langgraph_processor():
+    """Happy-path continue stream must forward processor events to SSE callers."""
+    session_repo = MagicMock()
+    session = MagicMock(id=42, thread_id="thread-abc")
+    session_repo.get_session_by_thread_id = AsyncMock(return_value=session)
+    session_repo.create_execution_record = AsyncMock(
+        return_value=MagicMock(execution_id="exec-1")
+    )
+    session_repo.get_session_config = AsyncMock(return_value=None)
+
+    service = ResearchStreamService(session_repo)
+    service._get_graph = AsyncMock(return_value=MagicMock())
+
+    async def emit_events(graph, initial_state, thread_id, execution_id, request, execution_type="continue"):
+        yield {"event": "message_chunk", "data": json.dumps({"content": "partial"})}
+        yield {"event": "complete", "data": json.dumps({"status": "done"})}
+
+    service._process_langgraph_stream = emit_events
+
+    events = [event async for event in service.continue_research_stream(_continue_request())]
+
+    assert [event["event"] for event in events] == ["message_chunk", "complete"]
+
+
+@pytest.mark.asyncio
 async def test_continue_research_stream_rejects_unknown_thread_id():
     session_repo = MagicMock()
     session_repo.get_session_by_thread_id = AsyncMock(return_value=None)

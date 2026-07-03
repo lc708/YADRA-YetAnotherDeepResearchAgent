@@ -227,6 +227,33 @@ async def test_create_research_stream_uses_nested_research_config_when_present()
 
 
 @pytest.mark.asyncio
+async def test_create_research_stream_yields_events_from_langgraph_processor():
+    """Happy-path create stream must forward processor events to SSE callers."""
+    session_repo = MagicMock()
+    created_session = MagicMock(id=1, thread_id="new-thread")
+    session_repo.create_session = AsyncMock(
+        return_value=(created_session, "url-slug")
+    )
+    session_repo.create_execution_record = AsyncMock(
+        return_value=MagicMock(execution_id="exec-1")
+    )
+
+    service = ResearchStreamService(session_repo)
+    service._get_graph = AsyncMock(return_value=MagicMock())
+
+    async def emit_events(graph, initial_state, thread_id, execution_id, request, execution_type="continue"):
+        yield {"event": "metadata", "data": json.dumps({"thread_id": thread_id})}
+        yield {"event": "complete", "data": json.dumps({"status": "done"})}
+
+    service._process_langgraph_stream = emit_events
+
+    events = [event async for event in service.create_research_stream(_create_request())]
+
+    assert [event["event"] for event in events] == ["metadata", "complete"]
+    assert json.loads(events[0]["data"])["thread_id"] == session_repo.create_session.await_args.kwargs["thread_id"]
+
+
+@pytest.mark.asyncio
 async def test_get_graph_caches_langgraph_instance(monkeypatch):
     """LangGraph instance must be created once and reused across stream requests."""
     mock_graph = MagicMock()

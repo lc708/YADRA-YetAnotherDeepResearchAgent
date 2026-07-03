@@ -26,3 +26,26 @@ def test_repair_json_output_repairs_trailing_comma():
     content = '{"items": [1, 2,],}'
     result = repair_json_output(content)
     assert json.loads(result) == {"items": [1, 2]}
+
+
+def test_repair_json_output_strips_ts_code_fence():
+    content = '```ts\n{"value": 42}\n```'
+    result = repair_json_output(content)
+    assert json.loads(result) == {"value": 42}
+
+
+def test_repair_json_output_returns_stripped_content_when_repair_fails(monkeypatch, caplog):
+    """Malformed fenced JSON must not crash callers; stripped inner content is returned."""
+    import src.utils.json_utils as json_utils
+
+    def boom(_content):
+        raise ValueError("cannot repair")
+
+    monkeypatch.setattr(json_utils.json_repair, "loads", boom)
+    content = '```json\n{not valid}\n```'
+
+    with caplog.at_level("WARNING"):
+        result = repair_json_output(content)
+
+    assert result == "\n{not valid}\n"
+    assert "JSON repair failed" in caplog.text

@@ -412,3 +412,106 @@ async def test_handle_non_stream_ask_rejects_unsupported_ask_type():
 
     assert exc.value.status_code == 400
     assert "不支持的ask_type" in exc.value.detail
+
+
+def _initial_request(**overrides):
+    data = {
+        "question": "What is quantum computing?",
+        "ask_type": "initial",
+        "frontend_uuid": "uuid-1",
+        "visitor_id": "visitor-1",
+        "config": {"model": {"model_name": "claude-haiku-4-5", "provider": "anthropic"}},
+    }
+    data.update(overrides)
+    return ResearchAskRequest(**data)
+
+
+@pytest.mark.asyncio
+async def test_create_initial_session_persists_parsed_config():
+    """Stream/non-stream initial flows must create sessions with parsed research/model/output config."""
+    session_repo = MagicMock()
+    created_session = MagicMock(id=7, thread_id="thread-7")
+    session_repo.create_session = AsyncMock(return_value=(created_session, "slug-7"))
+    service = ResearchAskService(session_repo=session_repo)
+
+    session_data, thread_id, url_param = await service._create_initial_session(
+        _initial_request()
+    )
+
+    kwargs = session_repo.create_session.await_args.kwargs
+    assert kwargs["initial_question"] == "What is quantum computing?"
+    assert kwargs["model_config"] == {
+        "model_name": "claude-haiku-4-5",
+        "provider": "anthropic",
+    }
+    assert session_data is created_session
+    assert thread_id == kwargs["thread_id"]
+    assert url_param == "slug-7"
+
+
+@pytest.mark.asyncio
+async def test_handle_initial_ask_creates_session_and_starts_background_task(monkeypatch):
+    """Non-stream initial ask must return navigation metadata and schedule background research."""
+    session_repo = MagicMock()
+    created_session = MagicMock(id=1, thread_id="thread-1")
+    session_repo.create_session = AsyncMock(return_value=(created_session, "slug-1"))
+
+    scheduled = {}
+
+    def capture_task(coro):
+        scheduled["coro"] = coro
+        coro.close()
+        return MagicMock()
+
+    monkeypatch.setattr("src.server.research_create_api.asyncio.create_task", capture_task)
+
+    service = ResearchAskService(session_repo=session_repo)
+    response = await service._handle_initial_ask(_initial_request())
+
+    assert response.ask_type == "initial"
+    assert response.url_param == "slug-1"
+    assert response.session_id == 1
+    assert response.workspace_url == "/workspace?id=slug-1"
+    assert response.thread_id == session_repo.create_session.await_args.kwargs["thread_id"]
+    assert "coro" in scheduled
+
+
+@pytest.mark.asyncio
+async def test_handle_followup_ask_success_starts_followup_task(monkeypatch):
+    """Non-stream followup must validate session identity and schedule followup background work."""
+    session_repo = MagicMock()
+    session_repo.get_session_overview = AsyncMock(
+        return_value={"id": 42, "thread_id": "thread-abc"}
+    )
+
+    scheduled = {}
+
+    def capture_task(coro):
+        scheduled["coro"] = coro
+        coro.close()
+        return MagicMock()
+
+    monkeypatch.setattr("src.server.research_create_api.asyncio.create_task", capture_task)
+
+    service = ResearchAskService(session_repo=session_repo)
+    response = await service._handle_followup_ask(_followup_request())
+
+    assert response.ask_type == "followup"
+    assert response.session_id == 42
+    assert response.thread_id == "thread-abc"
+    assert response.url_param == "test-slug"
+    assert response.workspace_url == "/workspace?id=test-slug"
+    assert "coro" in scheduled
+
+
+def test_ask_research_routes_stream_and_non_stream_modes():
+    service = _service()
+
+    stream_result = service.ask_research(_initial_request(), stream=True)
+    assert hasattr(stream_result, "__aiter__")
+
+    non_stream_result = service.ask_research(_initial_request(), stream=False)
+    import asyncio
+
+    assert asyncio.iscoroutine(non_stream_result)
+    non_stream_result.close()
