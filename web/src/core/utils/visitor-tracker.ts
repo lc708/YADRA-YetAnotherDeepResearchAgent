@@ -59,22 +59,6 @@ export function resetVisitorId(): string {
 }
 
 /**
- * 检查是否为首次访问（没有访客ID）
- */
-export function isFirstTimeVisitor(): boolean {
-  if (typeof window === 'undefined') {
-    return true;
-  }
-
-  try {
-    const existingId = localStorage.getItem(VISITOR_ID_KEY);
-    return !existingId || !isValidUUID(existingId);
-  } catch (error) {
-    return true;
-  }
-}
-
-/**
  * 获取访客ID创建时间（如果可用）
  */
 export function getVisitorIdCreatedAt(): Date | null {
