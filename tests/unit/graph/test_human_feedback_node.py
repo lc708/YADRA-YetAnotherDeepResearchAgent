@@ -111,6 +111,14 @@ def test_human_feedback_cancel_ends_workflow(monkeypatch):
     assert "计划已取消" in result.update["messages"][0].content
 
 
+def test_human_feedback_skip_research_with_invalid_plan_still_routes_to_reporter(monkeypatch):
+    """Invalid plan JSON during skip_research must not crash the workflow."""
+    monkeypatch.setattr("src.graph.nodes.interrupt", lambda value: "[SKIP_RESEARCH]")
+    result = human_feedback_node(_base_state(current_plan="not valid json"))
+    assert result.goto == "reporter"
+    assert result.update["skipped_research"] is True
+
+
 def test_human_feedback_unsupported_interrupt_raises(monkeypatch):
     monkeypatch.setattr("src.graph.nodes.interrupt", lambda value: "[UNKNOWN]")
     with pytest.raises(TypeError, match="not supported"):

@@ -504,7 +504,64 @@ async def test_handle_followup_ask_success_starts_followup_task(monkeypatch):
     assert "coro" in scheduled
 
 
-def test_ask_research_routes_stream_and_non_stream_modes():
+@pytest.mark.asyncio
+async def test_handle_non_stream_ask_wraps_unexpected_errors_as_500():
+    """Non-stream path must convert unexpected failures into HTTP 500."""
+    service = _service()
+    service._handle_initial_ask = AsyncMock(side_effect=RuntimeError("db unavailable"))
+
+    with pytest.raises(HTTPException) as exc:
+        await service._handle_non_stream_ask(_initial_request())
+
+    assert exc.value.status_code == 500
+    assert "研究询问失败" in exc.value.detail
+    assert "db unavailable" in exc.value.detail
+
+
+@pytest.mark.asyncio
+async def test_handle_stream_ask_rejects_unsupported_ask_type():
+    """Stream path must fail fast for unknown ask_type before session creation."""
+    service = _service()
+    request = ResearchAskRequest.model_construct(
+        question="test",
+        ask_type="unknown",
+        frontend_uuid="uuid-1",
+        visitor_id="visitor-1",
+        config={},
+    )
+
+    chunks = [chunk async for chunk in service._handle_stream_ask(request)]
+
+    assert any("event: error" in chunk for chunk in chunks)
+    payload = json.loads(
+        next(chunk.split("data: ", 1)[1].strip() for chunk in chunks if chunk.startswith("data: "))
+    )
+    assert payload["error_code"] == "STREAM_ERROR"
+    assert "Unsupported ask_type" in payload["error_message"]
+
+
+@pytest.mark.asyncio
+async def test_handle_stream_ask_reports_missing_database_url(monkeypatch):
+    """Stream path must surface missing DATABASE_URL as SSE error, not hang."""
+    session_data = MagicMock(id=1, thread_id="thread-1")
+    service = ResearchAskService(session_repo=MagicMock())
+    service._create_initial_session = AsyncMock(
+        return_value=(session_data, "thread-1", "slug-1")
+    )
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+
+    chunks = [chunk async for chunk in service._handle_stream_ask(_initial_request())]
+
+    assert any("event: error" in chunk for chunk in chunks)
+    error_payload = json.loads(
+        next(
+            chunk.split("data: ", 1)[1].strip()
+            for chunk in chunks
+            if chunk.startswith("data: ") and "STREAM_ERROR" in chunk
+        )
+    )
+    assert "DATABASE_URL not configured" in error_payload["error_message"]
+
     service = _service()
 
     stream_result = service.ask_research(_initial_request(), stream=True)

@@ -262,3 +262,38 @@ async def test_followup_task_marks_execution_error_on_stream_error(monkeypatch):
     update_kwargs = session_repo.update_execution_record.await_args.kwargs
     assert update_kwargs["status"] == ExecutionStatus.ERROR
     assert update_kwargs["error_message"] == "graph exploded"
+
+
+@pytest.mark.asyncio
+async def test_followup_task_marks_execution_error_on_stream_error_raw_string(monkeypatch):
+    """Non-JSON followup stream errors must still be persisted to execution records."""
+    session_repo = MagicMock()
+    execution = MagicMock(execution_id="exec-followup-raw")
+    session_repo.create_execution_record = AsyncMock(return_value=execution)
+    session_repo.update_execution_record = AsyncMock()
+    session_repo.get_session_by_thread_id = AsyncMock(
+        return_value=MagicMock(url_param="slug-2")
+    )
+
+    mock_stream_service = MagicMock()
+    mock_stream_service.continue_research_stream = _immediate_error_stream_raw
+    monkeypatch.setattr(
+        "src.server.research_stream_api.ResearchStreamService",
+        MagicMock(return_value=mock_stream_service),
+    )
+
+    service = ResearchAskService(session_repo=session_repo)
+    await service._start_followup_research_task(
+        thread_id="thread-2",
+        session_id=2,
+        question="Follow up",
+        frontend_uuid="uuid-2",
+        visitor_id="visitor-2",
+        research_config={},
+        model_config={},
+        output_config={},
+    )
+
+    update_kwargs = session_repo.update_execution_record.await_args.kwargs
+    assert update_kwargs["status"] == ExecutionStatus.ERROR
+    assert update_kwargs["error_message"] == "plain failure text"

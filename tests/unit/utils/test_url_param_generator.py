@@ -61,6 +61,26 @@ class TestGenerateUrlParam:
         assert generator.validate_url_param(result)
         assert "liang" in result or "zi" in result or "ji" in result
 
+    def test_chinese_to_pinyin_returns_empty_for_blank_text(self, generator):
+        assert generator.chinese_to_pinyin("") == ""
+        assert generator.chinese_to_pinyin("   ") == ""
+
+    def test_generate_url_param_falls_back_when_no_keywords_extracted(
+        self, generator, monkeypatch
+    ):
+        monkeypatch.setattr(generator, "extract_keywords", lambda text, max_keywords=6: [])
+        monkeypatch.setattr(generator, "generate_random_suffix", lambda length=8: "fallback1")
+        result = generator.generate_url_param("the and or")
+        assert result == "question-fallback1"
+
+    def test_generate_url_param_truncates_overlong_keyword_part(self, generator, monkeypatch):
+        monkeypatch.setattr(generator, "generate_random_suffix", lambda length=8: "short123")
+        long_question = "analysis " * 30
+        result = generator.generate_url_param(long_question, max_length=30)
+        assert len(result) <= 30
+        assert result.endswith("-short123")
+        assert generator.validate_url_param(result)
+
     def test_module_generate_url_param_matches_instance(self, generator, monkeypatch):
         monkeypatch.setattr(
             URLParamGenerator,
