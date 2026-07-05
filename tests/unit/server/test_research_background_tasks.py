@@ -297,3 +297,71 @@ async def test_followup_task_marks_execution_error_on_stream_error_raw_string(mo
     update_kwargs = session_repo.update_execution_record.await_args.kwargs
     assert update_kwargs["status"] == ExecutionStatus.ERROR
     assert update_kwargs["error_message"] == "plain failure text"
+
+
+@pytest.mark.asyncio
+async def test_background_task_swallows_execution_update_failure(monkeypatch):
+    """Background task must not raise when persisting ERROR status also fails."""
+    session_repo = MagicMock()
+    session_repo.create_execution_record = AsyncMock(
+        side_effect=RuntimeError("create execution failed")
+    )
+    session_repo.update_execution_record = AsyncMock(side_effect=OSError("db down"))
+
+    monkeypatch.setattr(
+        "src.server.research_stream_api.ResearchStreamService",
+        MagicMock(return_value=MagicMock()),
+    )
+
+    service = ResearchAskService(session_repo=session_repo)
+    await service._start_background_research_task(
+        thread_id="thread-fail",
+        session_id=1,
+        question="What is AI?",
+        frontend_uuid="uuid-1",
+        visitor_id="visitor-1",
+        research_config={},
+        model_config={},
+        output_config={},
+        existing_session_id=1,
+        existing_thread_id="thread-fail",
+    )
+
+    session_repo.update_execution_record.assert_awaited()
+    assert (
+        session_repo.update_execution_record.await_args.kwargs["execution_id"]
+        == "thread-fail"
+    )
+
+
+@pytest.mark.asyncio
+async def test_followup_task_swallows_execution_update_failure(monkeypatch):
+    """Followup background task must not raise when ERROR persistence fails."""
+    session_repo = MagicMock()
+    session_repo.create_execution_record = AsyncMock(
+        side_effect=RuntimeError("create execution failed")
+    )
+    session_repo.update_execution_record = AsyncMock(side_effect=OSError("db down"))
+
+    monkeypatch.setattr(
+        "src.server.research_stream_api.ResearchStreamService",
+        MagicMock(return_value=MagicMock()),
+    )
+
+    service = ResearchAskService(session_repo=session_repo)
+    await service._start_followup_research_task(
+        thread_id="thread-followup-fail",
+        session_id=2,
+        question="Follow up",
+        frontend_uuid="uuid-2",
+        visitor_id="visitor-2",
+        research_config={},
+        model_config={},
+        output_config={},
+    )
+
+    session_repo.update_execution_record.assert_awaited()
+    assert (
+        session_repo.update_execution_record.await_args.kwargs["execution_id"]
+        == "thread-followup-fail"
+    )

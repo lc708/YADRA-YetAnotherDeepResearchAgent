@@ -1,5 +1,6 @@
 # Copyright (c) 2025 YADRA
 
+import asyncio
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -10,7 +11,9 @@ from starlette.requests import Request
 from src.server.research_create_api import (
     ResearchAskRequest,
     ResearchAskResponse,
+    ResearchAskService,
     ask_research,
+    get_research_ask_service,
     get_session_repository_dependency,
 )
 
@@ -238,6 +241,43 @@ async def test_ask_research_reraises_http_exceptions():
         )
 
     assert exc.value.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_get_research_ask_service_returns_bound_service_instance():
+    mock_repo = MagicMock()
+    service = await get_research_ask_service(session_repo=mock_repo)
+
+    assert isinstance(service, ResearchAskService)
+    assert service.session_repo is mock_repo
+
+
+@pytest.mark.asyncio
+async def test_ask_research_stream_emits_sse_heartbeat_keepalive(monkeypatch):
+    """SSE route must emit comment heartbeats to keep proxies from closing idle streams."""
+    payload = _initial_payload()
+
+    async def fake_stream(_request):
+        yield "event: navigation\ndata: {}\n\n"
+        yield "event: chunk\ndata: {}\n\n"
+
+    mock_service = MagicMock()
+    mock_service.ask_research = MagicMock(return_value=fake_stream(payload))
+
+    times = iter([0.0, 35.0])
+    loop = asyncio.get_event_loop()
+    monkeypatch.setattr(loop, "time", lambda: next(times, 35.0))
+
+    response = await ask_research(
+        payload=payload,
+        http_request=_http_request(),
+        stream=True,
+        current_user={"user_id": "user-1"},
+        service=mock_service,
+    )
+
+    body = "".join([chunk async for chunk in response.body_iterator])
+    assert ": heartbeat" in body
 
 
 @pytest.mark.asyncio

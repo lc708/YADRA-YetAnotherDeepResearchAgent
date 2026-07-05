@@ -1,10 +1,33 @@
 # Copyright (c) 2025 YADRA
 
 
-import pytest
 import logging
+
+import pytest
 from unittest.mock import Mock, call, patch, MagicMock
-from src.tools.decorators import LoggedToolMixin, create_logged_tool
+from src.tools.decorators import LoggedToolMixin, create_logged_tool, log_io
+
+
+class TestLogIoDecorator:
+    def test_log_io_logs_parameters_and_return_value(self, caplog):
+        @log_io
+        def sample_tool(query, limit=5):
+            return f"result-{query}-{limit}"
+
+        with caplog.at_level(logging.INFO, logger="src.tools.decorators"):
+            assert sample_tool("hello", limit=3) == "result-hello-3"
+
+        assert "Tool sample_tool called with parameters: hello, limit=3" in caplog.text
+        assert "Tool sample_tool returned: result-hello-3" in caplog.text
+
+    def test_log_io_preserves_function_metadata(self):
+        @log_io
+        def documented_tool():
+            """Tool docstring."""
+            return "ok"
+
+        assert documented_tool.__name__ == "documented_tool"
+        assert documented_tool.__doc__ == "Tool docstring."
 
 
 class MockBaseTool:

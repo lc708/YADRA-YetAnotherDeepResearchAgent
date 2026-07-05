@@ -477,6 +477,20 @@ async def test_handle_initial_ask_creates_session_and_starts_background_task(mon
 
 
 @pytest.mark.asyncio
+async def test_handle_non_stream_ask_dispatches_followup():
+    """Non-stream dispatcher must route followup ask_type to _handle_followup_ask."""
+    service = _service()
+    expected = MagicMock()
+    service._handle_followup_ask = AsyncMock(return_value=expected)
+    request = _followup_request()
+
+    result = await service._handle_non_stream_ask(request)
+
+    assert result is expected
+    service._handle_followup_ask.assert_awaited_once_with(request)
+
+
+@pytest.mark.asyncio
 async def test_handle_followup_ask_success_starts_followup_task(monkeypatch):
     """Non-stream followup must validate session identity and schedule followup background work."""
     session_repo = MagicMock()

@@ -81,6 +81,31 @@ class TestGenerateUrlParam:
         assert result.endswith("-short123")
         assert generator.validate_url_param(result)
 
+    def test_generate_url_param_uses_question_prefix_when_keywords_strip_to_empty(
+        self, generator, monkeypatch
+    ):
+        """Punctuation-only keywords must fall back to question-<suffix> slugs."""
+        monkeypatch.setattr(generator, "extract_keywords", lambda text, max_keywords=6: ["!!!"])
+        monkeypatch.setattr(generator, "generate_random_suffix", lambda length=8: "sym12345")
+        result = generator.generate_url_param("!!! ???")
+        assert result == "question-sym12345"
+        assert generator.validate_url_param(result)
+
+    def test_generate_url_param_rebuilds_when_slug_too_short_after_cleanup(
+        self, generator, monkeypatch
+    ):
+        calls = {"n": 0}
+
+        def suffix(length=8):
+            calls["n"] += 1
+            return "x" if calls["n"] == 1 else "abcd1"
+
+        monkeypatch.setattr(generator, "extract_keywords", lambda text, max_keywords=6: ["a"])
+        monkeypatch.setattr(generator, "generate_random_suffix", suffix)
+        result = generator.generate_url_param("a", max_length=50)
+        assert result == "question-abcd1"
+        assert generator.validate_url_param(result)
+
     def test_module_generate_url_param_matches_instance(self, generator, monkeypatch):
         monkeypatch.setattr(
             URLParamGenerator,
