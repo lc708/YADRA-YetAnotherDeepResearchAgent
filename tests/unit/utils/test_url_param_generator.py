@@ -125,3 +125,29 @@ class TestExtractKeywords:
         keywords = generator.extract_keywords("the AI market trends in 2026")
         assert "the" not in keywords
         assert any(k in ("ai", "market", "trends") for k in keywords)
+
+
+class TestGenerateRandomSuffix:
+    def test_generate_random_suffix_honors_length(self, generator):
+        suffix = generator.generate_random_suffix(12)
+        assert len(suffix) == 12
+
+    def test_generate_random_suffix_avoids_ambiguous_characters(self, generator):
+        suffix = generator.generate_random_suffix(64)
+        assert "0" not in suffix
+        assert "O" not in suffix
+        assert "l" not in suffix
+        assert "I" not in suffix
+        assert re.match(r"^[a-zA-Z0-9]+$", suffix)
+
+
+class TestGenerateUrlParamEdgeCases:
+    def test_generate_url_param_truncates_final_slug_when_rebuilt_slug_exceeds_max_length(
+        self, generator, monkeypatch
+    ):
+        """Rebuilt question-<suffix> slugs must still respect max_length after composition."""
+        monkeypatch.setattr(generator, "extract_keywords", lambda text, max_keywords=6: ["a"])
+        monkeypatch.setattr(generator, "generate_random_suffix", lambda length=8: "12345678")
+        result = generator.generate_url_param("a", max_length=7)
+        assert len(result) <= 7
+        assert generator.validate_url_param(result)

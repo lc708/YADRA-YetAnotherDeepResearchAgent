@@ -156,3 +156,45 @@ def test_prompt_enhancer_node_returns_original_prompt_on_invoke_failure(monkeypa
     result = prompt_enhancer_node({"prompt": original})
 
     assert result["output"] == original
+
+
+@pytest.mark.parametrize(
+    "module_path,node_name,prompt_template",
+    [
+        ("src.prose.graph.prose_fix_node", "prose_fix_node", "prose/prose_fix"),
+        ("src.prose.graph.prose_improve_node", "prose_improve_node", "prose/prose_improver"),
+        ("src.prose.graph.prose_longer_node", "prose_longer_node", "prose/prose_longer"),
+        ("src.prose.graph.prose_shorter_node", "prose_shorter_node", "prose/prose_shorter"),
+        ("src.prose.graph.prose_zap_node", "prose_zap_node", "prose/prose_zap"),
+    ],
+)
+def test_prose_writer_nodes_use_langchain_core_messages(
+    module_path, node_name, prompt_template, monkeypatch
+):
+    """PR #28 migrated prose nodes to langchain_core.messages; each variant must still build System+Human messages."""
+    import importlib
+
+    module = importlib.import_module(module_path)
+    node_fn = getattr(module, node_name)
+    llm = _CapturingLLM()
+    monkeypatch.setattr(f"{module_path}.get_llm_by_type", lambda _type: llm)
+    monkeypatch.setattr(
+        f"{module_path}.get_prompt_template",
+        lambda _name: f"template:{prompt_template}",
+    )
+
+    result = node_fn(
+        {"content": "Draft paragraph text.", "command": "make it punchier"}
+        if node_name == "prose_zap_node"
+        else {"content": "Draft paragraph text."}
+    )
+
+    assert result["output"] == "generated output"
+    assert isinstance(llm.messages[0], SystemMessage)
+    assert isinstance(llm.messages[1], HumanMessage)
+    assert llm.messages[0].content == f"template:{prompt_template}"
+    if node_name == "prose_zap_node":
+        assert "Draft paragraph text." in llm.messages[1].content
+        assert "make it punchier" in llm.messages[1].content
+    else:
+        assert llm.messages[1].content == "The existing text is: Draft paragraph text."

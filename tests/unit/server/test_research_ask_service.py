@@ -343,6 +343,47 @@ async def test_handle_stream_ask_followup_forwards_interrupt_feedback(monkeypatc
 
 
 @pytest.mark.asyncio
+async def test_handle_stream_ask_logs_when_error_event_yield_fails(monkeypatch):
+    """If the client disconnects while emitting STREAM_ERROR, the handler must not crash."""
+    session_data = MagicMock(id=1, thread_id="thread-1")
+    service = ResearchAskService(session_repo=MagicMock())
+    service._create_initial_session = AsyncMock(
+        return_value=(session_data, "thread-1", "slug-1")
+    )
+
+    async def exploding_create_stream(*_args, **_kwargs):
+        raise RuntimeError("stream backend unavailable")
+        yield  # pragma: no cover
+
+    mock_stream_service = MagicMock()
+    mock_stream_service.create_research_stream = exploding_create_stream
+    monkeypatch.setattr(
+        "src.server.research_stream_api.ResearchStreamService",
+        MagicMock(return_value=mock_stream_service),
+    )
+    monkeypatch.setattr(
+        "src.server.research_create_api.get_session_repository",
+        MagicMock(return_value=MagicMock()),
+    )
+
+    logged_errors = []
+    monkeypatch.setattr(
+        "src.server.research_create_api.logger.error",
+        lambda message, **kwargs: logged_errors.append(message),
+    )
+
+    gen = service._handle_stream_ask(_initial_request())
+    try:
+        async for chunk in gen:
+            if chunk.startswith("event: error"):
+                await gen.athrow(GeneratorExit())
+    except (StopAsyncIteration, GeneratorExit):
+        pass
+
+    assert any("Failed to send error event" in message for message in logged_errors)
+
+
+@pytest.mark.asyncio
 async def test_handle_stream_ask_initial_emits_navigation_and_starts_create_stream(
     monkeypatch,
 ):
