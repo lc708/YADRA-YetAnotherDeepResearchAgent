@@ -21,7 +21,6 @@ TEAM_MEMBER_CONFIGRATIONS = {
             "Uses search engines and web crawlers to gather information from the internet. "
             "Outputs a Markdown report summarizing findings. Researcher can not do math or programming."
         ),
-        "is_optional": False,
     },
     "coder": {
         "name": "coder",
@@ -32,7 +31,6 @@ TEAM_MEMBER_CONFIGRATIONS = {
             "Executes Python or Bash commands, performs mathematical calculations, and outputs a Markdown report. "
             "Must be used for all mathematical computations."
         ),
-        "is_optional": True,
     },
 }
 
