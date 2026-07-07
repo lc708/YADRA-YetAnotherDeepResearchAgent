@@ -72,3 +72,42 @@ def test_performance_logger_emits_performance_event(restore_loguru_handlers):
     )
 
     assert "llm_call|claude-haiku-4-5|True" in buffer.getvalue()
+
+
+def test_performance_logger_emits_database_query_event(restore_loguru_handlers):
+    buffer = StringIO()
+    loguru_logger.remove()
+    loguru_logger.add(
+        buffer,
+        format="{extra[event]}|{extra[query_type]}|{extra[rows_affected]}",
+        level="INFO",
+    )
+
+    PerformanceLogger.log_database_query(
+        query_type="select",
+        duration_ms=12,
+        success=True,
+        rows_affected=3,
+    )
+
+    assert "database_query|select|3" in buffer.getvalue()
+
+
+def test_performance_logger_emits_api_request_event(restore_loguru_handlers):
+    buffer = StringIO()
+    loguru_logger.remove()
+    loguru_logger.add(
+        buffer,
+        format="{extra[event]}|{extra[method]}|{extra[status_code]}|{extra[user_id]}",
+        level="INFO",
+    )
+
+    PerformanceLogger.log_api_request(
+        endpoint="/api/research/ask",
+        method="POST",
+        status_code=200,
+        duration_ms=88,
+        user_id="user-123",
+    )
+
+    assert "api_request|POST|200|user-123" in buffer.getvalue()

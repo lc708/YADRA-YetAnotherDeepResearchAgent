@@ -166,3 +166,27 @@ def test_reask_node_restores_original_settings_and_clears_plan():
     assert result.update["final_report"] == ""
     assert result.update["auto_accepted_plan"] is True
     assert result.update["enable_background_investigation"] is False
+
+
+def test_human_feedback_accepted_with_enough_context_routes_to_reporter_on_auto_accept(
+    monkeypatch,
+):
+    """Auto-accepted plans with has_enough_context must bypass research_team."""
+    monkeypatch.setattr("src.graph.nodes.interrupt", lambda value: pytest.fail("interrupt"))
+    result = human_feedback_node(
+        _base_state(
+            auto_accepted_plan=True,
+            current_plan=_valid_plan_json(has_enough_context=True),
+        )
+    )
+    assert result.goto == "reporter"
+    assert result.update["plan_iterations"] == 1
+
+
+def test_human_feedback_accepted_invalid_json_routes_to_reporter(monkeypatch):
+    """Accepted plans increment iterations before JSON parse; invalid JSON falls back to reporter."""
+    monkeypatch.setattr("src.graph.nodes.interrupt", lambda value: "[ACCEPTED]")
+    result = human_feedback_node(
+        _base_state(current_plan="not valid json", plan_iterations=0)
+    )
+    assert result.goto == "reporter"
