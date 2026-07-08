@@ -64,8 +64,7 @@ def setup_session_mapping_schema():
                     "enable_background_investigation": true,
                     "report_style": "academic",
                     "enable_deep_thinking": false,
-                    "max_research_depth": 3,
-                    "enable_web_search": true
+                    "max_research_depth": 3
                 }',
                 
                 model_config JSONB NOT NULL DEFAULT '{
@@ -78,9 +77,7 @@ def setup_session_mapping_schema():
                 
                 output_config JSONB NOT NULL DEFAULT '{
                     "language": "zhCN",
-                    "output_format": "markdown",
-                    "include_citations": true,
-                    "include_artifacts": true
+                    "output_format": "markdown"
                 }',
                 
                 user_preferences JSONB DEFAULT '{}',
