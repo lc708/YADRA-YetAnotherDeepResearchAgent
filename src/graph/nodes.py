@@ -129,23 +129,18 @@ def projectmanager_node(
 
     if configurable.enable_deep_thinking:
         llm = get_llm_by_type("reasoning")
-    elif AGENT_LLM_MAP["projectmanager"] == "basic":
+    else:
         llm = get_llm_by_type("basic").with_structured_output(
             Plan,
             method="json_mode",
         )
-    else:
-        llm = get_llm_by_type(AGENT_LLM_MAP["projectmanager"])
 
     # if the plan iterations is greater than the max plan iterations, return the reporter node
     if plan_iterations >= configurable.max_plan_iterations:
         return Command(goto="reporter")
 
     full_response = ""
-    if (
-        AGENT_LLM_MAP["projectmanager"] == "basic"
-        and not configurable.enable_deep_thinking
-    ):
+    if not configurable.enable_deep_thinking:
         response = llm.invoke(messages)
         full_response = response.model_dump_json(indent=4, exclude_none=True)
     else:
@@ -447,8 +442,6 @@ def reask_node(state: State) -> Command[Literal["__end__"]]:
             "observations": [],  # Clear research results
             "plan_iterations": 0,  # Reset plan iterations
             "final_report": "",  # Clear final report
-            "early_termination": None,  # Clear early termination flag
-            "termination_reason": None,  # Clear termination reason
             "background_investigation_results": None,  # Clear background investigation results
             # Restore user settings from original input
             "auto_accepted_plan": (
