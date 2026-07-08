@@ -4,7 +4,7 @@ import pytest
 
 from src.config.tools import SearchEngine
 from src.tools import search as search_module
-from src.tools.search import LoggedTavilySearch, get_web_search_tool
+from src.tools.search import get_web_search_tool
 
 
 @pytest.mark.parametrize(
@@ -36,7 +36,7 @@ def test_get_web_search_tool_tavily_configures_result_limits(monkeypatch):
 
     def capture_tavily(**kwargs):
         captured.update(kwargs)
-        return LoggedTavilySearch.model_construct(**kwargs)
+        return object()
 
     monkeypatch.setattr(search_module, "LoggedTavilySearch", capture_tavily)
 
