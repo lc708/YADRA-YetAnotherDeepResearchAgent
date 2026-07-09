@@ -138,6 +138,29 @@ def test_projectmanager_appends_background_investigation_results(monkeypatch):
     assert any("background investigation results" in msg["content"] for msg in messages)
 
 
+def test_projectmanager_non_basic_llm_uses_streaming_response(monkeypatch):
+    """Non-basic projectmanager LLM types must use streaming instead of structured output."""
+    plan_json = _valid_plan().model_dump_json()
+
+    class _Chunk:
+        def __init__(self, content):
+            self.content = content
+
+    mock_llm = MagicMock()
+    mock_llm.stream.return_value = [_Chunk(plan_json)]
+    monkeypatch.setattr(
+        "src.graph.nodes.AGENT_LLM_MAP",
+        {"projectmanager": "reasoning"},
+    )
+    monkeypatch.setattr("src.graph.nodes.get_llm_by_type", lambda _type: mock_llm)
+
+    result = projectmanager_node(_state(), _config())
+
+    assert result.goto == "human_feedback"
+    mock_llm.stream.assert_called_once()
+    mock_llm.with_structured_output.assert_not_called()
+
+
 def test_projectmanager_deep_thinking_uses_streaming_response(monkeypatch):
     plan_json = _valid_plan().model_dump_json()
 
