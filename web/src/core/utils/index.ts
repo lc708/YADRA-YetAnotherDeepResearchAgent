@@ -17,7 +17,6 @@ export {
 export {
   getVisitorId,
   resetVisitorId,
-  isFirstTimeVisitor,
   getVisitorIdCreatedAt,
 } from "./visitor-tracker";
 
