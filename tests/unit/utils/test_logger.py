@@ -27,6 +27,16 @@ def test_structured_logger_includes_component_extra(restore_loguru_handlers):
     assert "test:component|hello world" in buffer.getvalue()
 
 
+def test_structured_logger_warning_emits_log(restore_loguru_handlers):
+    buffer = StringIO()
+    loguru_logger.remove()
+    loguru_logger.add(buffer, format="{level}|{extra[component]}|{message}", level="WARNING")
+
+    StructuredLogger("test:component").warning("ssl disabled")
+
+    assert "WARNING|test:component|ssl disabled" in buffer.getvalue()
+
+
 def test_get_logger_returns_structured_logger_with_component():
     logger = get_logger("research_ask_api")
     assert isinstance(logger, StructuredLogger)

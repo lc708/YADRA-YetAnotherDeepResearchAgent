@@ -176,3 +176,40 @@ def test_projectmanager_deep_thinking_uses_streaming_response(monkeypatch):
 
     assert result.goto == "human_feedback"
     mock_llm.stream.assert_called_once()
+
+
+def test_projectmanager_streaming_invalid_json_first_iteration_ends_workflow(monkeypatch):
+    """Streaming LLM responses must use the same invalid-JSON guardrails as structured output."""
+
+    class _Chunk:
+        def __init__(self, content):
+            self.content = content
+
+    mock_llm = MagicMock()
+    mock_llm.stream.return_value = [_Chunk("not valid json")]
+    monkeypatch.setattr(
+        "src.graph.nodes.AGENT_LLM_MAP",
+        {"projectmanager": "reasoning"},
+    )
+    monkeypatch.setattr("src.graph.nodes.get_llm_by_type", lambda _type: mock_llm)
+
+    result = projectmanager_node(_state(plan_iterations=0), _config())
+
+    assert result.goto == "__end__"
+    mock_llm.stream.assert_called_once()
+    mock_llm.with_structured_output.assert_not_called()
+
+
+def test_projectmanager_streaming_invalid_json_after_retry_routes_to_reporter(monkeypatch):
+    class _Chunk:
+        def __init__(self, content):
+            self.content = content
+
+    mock_llm = MagicMock()
+    mock_llm.stream.return_value = [_Chunk("still not json")]
+    monkeypatch.setattr("src.graph.nodes.get_llm_by_type", lambda _type: mock_llm)
+
+    result = projectmanager_node(_state(plan_iterations=1), _config(enable_deep_thinking=True))
+
+    assert result.goto == "reporter"
+    mock_llm.stream.assert_called_once()
