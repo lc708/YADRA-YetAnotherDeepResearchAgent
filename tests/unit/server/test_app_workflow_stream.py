@@ -241,3 +241,127 @@ async def test_workflow_generator_emits_tool_call_result_event():
     _, payload = result
     assert payload["content"] == "search results"
     assert payload["tool_call_id"] == "call-1"
+
+
+@pytest.mark.asyncio
+async def test_workflow_generator_legacy_interrupt_uses_default_options():
+    """Non-dict interrupt payloads must emit default HITL options in legacy chat stream."""
+    interrupt_data = SimpleNamespace(
+        value="legacy interrupt payload",
+        ns=["legacy-node"],
+    )
+
+    async def legacy_interrupt_astream(*_args, **_kwargs):
+        yield (("planner:node",), None, {"__interrupt__": [interrupt_data]})
+
+    mock_graph = MagicMock()
+    mock_graph.astream = legacy_interrupt_astream
+
+    events = [
+        event
+        async for event in _astream_workflow_generator(
+            mock_graph, **_workflow_kwargs(interrupt_feedback="")
+        )
+    ]
+
+    interrupt = next(
+        _parse_sse(event) for event in events if event.startswith("event: interrupt")
+    )
+    _, payload = interrupt
+    assert payload["content"] == "legacy interrupt payload"
+    option_values = {opt["value"] for opt in payload["options"]}
+    assert option_values == {"accepted", "edit_plan", "skip_research", "cancel"}
+
+
+@pytest.mark.asyncio
+async def test_workflow_generator_message_chunk_includes_reasoning_metadata():
+    message = AIMessageChunk(
+        content="final answer",
+        id="msg-reason",
+        additional_kwargs={"reasoning_content": "internal reasoning"},
+        response_metadata={"finish_reason": "stop"},
+    )
+
+    async def reasoning_astream(*_args, **_kwargs):
+        yield (("writer:node",), None, (message, {}))
+
+    mock_graph = MagicMock()
+    mock_graph.astream = reasoning_astream
+
+    events = [
+        event
+        async for event in _astream_workflow_generator(
+            mock_graph, **_workflow_kwargs(interrupt_feedback="")
+        )
+    ]
+
+    chunk = next(
+        _parse_sse(event) for event in events if event.startswith("event: message_chunk")
+    )
+    _, payload = chunk
+    assert payload["reasoning_content"] == "internal reasoning"
+    assert payload["finish_reason"] == "stop"
+
+
+@pytest.mark.asyncio
+async def test_workflow_generator_emits_tool_calls_event():
+    message = AIMessageChunk(
+        content="",
+        id="msg-tool",
+        tool_calls=[{"name": "web_search", "args": {"query": "AI"}, "id": "call-1"}],
+    )
+
+    async def tool_calls_astream(*_args, **_kwargs):
+        yield (("researcher:node",), None, (message, {}))
+
+    mock_graph = MagicMock()
+    mock_graph.astream = tool_calls_astream
+
+    events = [
+        event
+        async for event in _astream_workflow_generator(
+            mock_graph, **_workflow_kwargs(interrupt_feedback="")
+        )
+    ]
+
+    tool_calls = next(
+        _parse_sse(event) for event in events if event.startswith("event: tool_calls")
+    )
+    _, payload = tool_calls
+    assert payload["tool_calls"][0]["name"] == "web_search"
+    assert payload["agent"] == "researcher"
+
+
+@pytest.mark.asyncio
+async def test_workflow_generator_emits_tool_call_chunks_event():
+    message = AIMessageChunk.model_construct(
+        content="",
+        id="msg-chunks",
+        tool_calls=[],
+        tool_call_chunks=[
+            {"name": "web_search", "args": '{"query": "AI"}', "index": 0, "id": "call-1"}
+        ],
+        additional_kwargs={},
+        response_metadata={},
+    )
+
+    async def tool_call_chunks_astream(*_args, **_kwargs):
+        yield (("researcher:node",), None, (message, {}))
+
+    mock_graph = MagicMock()
+    mock_graph.astream = tool_call_chunks_astream
+
+    events = [
+        event
+        async for event in _astream_workflow_generator(
+            mock_graph, **_workflow_kwargs(interrupt_feedback="")
+        )
+    ]
+
+    chunks = next(
+        _parse_sse(event)
+        for event in events
+        if event.startswith("event: tool_call_chunks")
+    )
+    _, payload = chunks
+    assert payload["tool_call_chunks"][0]["name"] == "web_search"
