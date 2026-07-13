@@ -57,7 +57,6 @@ export interface AdaptiveResearchCardProps {
     showTimestamps?: boolean;
     expandByDefault?: boolean;
     maxOutputsPerAction?: number;
-    enableRealTimeUpdates?: boolean;
   };
   
   /** 样式配置 */
@@ -167,7 +166,6 @@ export const AdaptiveResearchCard: React.FC<AdaptiveResearchCardProps> = ({
     showTimestamps = true,
     expandByDefault = true,
     maxOutputsPerAction = 5,
-    enableRealTimeUpdates = true
   } = config;
 
   // 初始化展开状态
