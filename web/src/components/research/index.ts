@@ -58,6 +58,3 @@ export type {
   DynamicActionInfo as ResearchActivity,
   DynamicOutput as ResearchOutput
 } from "./adaptive-research-types";
-
-// 组件别名（向后兼容）
-export { default as EnhancedResearchCard } from "./adaptive-research-card"; 
