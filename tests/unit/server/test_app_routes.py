@@ -15,6 +15,7 @@ from src.server.app import (
     enhance_prompt,
     generate_podcast,
     generate_ppt,
+    generate_prose,
     health_check,
     mcp_server_metadata,
     rag_config,
@@ -25,6 +26,7 @@ from src.server.chat_request import (
     EnhancePromptRequest,
     GeneratePodcastRequest,
     GeneratePPTRequest,
+    GenerateProseRequest,
     TTSRequest,
 )
 from src.server.mcp_request import MCPServerMetadataRequest
@@ -279,5 +281,87 @@ async def test_generate_podcast_failure_returns_server_error():
     ):
         with pytest.raises(HTTPException) as exc:
             await generate_podcast(GeneratePodcastRequest(content="report"))
+
+    assert exc.value.status_code == 500
+
+
+@pytest.mark.asyncio
+async def test_generate_ppt_failure_returns_server_error():
+    with patch(
+        "src.server.app.build_ppt_graph",
+        side_effect=RuntimeError("ppt workflow unavailable"),
+    ):
+        with pytest.raises(HTTPException) as exc:
+            await generate_ppt(GeneratePPTRequest(content="report"))
+
+    assert exc.value.status_code == 500
+
+
+@pytest.mark.asyncio
+async def test_generate_prose_streams_sse_chunks():
+    """Prose generation must stream workflow message chunks as SSE data lines."""
+
+    class _MessageChunk:
+        def __init__(self, content: str):
+            self.content = content
+
+    async def fake_astream(_inputs, stream_mode="messages", subgraphs=True):
+        assert stream_mode == "messages"
+        assert subgraphs is True
+        yield ("prose_continue", (_MessageChunk("First chunk"),))
+        yield ("prose_continue", (_MessageChunk("Second chunk"),))
+
+    mock_workflow = MagicMock()
+    mock_workflow.astream = MagicMock(side_effect=fake_astream)
+
+    with patch("src.server.app.build_prose_graph", return_value=mock_workflow):
+        response = await generate_prose(
+            GenerateProseRequest(
+                prompt="Expand this paragraph",
+                option="continue",
+                command="",
+            )
+        )
+
+    chunks = [chunk async for chunk in response.body_iterator]
+    body = "".join(chunks)
+
+    assert response.media_type == "text/event-stream"
+    assert "data: First chunk" in body
+    assert "data: Second chunk" in body
+    mock_workflow.astream.assert_called_once()
+    invoke_payload = mock_workflow.astream.call_args[0][0]
+    assert invoke_payload["content"] == "Expand this paragraph"
+    assert invoke_payload["option"] == "continue"
+    assert invoke_payload["command"] == ""
+
+
+@pytest.mark.asyncio
+async def test_generate_prose_failure_returns_server_error():
+    with patch(
+        "src.server.app.build_prose_graph",
+        side_effect=RuntimeError("prose workflow unavailable"),
+    ):
+        with pytest.raises(HTTPException) as exc:
+            await generate_prose(
+                GenerateProseRequest(
+                    prompt="topic",
+                    option="fix",
+                )
+            )
+
+    assert exc.value.status_code == 500
+
+
+@pytest.mark.asyncio
+async def test_mcp_server_metadata_wraps_generic_errors_as_500():
+    with patch(
+        "src.server.app.load_mcp_tools",
+        AsyncMock(side_effect=RuntimeError("connection refused")),
+    ):
+        with pytest.raises(HTTPException) as exc:
+            await mcp_server_metadata(
+                MCPServerMetadataRequest(transport="stdio", command="npx")
+            )
 
     assert exc.value.status_code == 500
